@@ -6,9 +6,9 @@ import { createRestuarantBranch,getAllRestaurant,updateRestaurantBranch,deleteRe
 } from '../controller/Restaurant/restaurant.js';
 
 import { createFloors,deleteFloor,getAllFloorsbyRest,updateFloorName ,createTables,getAllTablesbyRest,updateTable,deleteTable } from '../controller/Restaurant/floors&tables.js'
-
-
-
+import {createCategory,deleteCategory,getAllCategories,updateCategory } from '../controller/foodController/categoryCnrl.js'
+import {CreateMenuType,getAllMenuTypes,updateMenuTypes,deleteMenuTypes,createCourse,getAllCourses,updateCourse,deleteCourse } from '../controller/foodController/menuTypeCntrls.js'
+import { createAddOns,deleteAddOn,getAllAddOns,updateAddOns } from '../controller/foodController/AddOnsCntrl.js'
 const router = express.Router();
 
 
@@ -48,7 +48,35 @@ router.delete('/tables/:tableId',VerifyToken,deleteTable);
 router.post('/user',VerifyToken,createUser);
 router.get('/user/:restaurantId',VerifyToken,getAllUsers);
 router.put('/user-update',VerifyToken, updateUser);
-router.delete('/user',VerifyToken, deleteUser)
+router.delete('/user',VerifyToken, deleteUser);
+
+//category
+router.post('/category',VerifyToken,createCategory);
+router.get('/category/:restaurantId' ,VerifyToken,getAllCategories)
+router.put('/category',VerifyToken,updateCategory );
+router.delete('/category/:categoryId',VerifyToken,deleteCategory);
+
+
+//menu type 
+router.post('/menu-type',VerifyToken,CreateMenuType)
+router.get('/menu-type/:restaurantId',VerifyToken,getAllMenuTypes)
+router.put('/menu-type',VerifyToken,updateMenuTypes)
+router.delete('/menu-type',VerifyToken,deleteMenuTypes);
+
+
+//course sections
+router.post('/course',VerifyToken,createCourse);
+router.get('/course/:restaurantId',VerifyToken,getAllCourses);
+router.put('/course',VerifyToken, updateCourse);
+router.delete('/course',VerifyToken, deleteCourse);
+
+
+//add-ons 
+router.post('/add-ons',VerifyToken,createAddOns);
+router.get('/add-ons/:restaurantId',VerifyToken,getAllAddOns )
+router.put('/add-ons',VerifyToken,updateAddOns )
+router.delete('/add-ons',VerifyToken,deleteAddOn);
+
 
 
 
