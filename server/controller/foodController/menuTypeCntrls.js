@@ -3,6 +3,7 @@ import USER from '../../model/userModel.js';
 import RESTAURANT from '../../model/restaurant.js'
 import COURSE from '../../model/course.js'
 
+
 export const CreateMenuType = async(req,res,next)=>{
     try {
 
@@ -344,10 +345,14 @@ export const createCourse = async (req,res,next)=>{
                     createdBy: user.name,
                 })
              }
+
+            //  req.io?.to(`pos_course-${restaurant._id}`).emit("course-updated", { restaurantId : restaurant._id});
+            //  req.io?.to(`pos-${restaurant._id}`).emit("food-updated",{ restaurantId: restaurant._id});
           }
 
           const createCourse = await COURSE.insertMany(courseData);
 
+     
           return res.status(201).json({
             message: "Course added successfully!",
             data: createCourse,
@@ -470,6 +475,9 @@ export const updateCourse = async (req,res,next)=>{
          course.name = name.trim();
          await course.save();
 
+        //  req.io?.to(`pos_course-${restaurantId}`).emit("course-updated", { restaurantId});
+        //  req.io?.to(`pos-${restaurantId}`).emit("food-updated",{ restaurantId});
+
          return res.status(200).json({
             message: "Course updated successfully!",
             data: course,
@@ -528,6 +536,10 @@ export const deleteCourse = async (req,res,next)=>{
 
 
             await COURSE.findByIdAndDelete(courseId)
+
+            // req.io?.to(`pos_course-${restaurantId}`).emit("course-updated", { restaurantId});
+            // req.io?.to(`pos-${restaurantId}`).emit("food-updated",{ restaurantId});
+
             
          return res.status(200).json({
             message: "Course deleted successfully!",

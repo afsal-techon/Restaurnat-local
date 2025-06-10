@@ -234,8 +234,8 @@ export const updateUser = async(req,res,next)=>{
       const { restaurantId ,userId } = req.body;
   
           const userid = req.user;
-   //added
-   const user = await USER.findOne({ _id: userid })
+           //added
+          const user = await USER.findOne({ _id: userid })
           if (!user) {
               return res.status(400).json({ message: "User not found!" });
           }
