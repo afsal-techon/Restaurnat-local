@@ -1,5 +1,8 @@
 import USER from '../../model/userModel.js'
 import RESTAURANT from '../../model/restaurant.js'
+import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+
 
 
 export const createCompanyhAdmin = async (req,res,next)=>{
