@@ -35,6 +35,7 @@ const foodSchema =new mongoose.Schema({
         ref: 'Category',
         required: true,
     },
+    image: { type: String, default: null },
 
     foodType:{
         type:String,
@@ -84,6 +85,11 @@ const foodSchema =new mongoose.Schema({
           prices:[priceSchema]
         }
       ],
+      kitchenId:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Kitchen',
+        default:null
+    },
     special : {
         type:Boolean,
         default:false

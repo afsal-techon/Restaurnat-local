@@ -6,10 +6,12 @@ import RESTAURANT from '../../model/restaurant.js'
 
 export const createCategory = async(req,res,next)=>{
     try {
-
+        
         const { restaurantIds , name  } = req.body;
 
         const userId = req.user;
+
+       
 
           const user = await USER.findOne({ _id: userId })
         if (!user) {
@@ -168,6 +170,8 @@ export const getAllCategories = async (req, res, next) => {
                 message:`category name '${existingCategory.name}' is already used!`
             });
         }
+
+        category.name = name;
 
         const updatedCategory = await category.save();
 

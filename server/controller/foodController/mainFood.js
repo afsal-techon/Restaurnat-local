@@ -11,23 +11,26 @@ import FOOD from '../../model/food.js'
 
 export const createFood = async (req, res, next) => {
   try {
+
     let {
       foodName,
       restaurantId,
       foodType,
       categoryId,
+      kitchenId ,
       prices,
       basePrice,
       menuTypeIds,
       courseIds,
       portions,
-      kitchenId,
       special,
       addOnsIds,
       choices,
       offer,
 
     } = req.body;
+
+    const foodImg = req.file ? `/uploads/${req.file.filename}` : null;
 
   
     if (typeof menuTypeIds === "string") {
@@ -88,8 +91,6 @@ export const createFood = async (req, res, next) => {
       return res.status(400).json({ message: "Food name is required!" });
     if (!foodType)
       return res.status(400).json({ message: "Food type is required!" });
-    if (!menuTypeIds || menuTypeIds.length === 0)
-      return res.status(400).json({ message: "Menu type is required!" });
     if (!categoryId)
       return res.status(400).json({ message: "Category Id is required!" });
 
@@ -203,6 +204,7 @@ export const createFood = async (req, res, next) => {
       foodName,
       restaurantId,
       categoryId,
+      image : foodImg,
       foodType,
       menuTypeIds,
       courseIds,
@@ -211,6 +213,7 @@ export const createFood = async (req, res, next) => {
       portions: portions || [],
       special: special || false,
       addOnsIds,
+      kitchenId : kitchenId || null,
       choices: choiceIds,
       offer: offer ? offer : null,
       special: special ? special : false,
@@ -268,6 +271,7 @@ export const getAllFoodbyRestaurat = async (req, res, next) => {
     .populate([
       { path: "categoryId", select: "name" },
       { path: "menuTypeIds", select: "name" },
+      { path: "kitchenId", select: "name" },
       { path: "courseIds", select: "name" },
       { path: "addOnsIds", select: "name" },
       { path: "choices", select: "name" },
@@ -300,6 +304,7 @@ export const updateFood = async (req, res, next) => {
       categoryId,
       basePrice,
       prices,
+      kitchenId,
       menuTypeIds,
       courseIds,
       portions,
@@ -308,6 +313,8 @@ export const updateFood = async (req, res, next) => {
       choices,
       offer,
     } = req.body;
+
+    const foodImg = req.file ? `/uploads/${req.file.filename}` : null;
 
 
 
@@ -430,10 +437,12 @@ export const updateFood = async (req, res, next) => {
     food.categoryId = categoryId;
     food.foodType = foodType;
     food.menuTypeIds = menuTypeIds;
+    food.image = foodImg;
     food.courseIds = courseIds;
     food.prices = portions && portions.length > 0 ? null : prices;
     food.basePrice = portions && portions.length > 0 ? null : basePrice,
     food.portions = portions || [];
+    food.kitchenId = kitchenId || null;
     food.special = special || false;
     food.addOnsIds = addOnsIds;
     food.choices = choiceIds;
@@ -466,6 +475,7 @@ export const getOneFood = async (req, res, next) => {
     .populate([
       { path: "categoryId", select: "name" },
       { path: "menuTypeIds", select: "name" },
+      { path: "kitchenId", select: "name" },
       { path: "courseIds", select: "name" },
       { path: "addOnsIds", select: "name" },
       { path: "choices", select: "name" },

@@ -10,6 +10,7 @@ const restaurantSchema = new mongoose.Schema(
         name: { type: String, required: true },
         address: { type: String, required: true },
         country : { type: String, required: true },
+        logo: { type: String, default: null },
         state: { type: String, required: true },
         city: { type: String, required: true },
         phone: { type: String, required: true },
@@ -22,6 +23,7 @@ const restaurantSchema = new mongoose.Schema(
         vatPercentage: { type: Number , default:null },
         currency: { type: String ,default:null },
         currencySymbol: { type: String,default:null },
+
     },
     { timestamps: true }
 );

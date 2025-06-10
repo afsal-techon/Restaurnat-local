@@ -3,6 +3,7 @@ import USER from '../../model/userModel.js';
 import RESTAURANT from '../../model/restaurant.js'
 import FLOORS from '../../model/floor.js'
 import TABLE from '../../model/tables.js'
+import KITCHEN from '../../model/kitchen.js'
 
 
 
@@ -464,6 +465,209 @@ export const deleteTable = async (req,res,next)=>{
         await TABLE.findByIdAndDelete(tableId)
 
         return res.status(200).json({ message:'Floor deleted succssfully' })
+        
+    } catch (err) {
+        next(err)
+        
+    }
+}
+
+
+
+export const addKitchen = async(req,res,next)=>{
+    try {
+
+        const { restaurantId , kitchens  } = req.body;
+
+        const userId = req.user;
+
+          const user = await USER.findOne({ _id: userId,  })
+        if (!user) {
+            return res.status(400).json({ message: "User not found!" });
+        }
+
+        if (!restaurantId) {
+            return res.status(400).json({ message: "Restaurant IDs are required!" });
+        }
+
+        if (!kitchens || !Array.isArray(kitchens) || kitchens.length === 0) {
+            return res.status(400).json({ message: "kitchen are required!" });
+        }
+
+        for (const kitchen of kitchens) {
+            if (!kitchen.name || typeof kitchen.name !== "string" || kitchen.name.trim().length === 0) {
+                return res.status(400).json({ message: "kitchen name is required!" });
+            }
+        }
+
+        let filter = {};
+        if (user.role === "CompanyAdmin") {
+            filter = { _id: restaurantId, companyAdmin: user._id };
+        } else if (user.role === "User") {
+            filter = { _id: restaurantId };
+        } else {
+            return res.status(403).json({ message: "Unauthorized access!" });
+        }
+
+        // Validate restaurant ownership
+        const restaurant = await RESTAURANT.findOne(filter);
+        if (!restaurant) {
+            return res.status(404).json({ message: "No matching restaurants found!" });
+        }
+
+
+        for (const kitchen of kitchens) {
+            const existKtichen = await KITCHEN.findOne({
+                restaurantId,
+                name: kitchen.name.trim(),
+            });
+
+            if (existKtichen) {
+                return res.status(400).json({
+                    message: `Kitchen '${kitchen.name}' already exists in this branch!`,
+                });
+            }
+        }
+
+        const kitchenData = kitchens.map((kitchen) => ({
+            name: kitchen.name.trim(),
+            restaurantId,
+            createdById: user._id,
+            createdBy: user.name,
+        }));
+
+
+        const createKitchen  = await KITCHEN.insertMany(kitchenData);
+        return res.status(201).json({
+            message: "Kitchens added successfully!",
+            data: createKitchen,
+        });
+    } catch (err) {
+        next(err)  
+    }
+}
+
+
+
+export const getAllKitchen = async (req, res, next) => {
+    try {
+        const { restaurantId } = req.params;
+
+        const userId = req.user;
+
+          const user = await USER.findOne({ _id: userId,  })
+        if (!user) {
+            return res.status(400).json({ message: "User not found!" });
+        }
+
+        if (!restaurantId) {
+            return res.status(400).json({ message: "Restaurant ID is required!" });
+        }
+
+
+        const kitchen = await KITCHEN.find({ restaurantId}).sort({ createdAt: -1});
+
+
+        return res.status(200).json({ kitchen });
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+
+export const updateKitchen = async (req, res, next) => {
+    try {
+        const { restaurantId ,kitchenId ,name  } = req.body;
+
+        const userId = req.user;
+
+          const user = await USER.findOne({ _id: userId,  })
+        if (!user) {
+            return res.status(400).json({ message: "User not found!" });
+        }
+
+        if (!restaurantId) {
+            return res.status(400).json({ message: "Restaurant ID is required!" });
+        }
+
+        if (!kitchenId) {
+            return res.status(400).json({ message: "kitchen ID is required!" });
+        }
+
+        if (!name || typeof name !== "string" || name.trim().length === 0) {
+            return res.status(400).json({ message: "Kitchen name is required!" });
+        }
+        let filter = {};
+        if (user.role === "CompanyAdmin") {
+            filter = { _id: restaurantId, companyAdmin: user._id };
+        } else if (user.role === "User") {
+            filter = { _id: restaurantId };
+        } else {
+            return res.status(403).json({ message: "Unauthorized access!" });
+        }
+
+        // Validate restaurant ownership
+        const restaurant = await RESTAURANT.findOne(filter);
+        if (!restaurant) {
+            return res.status(404).json({ message: "No matching restaurants found!" });
+        }
+
+        const kitchen = await KITCHEN.findOne({ _id: kitchenId, restaurantId });
+        if (!kitchen) {
+            return res.status(404).json({ message: "Kitchen not found!" });
+        }
+
+        const duplicateKitchen = await KITCHEN.findOne({
+            _id: { $ne: kitchenId },
+            restaurantId,
+            name: name.trim(),
+          });
+          
+          if (duplicateKitchen) {
+            return res.status(400).json({
+              message: `Kitchen '${name}' already exists in this branch!`,
+            });
+          }
+
+
+
+        const updatedKitchen = await KITCHEN.findByIdAndUpdate(
+            kitchenId,
+            { name: name.trim() },
+            { new: true } // Return the updated document
+        );
+
+
+        return res.status(200).json({message:"Kitchen updated succssfully", data: updatedKitchen })
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+
+export const deleteKitchen = async (req,res,next)=>{
+    try {
+
+        const { kitchenId  } = req.params;
+
+        const userId = req.user;
+   
+
+          const user = await USER.findOne({ _id: userId,  })
+        if (!user) {
+            return res.status(400).json({ message: "User not found!" });
+        }
+
+        const kitchen = await KITCHEN.findById(kitchenId);
+        if (!kitchen) {
+            return res.status(404).json({ message: "Kithen not found!" });
+        }
+
+        await KITCHEN.findByIdAndDelete(kitchenId)
+
+        return res.status(200).json({ message:'Kitchen deleted succssfully' })
         
     } catch (err) {
         next(err)

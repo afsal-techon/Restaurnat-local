@@ -21,11 +21,13 @@ const generateUniqueRestaurantId = async () => {
 
 export const  createRestuarantBranch = async (req,res,next)=>{
     try{
-       
+       console.log(req.body,'--dfid')
         const {
             name, address,country, state, city, email,phone,phone2,phone3,
             openingTime, closingTime, vatPercentage, currency, currencySymbol,
         } = req.body;
+
+          const logo = req.file ? `/uploads/${req.file.filename}` : null;
 
       
 
@@ -91,7 +93,8 @@ export const  createRestuarantBranch = async (req,res,next)=>{
             vatPercentage,
             currency,
             currencySymbol,
-            companyAdmin: companyAdminId
+            companyAdmin: companyAdminId,
+            logo,
         });
         return res.status(201).json({ message: "Restaurant created successfully", restaurant });
 
@@ -111,27 +114,26 @@ export const getAllRestaurant = async(req,res,next)=>{
         if (!user) {
             return res.status(400).json({ message: "User not found!" });
         }
+
+        
  
 
-        let restaurants = [];
-
+        let restaurant;
         if (user.role === "CompanyAdmin") {
           // Use isDeleted in query — uses compound index { companyAdmin: 1, isDeleted: 1 }
-          restaurants = await RESTAURANT.findOne({
+         restaurant = await RESTAURANT.findOne({
             companyAdmin: user._id,
           });
         } else if (user.role === "User") {
           const restaurantId = user.restaurantId;
-          const restaurant = await RESTAURANT.findOne({
+         restaurant = await RESTAURANT.findOne({
             _id: restaurantId,
           }); // this uses index on _id + isDeleted (by default MongoDB indexes _id)
-    
-          if (restaurant) {
-            restaurants = [restaurant];
-          }
         }
 
-        return res.status(200).json({ restaurants });
+     
+
+        return res.status(200).json({ restaurant });
 
     }catch(err){
         next(err) 
@@ -147,6 +149,8 @@ export const updateRestaurantBranch = async (req, res, next) => {
             name, address,country, state, city, email,phone,phone2,phone3,
             openingTime, closingTime, vatPercentage, currency, currencySymbol,
         } = req.body;
+
+        const logo = req.file ? `/uploads/${req.file.filename}` : null;
 
 
 
@@ -200,6 +204,7 @@ export const updateRestaurantBranch = async (req, res, next) => {
                 country : country || restaurant.country,
                 state: state || restaurant.state,
                 city: city || restaurant.city,
+                logo:logo || restaurant.logo,
                 email: email || restaurant.email,
                 phone: phone || restaurant.phone,
                 phone2 : phone2 || restaurant.phone2,
