@@ -21,11 +21,13 @@ const generateUniqueRestaurantId = async () => {
 
 export const  createRestuarantBranch = async (req,res,next)=>{
     try{
-
+       
         const {
             name, address,country, state, city, email,phone,phone2,phone3,
             openingTime, closingTime, vatPercentage, currency, currencySymbol,
         } = req.body;
+
+      
 
   
         // Validate required fields
