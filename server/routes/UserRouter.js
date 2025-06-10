@@ -11,7 +11,8 @@ import {CreateMenuType,getAllMenuTypes,updateMenuTypes,deleteMenuTypes,createCou
 import { createAddOns,deleteAddOn,getAllAddOns,updateAddOns } from '../controller/foodController/AddOnsCntrl.js';
 import { createFood,deleteFood,getAllFoodbyRestaurat,getOneFood,updateFood } from '../controller/foodController/mainFood.js'
 import {getAllByCategoryForPOS,getAllComboForPOS,getAllFoodForPOS,getComboForPOS,getCourseForPOS,getMenusItemsForPOS,getOneComboForPOS } from '../controller/POS controller/menuCntrl.js';
-import {  getFloorsForPOS,getTablesForPOS} from '../controller/POS controller/posBasicCntrl.js'
+import {  getFloorsForPOS,getTablesForPOS} from '../controller/POS controller/posBasicCntrl.js';
+import {createOrder, } from '../controller/POS controller/posOrderCntrl.js'
 import upload from '../middleware/multer.js'
 const router = express.Router();
 
@@ -109,6 +110,12 @@ router.get('/pos-combo/:restaurantId',VerifyToken,getComboForPOS)
 //pos-tables and floors
 router.get('/pos-floors/:restaurantId',VerifyToken,getFloorsForPOS);
 router.get('/pos-tables/:restaurantId',VerifyToken,getTablesForPOS);
+
+
+//pos-order
+router.post('/pos/order',VerifyToken,createOrder);
+
+
 
 
 
