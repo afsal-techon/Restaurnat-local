@@ -6,6 +6,7 @@ import RESTAURANT from '../../model/restaurant.js'
 import COURSE from '../../model/course.js'
 import CATEGORY from '../../model/category.js'
 import FOOD from '../../model/food.js'
+import COMBO from '../../model/combo.js'
 
 
 
@@ -575,7 +576,6 @@ export const getAllFoodForPOS = async (req, res, next) => {
                       $expr: {
                         $and: [
                           { $in: ["$_id", "$$addOnIds"] },
-                          { $eq: ["$isDeleted", false] },
                         ],
                       },
                     },

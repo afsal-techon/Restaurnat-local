@@ -204,7 +204,7 @@ export const createFood = async (req, res, next) => {
       foodName,
       restaurantId,
       categoryId,
-      image : foodImg,
+      image : foodImg ,
       foodType,
       menuTypeIds,
       courseIds,

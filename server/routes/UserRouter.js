@@ -12,7 +12,8 @@ import { createAddOns,deleteAddOn,getAllAddOns,updateAddOns } from '../controlle
 import { createFood,deleteFood,getAllFoodbyRestaurat,getOneFood,updateFood } from '../controller/foodController/mainFood.js'
 import {getAllByCategoryForPOS,getAllComboForPOS,getAllFoodForPOS,getComboForPOS,getCourseForPOS,getMenusItemsForPOS,getOneComboForPOS } from '../controller/POS controller/menuCntrl.js';
 import {  getFloorsForPOS,getTablesForPOS} from '../controller/POS controller/posBasicCntrl.js';
-import {createOrder, } from '../controller/POS controller/posOrderCntrl.js'
+import {createOrder, } from '../controller/POS controller/posOrderCntrl.js';
+import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../controller/foodController/comboCntrl.js'
 import upload from '../middleware/multer.js'
 const router = express.Router();
 
@@ -98,6 +99,15 @@ router.get('/food-id/:foodId',VerifyToken, getOneFood);
 router.delete('/food/:foodId',VerifyToken,deleteFood);
 
 
+//compo section 
+router.post('/combo',VerifyToken,upload.single('comboImg'),createCompo);
+router.put('/combo',VerifyToken,upload.single('comboImg'),updateCombo);
+router.get('/combo/:restaurantId',VerifyToken,getAllCombo);
+router.get('/combo/:restaurantId/:comboId',VerifyToken,getOneCombo);
+router.delete('/combo/:comboId',VerifyToken,deleteCombo );
+
+
+
 
 //pos-category-food
 router.get("/pos-foods/:restaurantId",VerifyToken,getAllFoodForPOS)
@@ -105,6 +115,10 @@ router.get('/pos-category/:restaurantId',VerifyToken,getAllByCategoryForPOS);
 router.get('/pos-menuitems/:restaurantId',VerifyToken,getMenusItemsForPOS)
 router.get('/pos-course/:restaurantId',VerifyToken,getCourseForPOS);
 router.get('/pos-combo/:restaurantId',VerifyToken,getComboForPOS)
+
+//pos-combo
+router.get('/pos-combo/:restaurantId',VerifyToken,getAllComboForPOS);
+router.get('/pos-combo/:restaurantId/:comboId',VerifyToken,getOneComboForPOS)
 
 
 //pos-tables and floors

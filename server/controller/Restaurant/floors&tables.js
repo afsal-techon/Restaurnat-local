@@ -4,6 +4,7 @@ import RESTAURANT from '../../model/restaurant.js'
 import FLOORS from '../../model/floor.js'
 import TABLE from '../../model/tables.js'
 import KITCHEN from '../../model/kitchen.js'
+import mongoose from 'mongoose';
 
 
 
@@ -17,7 +18,7 @@ export const createFloors = async (req,res,next)=>{
 
         const userId = req.user;
 
-          const user = await USER.findOne({ _id: user })
+          const user = await USER.findOne({ _id: userId })
         if (!user) {
             return res.status(400).json({ message: "User not found!" });
         }
@@ -93,7 +94,7 @@ export const getAllFloorsbyRest = async (req, res, next) => {
 
         const userId = req.user;
 
-          const user = await USER.findOne({ _id: user })
+          const user = await USER.findOne({ _id: userId })
         if (!user) {
             return res.status(400).json({ message: "User not found!" });
         }
@@ -148,7 +149,7 @@ export const updateFloorName = async (req,res,next)=>{
 
         const userId = req.user;
 
-          const user = await USER.findOne({ _id: user })
+          const user = await USER.findOne({ _id: userId })
         if (!user) {
             return res.status(400).json({ message: "User not found!" });
         }
@@ -222,7 +223,7 @@ export const deleteFloor = async (req,res,next)=>{
 
         const userId = req.user;
 
-          const user = await USER.findOne({ _id: user })
+          const user = await USER.findOne({ _id: userId })
         if (!user) {
             return res.status(400).json({ message: "User not found!" });
         }
@@ -248,6 +249,8 @@ export const deleteFloor = async (req,res,next)=>{
 export const createTables = async (req,res,next)=>{
     try {
 
+        console.log(req.body,'body')
+
         const { restaurantId , floorId , name, capacity  } = req.body;
 
         const userId = req.user;
@@ -258,7 +261,7 @@ export const createTables = async (req,res,next)=>{
         }
 
         if (!restaurantId) {
-            return res.status(400).json({ message: "Restaurant IDs are required!" });
+            return res.status(400).json({ message: "Restaurant ID are required!" });
         }
 
 

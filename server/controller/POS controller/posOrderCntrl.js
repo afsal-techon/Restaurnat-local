@@ -188,8 +188,7 @@ const generateOrderId = async () => {
           }else{
       
         const food = foodMap[item.foodId];
-        console.log(food,'food andi')
-              if (!food) throw new Error(`Invalid food item: ${item.foodId}`);
+       if (!food) throw new Error(`Invalid food item: ${item.foodId}`);
   
         const selectedPortion = item.portion || null;
         const portionData = food.portions?.find(p => p.name === item.portion);
