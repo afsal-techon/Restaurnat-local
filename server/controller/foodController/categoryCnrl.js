@@ -1,6 +1,7 @@
 import CATEGORY from '../../model/category.js'
 import USER from '../../model/userModel.js';
 import RESTAURANT from '../../model/restaurant.js'
+import { getIO  } from "../../config/socket.js";
 
 
 
@@ -61,8 +62,10 @@ export const createCategory = async(req,res,next)=>{
               const saved = await category.save();
               createdCategories.push(saved);
 
-            //   req.io?.to(`pos_category-${restaurant._id}`).emit("category-updated", { restaurantId: restaurant._id });
-            //   req.io?.to(`pos-${restaurant._id}`).emit("food-updated",{ restaurantId : restaurant._id});
+
+            const io = getIO();
+              io.to(`pos_category-${restaurant._id}`).emit("category-updated", { restaurantId: restaurant._id });
+              io.to(`pos-${restaurant._id}`).emit("food-updated",{ restaurantId : restaurant._id});
             
             }
 
@@ -175,8 +178,11 @@ export const getAllCategories = async (req, res, next) => {
 
         const updatedCategory = await category.save();
 
-        // req.io?.to(`pos_category-${restaurant._id}`).emit("category-updated", { restaurantId: restaurant._id });
-        // req.io?.to(`pos-${restaurant._id}`).emit("food-updated",{ restaurantId : restaurant._id});
+
+        
+        const io = getIO();
+        io.to(`pos_category-${restaurant._id}`).emit("category-updated", { restaurantId: restaurant._id });
+        io.to(`pos-${restaurant._id}`).emit("food-updated",{ restaurantId : restaurant._id});
 
 
         return res.status(200).json({
@@ -210,8 +216,11 @@ export const deleteCategory = async (req, res, next) => {
 
       await CATEGORY.findByIdAndDelete(categoryId)
 
-    //   req.io?.to(`pos_category-${category.restaurantId}`).emit("category-updated", { restaurantId: category.restaurantId });
-    //   req.io?.to(`pos-${category.restaurantId}`).emit("food-updated",{ restaurantId : category.restaurantId});
+
+      
+      const io = getIO();
+       io.to(`pos_category-${category.restaurantId}`).emit("category-updated", { restaurantId: category.restaurantId });
+       io.to(`pos-${category.restaurantId}`).emit("food-updated",{ restaurantId : category.restaurantId});
   
 
       return res.status(200).json({ message: "Category deleted successfully!" });

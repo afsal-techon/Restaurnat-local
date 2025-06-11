@@ -6,6 +6,7 @@ import COURSE from '../../model/course.js'
 import CATEGORY from '../../model/category.js'
 import CHOICE from "../../model/choice.js";
 import FOOD from '../../model/food.js'
+import { getIO  } from "../../config/socket.js";
 
 
 
@@ -221,9 +222,8 @@ export const createFood = async (req, res, next) => {
       createdBy: `${user.name}`,
     });
 
-    // req.io?.to(`pos-${restaurantId}`).emit("food-updated", { restaurantId });
-
-
+    const io = getIO();
+    io.to(`pos-${restaurantId}`).emit("food-updated", { restaurantId });
 
     return res
       .status(201)
@@ -450,7 +450,8 @@ export const updateFood = async (req, res, next) => {
 
     await food.save();
 
-    // req.io?.to(`pos-${restaurantId}`).emit("food-updated", { restaurantId });
+    const io = getIO();
+    io.to(`pos-${restaurantId}`).emit("food-updated", { restaurantId });
   
 
     return res
@@ -525,8 +526,9 @@ export const deleteFood = async (req, res, next) => {
 
  
     // Emit to notify clients of the update
-    // req.io?.to(`pos-${food.restaurantId}`).emit("food-updated", { restaurantId: food.restaurantId });
-
+    const io = getIO();
+    io.to(`pos-${food.restaurantId}`).emit("food-updated", { restaurantId: food.restaurantId });
+  
     return res.status(200).json({ message: "Food deleted successfully!" });
 
   } catch (err) {

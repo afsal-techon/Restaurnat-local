@@ -11,9 +11,10 @@ import {CreateMenuType,getAllMenuTypes,updateMenuTypes,deleteMenuTypes,createCou
 import { createAddOns,deleteAddOn,getAllAddOns,updateAddOns } from '../controller/foodController/AddOnsCntrl.js';
 import { createFood,deleteFood,getAllFoodbyRestaurat,getOneFood,updateFood } from '../controller/foodController/mainFood.js'
 import {getAllByCategoryForPOS,getAllComboForPOS,getAllFoodForPOS,getComboForPOS,getCourseForPOS,getMenusItemsForPOS,getOneComboForPOS } from '../controller/POS controller/menuCntrl.js';
-import {  getFloorsForPOS,getTablesForPOS} from '../controller/POS controller/posBasicCntrl.js';
-import {createOrder, } from '../controller/POS controller/posOrderCntrl.js';
+import {  getFloorsForPOS,getTablesForPOS ,createCustomerForPOS,getCustomerCreditHistory,getCustomerTypesForPOS,getCustomersForPOS,updateCustomerforPOS,} from '../controller/POS controller/posBasicCntrl.js';
+import {createOrder,getOneOrderDetails,getTodayOrdersForPOS,posOrderBilling } from '../controller/POS controller/posOrderCntrl.js';
 import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../controller/foodController/comboCntrl.js'
+
 import upload from '../middleware/multer.js'
 const router = express.Router();
 
@@ -126,8 +127,26 @@ router.get('/pos-floors/:restaurantId',VerifyToken,getFloorsForPOS);
 router.get('/pos-tables/:restaurantId',VerifyToken,getTablesForPOS);
 
 
+//pos-customer
+router.post('/pos-customer',VerifyToken,createCustomerForPOS);
+router.get('/pos-customer/:restaurantId',VerifyToken,getCustomersForPOS);
+router.put('/pos-customer',VerifyToken,updateCustomerforPOS);
+router.get('/pos-customerTypes/:restaurantId',VerifyToken,getCustomerTypesForPOS)
+router.get('/pos-customer/history/:customerId',VerifyToken,getCustomerCreditHistory)
+
+
+//pos-order-listing
+router.get('/pos/order/list/:restaurantId',VerifyToken,getTodayOrdersForPOS);
+router.get('/pos/order/:orderId',VerifyToken,getOneOrderDetails)
+
+
 //pos-order
 router.post('/pos/order',VerifyToken,createOrder);
+
+
+
+//pos-billing
+router.post('/pos/order/billing',VerifyToken,posOrderBilling)
 
 
 

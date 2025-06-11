@@ -1,9 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import http from "http";
 import connectDB from './config/database.js'
 import UserRouter from './routes/UserRouter.js'
 import dotenv from 'dotenv';
-
+import {  attachSocketToRequest } from './middleware/attachSocket.js';
+import { initSocketServer}  from './config/socket.js'
 
 
 
@@ -20,6 +22,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
 
+
+app.use(attachSocketToRequest);
 
 // Routers
 app.use("/api/user", UserRouter);
@@ -42,9 +46,13 @@ app.use((err, req, res, next) => {
   try {
     await connectDB();
 
+    
+    const httpServer = http.createServer(app);
+    await initSocketServer(httpServer)
 
-    app.listen(port, "0.0.0.0", () => {
-      console.log(` Server running on port ${port}`);
+
+    httpServer.listen(port, "0.0.0.0", () => {
+      console.log(`Server running on port ${port}`);
     });
   } catch (error) {
     console.error(" App failed to start:", error);

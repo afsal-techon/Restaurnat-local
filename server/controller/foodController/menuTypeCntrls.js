@@ -2,6 +2,7 @@ import MENUTYPE from '../../model/menuType.js'
 import USER from '../../model/userModel.js';
 import RESTAURANT from '../../model/restaurant.js'
 import COURSE from '../../model/course.js'
+import { getIO  } from "../../config/socket.js";
 
 
 export const CreateMenuType = async(req,res,next)=>{
@@ -77,6 +78,9 @@ export const CreateMenuType = async(req,res,next)=>{
                    createdBy: user.name,
                })
             }
+          const io = getIO();
+            io.to(`pos-${restaurant._id}`).emit("food-updated", { restaurantId: restaurant._id });
+            io.to(`pos_menu-${restaurant._id}`).emit("MenuType-updated", { restaurantId: restaurant._id });
 
          }
 
@@ -202,6 +206,13 @@ export const updateMenuTypes = async (req,res,next)=>{
 
         menuType.name = name.trim();
          await menuType.save();
+
+
+
+         const io = getIO();
+         io.to(`pos_menu-${restaurantId}`).emit("MenuType-updated", { restaurantId});
+         io.to(`pos-${restaurantId}`).emit("food-updated",{ restaurantId});
+
      
          return res.status(200).json({
             message: "Menu type updated successfully!",
@@ -258,6 +269,10 @@ export const deleteMenuTypes = async (req,res,next)=>{
          }
 
             await MENUTYPE.findByIdAndDelete(menuTypeId)
+            const io = getIO();
+            io.to(`pos_menu-${restaurantId}`).emit("MenuType-updated", { restaurantId});
+            io.to(`pos-${restaurantId}`).emit("food-updated",{ restaurantId});
+
       
          return res.status(200).json({
             message: "Meny type deleted successfully!",
@@ -345,9 +360,9 @@ export const createCourse = async (req,res,next)=>{
                     createdBy: user.name,
                 })
              }
-
-            //  req.io?.to(`pos_course-${restaurant._id}`).emit("course-updated", { restaurantId : restaurant._id});
-            //  req.io?.to(`pos-${restaurant._id}`).emit("food-updated",{ restaurantId: restaurant._id});
+             const io = getIO();
+            io.to(`pos_course-${restaurant._id}`).emit("course-updated", { restaurantId : restaurant._id});
+            io.to(`pos-${restaurant._id}`).emit("food-updated",{ restaurantId: restaurant._id});
           }
 
           const createCourse = await COURSE.insertMany(courseData);
@@ -475,8 +490,11 @@ export const updateCourse = async (req,res,next)=>{
          course.name = name.trim();
          await course.save();
 
-        //  req.io?.to(`pos_course-${restaurantId}`).emit("course-updated", { restaurantId});
-        //  req.io?.to(`pos-${restaurantId}`).emit("food-updated",{ restaurantId});
+
+
+         const io = getIO();
+        io.to(`pos_course-${restaurantId}`).emit("course-updated", { restaurantId});
+        io.to(`pos-${restaurantId}`).emit("food-updated",{ restaurantId});
 
          return res.status(200).json({
             message: "Course updated successfully!",
@@ -537,8 +555,8 @@ export const deleteCourse = async (req,res,next)=>{
 
             await COURSE.findByIdAndDelete(courseId)
 
-            // req.io?.to(`pos_course-${restaurantId}`).emit("course-updated", { restaurantId});
-            // req.io?.to(`pos-${restaurantId}`).emit("food-updated",{ restaurantId});
+            // req.io.to(`pos_course-${restaurantId}`).emit("course-updated", { restaurantId});
+            // req.io.to(`pos-${restaurantId}`).emit("food-updated",{ restaurantId});
 
             
          return res.status(200).json({

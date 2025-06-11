@@ -8,8 +8,12 @@ import CHOICE from "../../model/choice.js";
 import FOOD from '../../model/food.js'
 import CUSTOMER_TYPE from '../../model/customerTypes.js';
 import KITCHEN from '../../model/kitchen.js'
-import ORDER from '../../model/oreder.js'
-
+import ORDER from '../../model/oreder.js';
+import COMBO from '../../model/combo.js'
+import TABLES from '../../model/tables.js';
+import CUSTOMER from '../../model/customer.js';
+import PAYMENT from '../../model/paymentRecord.js'
+import { getIO  } from "../../config/socket.js";
 
 const generateOrderId = async () => {
     const latestOrder = await ORDER.findOne({ order_id: { $regex: /^#\d{5}$/ } })
@@ -55,8 +59,6 @@ const generateOrderId = async () => {
 
 
   export const createOrder = async(req,res,next)=>{
-    const session = await mongoose.startSession();
-    session.startTransaction();
     try { 
        console.log(req.body,'body')
       // 1. Extract and Validate Request Parameters
@@ -82,20 +84,14 @@ const generateOrderId = async () => {
       console.log(isAdditionalOrder,'additional roder')
   
       // 2. Validate User and Basic Parameters
-      const user = await USER.findOne({ _id: userId, isDeleted: false }).lean();
+      const user = await USER.findOne({ _id: userId }).lean();
       if (!user) {
-        await session.abortTransaction();
         return res.status(400).json({ message: "User not found" });
       }
   
       if (!Array.isArray(items) || items.length === 0) {
-        await session.abortTransaction();
         return res.status(400).json({ message: 'No items in order' });
       }
-  
-      // if(!counterId){
-      //   return res.status(400).json({ message:'Counter not found!'})
-      // }
   
       // 3. Process Order Items for validation (updated for combos)
            const foodIds = [];
@@ -120,12 +116,10 @@ const generateOrderId = async () => {
           const [foodDocs, comboDocs] = await Promise.all([
             FOOD.find({ 
               _id: { $in: uniqueFoodIds }, 
-              isDeleted: false,  
               restaurantId: restaurantId 
             }).lean(),
             COMBO.find({
               _id: { $in: comboIds },
-              isDeleted: false,
               restaurantId: restaurantId
             }).populate({
               path: 'groups',
@@ -147,8 +141,6 @@ const generateOrderId = async () => {
             // Handle combo item
             const combo = comboMap[item.comboId];
             if (!combo) throw new Error(`Invalid combo item: ${item.comboId}`);
-            // Process combo items
-            console.log(item.items,'combo items')
             const comboItems = await Promise.all(item.items.map(async (comboItem) => {
               const food = foodMap[comboItem.foodId];
               if (!food) throw new Error(`Invalid food item in combo: ${comboItem.foodId}`);
@@ -221,10 +213,9 @@ const generateOrderId = async () => {
         order = await ORDER.findOne({
           _id: orderId,
           status: { $nin: ['Completed', 'Cancelled'] }
-        }).session(session);
+        })
   
         if (!order) {
-          await session.abortTransaction();
           return res.status(404).json({ message: "Order not found or cannot be modified" });
         }
   
@@ -233,7 +224,6 @@ const generateOrderId = async () => {
         // New Order Flow
         const custType = await CUSTOMER_TYPE.findById(customerTypeId).lean();
         if (!custType) {
-          await session.abortTransaction();
           return res.status(400).json({ message: 'Invalid customer type' });
         }
   
@@ -266,7 +256,7 @@ const generateOrderId = async () => {
           status: "Placed",
           createdById: user._id,
           createdBy: user.name,
-        }], { session });
+        }]);
       }
   
   
@@ -277,14 +267,13 @@ const generateOrderId = async () => {
       } else {
         order.items = processedItems;
       }
-      await order.save({ session });
+      await order.save();
 
   
       // 7. Handle Table Status for Dine-In
       if (ctypeName.includes("Dine-In") && tableId) {
-        const table = await TABLES.findById(tableId).session(session);
+        const table = await TABLES.findById(tableId)
         if (!table) {
-          await session.abortTransaction();
           return res.status(400).json({ message: 'Table not found' });
         }
   
@@ -296,14 +285,14 @@ const generateOrderId = async () => {
             totalAmount: order.totalAmount,
             runningSince: new Date()
           },
-          { new: true, session }
+          { new: true }
         ).lean();
   
-        // const io = getIO();
-        // io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
+        const io = getIO();
+        io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
       }
   
-      const shouldPrint = ['kot_print', 'save_print'].includes(action);
+      const shouldPrint = action === 'print';
   
       // 7. Handle Printing
       if (shouldPrint) {
@@ -321,9 +310,7 @@ const generateOrderId = async () => {
           // Continue even if printing fails
         }
       }
-  
-      // 8. Commit Transaction
-      await session.commitTransaction();
+
   
       // 9. Prepare Response
       const populatedOrder = await ORDER.findById(order._id)
@@ -332,7 +319,7 @@ const generateOrderId = async () => {
         .lean();
   
       // Emit real-time updates
-      const io = getIO();
+      // const io = getIO();
       const responseData = {
         action,  // Include action for frontend handling if needed
         order: populatedOrder,  // Always nest under 'order' for consistency
@@ -344,10 +331,7 @@ const generateOrderId = async () => {
 
   
     } catch (err) {
-      await session.abortTransaction();
       return next(err);
-    } finally {
-      session.endSession(); 
     }
   }
 
@@ -392,8 +376,7 @@ const generateOrderId = async () => {
         ORDER.find({
           restaurantId,
           createdAt: { $gte: todayStart, $lte: todayEnd },
-          status: { $in: ["Placed", "Preparing", "Ready", "Served"] },
-          isDeleted: false
+          status: "Placed"
         })
         .select("_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod")
           .populate("tableId", "name")
@@ -404,7 +387,7 @@ const generateOrderId = async () => {
           restaurantId,
           createdAt: { $gte: todayStart, $lte: todayEnd },
           status: "Completed",
-          isDeleted: false
+          
         })
         .select("_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod")
           .populate("tableId", "name")
@@ -415,7 +398,6 @@ const generateOrderId = async () => {
           restaurantId,
           createdAt: { $gte: todayStart, $lte: todayEnd },
           status: "Cancelled",
-          isDeleted: false
         })
         .select("_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod")
           .populate("tableId", "name")
@@ -432,3 +414,175 @@ const generateOrderId = async () => {
       return next(err);
     }
   };
+
+  export const getOneOrderDetails = async (req, res, next) => {
+    try {
+      const { orderId } = req.params;
+      const userId = req.user; 
+  
+      // Validate restaurant access
+      const user = await USER.findOne({ _id: userI });
+      if (!user) return res.status(403).json({ message: "User not found!" });
+  
+      if(!orderId){
+        return res.status(403).json({ message: "Order Id not found!" });
+      }
+  
+  
+      const order = await ORDER.findById(orderId).select("items");
+  
+      if(!order){
+        return res.status(400).json({ message:'Order not found!'})
+      }
+  
+      return res.status(200).json({ data:order })
+  
+    } catch (err) {
+      return next(err);
+    }
+  };
+
+
+  export const posOrderBilling = async (req,res,next)=>{
+    try {
+  
+      const {
+        restaurantId,
+        orderId,
+        customerId, // optional
+        paymentMethods, // array of {method: 'cash/card/online', amount: Number}
+        changeAmount,
+        grandTotal,
+        dueAmount = 0 // default to 0 if not provided
+      } = req.body;
+  
+  
+  
+      const userId = req.user;
+  
+       // Validate user
+      const user = await USER.findOne({ _id: userId }).lean();
+      if (!user) return res.status(400).json({ message: "User not found" });
+  
+      if(!restaurantId){
+        return res.status(400).json({ message: "Restaurnat Id not found!" })
+      }
+  
+          // Get and validate order
+          const order = await ORDER.findOne({
+            _id: orderId,
+            status: { $nin: ['Completed', 'Cancelled'] }
+          })
+      
+          if (!order) {
+            return res.status(404).json({ message: "Order not found or already completed/cancelled" });
+          }
+  
+              // Validate payment amounts
+              const paidAmount = paymentMethods
+              .filter(pm => pm.method !== 'due')
+              .reduce((sum, pm) => sum + pm.amount, 0);
+  
+      
+  
+      if (dueAmount > 0) {
+        if (!customerId) {
+          return res.status(400).json({ message: "Customer Id  required for due payments" });
+        }
+  
+        const customer = await CUSTOMER.findById(customerId)
+        if (!customer) {
+          return res.status(400).json({ message: "Customer not found" });
+        }
+  
+        // Update customer credit
+       const previousBalance = customer.credit || 0;
+        customer.credit = previousBalance + dueAmount;
+        await customer.save();
+  
+  
+        // Record credit transaction
+        // await CUSTOMER_CREDIT_HISTORY.create([{
+        //   restaurantId,
+        //   customerId,
+        //   orderId,
+        //   amount: dueAmount,
+        //   type: 'credit',
+        //   notes: `Bill settlement for order ${order.order_id}`,
+        //   createdById: userId,
+        //   createdBy:user.name,
+        //   previousBalance: previousBalance,
+        //   newBalance: customer.credit
+        // }]);
+      }
+  
+          // Create payment records
+          const paymentRecord = {
+            restaurantId,
+            orderId,
+            methods: paymentMethods.map(pm => ({
+              method: pm.method,
+              amount: pm.amount,
+              // Only add cash-specific fields
+              ...(pm.method === 'cash' && { 
+                receivedAmount: pm.receivedAmount || pm.amount,
+                changeGiven: pm.receivedAmount - pm.amount
+              })
+            })),
+            grandTotal,
+            paidAmount,
+            dueAmount,
+            paymentMethods,
+            changeAmount: paymentMethods
+            .filter(pm => pm.method === 'cash')
+            .reduce((sum, pm) => sum + ((pm.receivedAmount || pm.amount) - pm.amount), 0),
+            createdById: userId,
+            createdBy:user.name,
+          };
+      
+          await PAYMENT.create([paymentRecord]);
+  
+             // Update order status
+      order.status = "Completed";
+      order.paymentStatus = dueAmount > 0 ? "Partial" : "Paid";
+      await order.save();
+  
+  
+        // Handle table status if dine-in
+      if (order.orderType.includes("Dine-In") && order.tableId) {
+        const updatedTable = await TABLES.findOneAndUpdate(
+          { _id: order.tableId },
+          {
+            currentStatus: 'Available',
+            currentOrderId: null,
+            totalAmount: 0,
+            runningSince: null
+          },
+          { new: true }
+        ).lean();
+  
+        // Emit table update
+        // const io = getIO();
+        // io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
+      }
+  
+      const updateOrder = await ORDER.findOneAndUpdate(
+        { _id: order._id },
+        {
+          status: 'Completed'
+        },
+        { new: true}
+      ).lean();
+  
+      // Emit order completion
+      // const io = getIO();
+      // io.to(`posOrder-${order.restaurantId}`).emit('order_completed', {order: updateOrder });
+
+      return res.status(200).json({ 
+        message: 'Order settled successfully',
+      });
+      
+    } catch (err) {
+     return next(err)
+    }
+  }
