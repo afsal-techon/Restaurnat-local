@@ -319,13 +319,13 @@ const generateOrderId = async () => {
         .lean();
   
       // Emit real-time updates
-      // const io = getIO();
+      const io = getIO();
       const responseData = {
         action,  // Include action for frontend handling if needed
         order: populatedOrder,  // Always nest under 'order' for consistency
       };
       
-    //   io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
+      io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
   
       return res.status(200).json(responseData);
 
@@ -379,7 +379,8 @@ const generateOrderId = async () => {
           status: "Placed"
         })
         .select("_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod")
-          .populate("tableId", "name")
+           .populate({ path: "tableId", select: "name" })
+           .populate({ path: "customerTypeId", select: "type" })
           .sort({ createdAt: -1 }), // Newest first
         
         // Completed orders
@@ -421,7 +422,7 @@ const generateOrderId = async () => {
       const userId = req.user; 
   
       // Validate restaurant access
-      const user = await USER.findOne({ _id: userI });
+      const user = await USER.findOne({ _id: userId });
       if (!user) return res.status(403).json({ message: "User not found!" });
   
       if(!orderId){
@@ -429,7 +430,9 @@ const generateOrderId = async () => {
       }
   
   
-      const order = await ORDER.findById(orderId).select("items");
+      const order = await ORDER.findById(orderId)
+      .populate({ path: "tableId", select: "name" })
+      .populate({ path: "customerTypeId", select: "type" })
   
       if(!order){
         return res.status(400).json({ message:'Order not found!'})
@@ -562,8 +565,8 @@ const generateOrderId = async () => {
         ).lean();
   
         // Emit table update
-        // const io = getIO();
-        // io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
+        const io = getIO();
+        io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
       }
   
       const updateOrder = await ORDER.findOneAndUpdate(
@@ -575,8 +578,8 @@ const generateOrderId = async () => {
       ).lean();
   
       // Emit order completion
-      // const io = getIO();
-      // io.to(`posOrder-${order.restaurantId}`).emit('order_completed', {order: updateOrder });
+      const io = getIO();
+      io.to(`posOrder-${order.restaurantId}`).emit('order_completed', {order: updateOrder });
 
       return res.status(200).json({ 
         message: 'Order settled successfully',

@@ -5,6 +5,8 @@ import { createRestuarantBranch,getAllRestaurant,updateRestaurantBranch,deleteRe
     addCustomerType,updateCustomerTypes,deleteCustomerTypes ,getAllCustomerTypes
 } from '../controller/Restaurant/restaurant.js';
 
+import {createAccounts,getAccounts } from '../controller/Restaurant/accounts.js'
+
 import { createFloors,deleteFloor,getAllFloorsbyRest,updateFloorName ,createTables,getAllTablesbyRest,updateTable,deleteTable ,addKitchen,deleteKitchen,getAllKitchen,updateKitchen } from '../controller/Restaurant/floors&tables.js'
 import {createCategory,deleteCategory,getAllCategories,updateCategory } from '../controller/foodController/categoryCnrl.js'
 import {CreateMenuType,getAllMenuTypes,updateMenuTypes,deleteMenuTypes,createCourse,getAllCourses,updateCourse,deleteCourse } from '../controller/foodController/menuTypeCntrls.js'
@@ -142,11 +144,17 @@ router.get('/pos/order/:orderId',VerifyToken,getOneOrderDetails)
 
 //pos-order
 router.post('/pos/order',VerifyToken,createOrder);
+// router.post('/pos/cancel-order',VerifyToken,cancelOrder)
 
 
 
 //pos-billing
-router.post('/pos/order/billing',VerifyToken,posOrderBilling)
+router.post('/pos/order/billing',VerifyToken,posOrderBilling);
+
+
+//accounts
+router.post('/accounts',VerifyToken,createAccounts);
+router.get('/accounts/:restaurantId',VerifyToken,getAccounts)
 
 
 

@@ -69,7 +69,7 @@ const orderSchema = new mongoose.Schema(
     },
     customerTypeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "CustomerType",
+      ref: "customerTypes",
       required: true,
     },
     counterId:{
