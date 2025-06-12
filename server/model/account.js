@@ -16,6 +16,11 @@ const accountSchema = new mongoose.Schema({
     enum: ['Asset', 'Liability', 'Income', 'Expense'],
     required: true
   },
+  accountCategory: {
+    type: String,
+    enum: ["Cash", "Bank", "Card", "Supplier", "Customer", "Other"],
+    required: true,
+  },
   description: {
     type: String,
     default: ''
