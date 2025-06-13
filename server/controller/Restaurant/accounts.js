@@ -9,10 +9,10 @@ export const createAccounts = async (req, res,next) => {
       const {
         restaurantId,
         accountName,
-        accountCategory,
         accountType,
         description,
-        openingBalance
+        openingBalance,
+        showInPos,
       } = req.body;
 
       const userId = req.user;
@@ -28,9 +28,6 @@ export const createAccounts = async (req, res,next) => {
         if(!accountName){
             return res.status(400).json({ message:'Account name is required!'})
         }
-        if(!accountCategory){
-            return res.status(400).json({ message:'Account category is required!'})
-        }
         if(!accountType){
             return res.status(400).json({ message:'Account type is required!'})
         }
@@ -44,10 +41,10 @@ export const createAccounts = async (req, res,next) => {
       const newAccount = new ACCOUNTS({
         restaurantId,
         accountName,
-        accountCategory,
         accountType,
         description,
-        openingBalance
+        openingBalance,
+        showInPos
       });
   
       await newAccount.save();
@@ -90,9 +87,9 @@ export const createAccounts = async (req, res,next) => {
       const {
         restaurantId,
         accountName,
-        accountCategory,
         accountType,
         description,
+        showInPos,
         openingBalance
       } = req.body;
   
@@ -102,7 +99,7 @@ export const createAccounts = async (req, res,next) => {
         return res.status(400).json({ message: "User not found!" });
       }
   
-      if (!restaurantId || !accountName || !accountType || accountCategory) {
+      if (!restaurantId || !accountName || !accountType) {
         return res.status(400).json({ message: "Missing required fields!" });
       }
   
@@ -121,10 +118,10 @@ export const createAccounts = async (req, res,next) => {
         {
           restaurantId,
           accountName,
-          accountCategory,
           accountType,
           description,
-          openingBalance
+          openingBalance,
+          showInPos,
         },
         { new: true }
       );
@@ -170,4 +167,38 @@ export const createAccounts = async (req, res,next) => {
       next(err);
     }
   };
+  
+
+  export const defaultStatusAccounts = async (req,res,next)=>{
+    try {
+
+      const { accountId,defaultAccount } = req.params
+      const userId = req.user;
+      const user = await USER.findOne({ _id: userId });
+      if (!user) {
+        return res.status(400).json({ message: "User not found!" });
+      }
+
+      if(!defaultAccount){
+        return res.status(400).json({ message:"status not found!"})
+      }
+
+      const acccount = await ACCOUNTS.findById(accountId);
+      if(!acccount){
+        return res.status(400).json({ message:'Account not found!'})
+      }
+
+      acccount.defaultAccount = defaultAccount;
+      acccount.save();
+
+      return res.status(200).json({ message:'Updated successfully'})
+
+
+    } catch (err) {
+      next(err)
+    }
+  }
+
+
+
   

@@ -16,10 +16,9 @@ const accountSchema = new mongoose.Schema({
     enum: ['Asset', 'Liability', 'Income', 'Expense'],
     required: true
   },
-  accountCategory: {
-    type: String,
-    enum: ["Cash", "Bank", "Card", "Supplier", "Customer", "Other"],
-    required: true,
+  showInPos:{
+    type:Boolean,
+    default:false
   },
   description: {
     type: String,
@@ -28,6 +27,10 @@ const accountSchema = new mongoose.Schema({
   openingBalance: {
     type: Number,
     default: 0
+  },
+  defaultAccount:{
+    type:Boolean,
+    default:false
   },
 },{
     timestamps:true

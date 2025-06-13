@@ -5,7 +5,7 @@ import { createRestuarantBranch,getAllRestaurant,updateRestaurantBranch,deleteRe
     addCustomerType,updateCustomerTypes,deleteCustomerTypes ,getAllCustomerTypes
 } from '../controller/Restaurant/restaurant.js';
 
-import {createAccounts,getAccounts,updateAccount,deleteAccount } from '../controller/Restaurant/accounts.js'
+import {createAccounts,getAccounts,updateAccount,deleteAccount,defaultStatusAccounts } from '../controller/Restaurant/accounts.js'
 
 import { createFloors,deleteFloor,getAllFloorsbyRest,updateFloorName ,createTables,getAllTablesbyRest,updateTable,deleteTable ,addKitchen,deleteKitchen,getAllKitchen,updateKitchen } from '../controller/Restaurant/floors&tables.js'
 import {createCategory,deleteCategory,getAllCategories,updateCategory } from '../controller/foodController/categoryCnrl.js'
@@ -23,7 +23,7 @@ const router = express.Router();
 
 
 //create company admin 
-router.post('/create-admin',VerifyToken, createCompanyhAdmin);
+router.post('/create-admin', createCompanyhAdmin);
 router.post('/login',LoginUser);
 
 //
@@ -156,7 +156,8 @@ router.post('/pos/order/billing',VerifyToken,posOrderBilling);
 router.post('/accounts',VerifyToken,createAccounts);
 router.get('/accounts/:restaurantId',VerifyToken,getAccounts);
 router.put('/accounts/:accountId',VerifyToken,updateAccount);
-router.delete('/accounts/:accountId',VerifyToken,deleteAccount)
+router.delete('/accounts/:accountId',VerifyToken,deleteAccount);
+router.patch('/accounts/status/:accountId',VerifyToken,defaultStatusAccounts)
 
 
 
