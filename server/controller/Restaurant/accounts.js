@@ -1,6 +1,8 @@
 import ACCOUNTS from '../../model/account.js'
 import USER from '../../model/userModel.js';
-import RESTAURANT from '../../model/restaurant.js'
+import RESTAURANT from '../../model/restaurant.js';
+import TRANSACTION from '../../model/transaction.js';
+import mongoose from 'mongoose';
 
 
 
@@ -42,6 +44,7 @@ export const createAccounts = async (req, res,next) => {
           // Optional: Validate parent account exists
     if (parentAccountId) {
       const parent = await ACCOUNTS.findOne({ _id: parentAccountId, restaurantId });
+      
       if (!parent) {
         return res.status(400).json({ message: "Parent account not found." });
       }
@@ -55,6 +58,8 @@ export const createAccounts = async (req, res,next) => {
         openingBalance,
         showInPos,
           parentAccountId: parentAccountId || null,
+          createdBy:user.name,
+          createdById:user._id
       });
   
       await newAccount.save();
@@ -73,31 +78,106 @@ export const createAccounts = async (req, res,next) => {
   export const getAccounts = async(req,res,next)=>{
     try {
 
-        const { restaurantId } = req.params;
+          const { restaurantId } = req.params;
+    const userId = req.user;
 
-        const userId = req.user;
+    const user = await USER.findById(userId);
+    if (!user) {
+      return res.status(400).json({ message: "User not found!" });
+    }
 
-        const user = await USER.findOne({ _id: userId })
-             if (!user) {
-                 return res.status(400).json({ message: "User not found!" });
-             }
-
-    
-    
-    // Get accounts with parent account populated
+    // Fetch all accounts with parentAccountId populated
     const accounts = await ACCOUNTS.find({ restaurantId })
       .populate({ path: 'parentAccountId', select: 'accountName' });
 
-    // Map to include parentAccountName
-    const result = accounts.map(acc => ({
+    // Get all transaction totals grouped by accountId
+    const transactions = await TRANSACTION.aggregate([
+      {
+        $match: {
+          restaurantId: new mongoose.Types.ObjectId(restaurantId)
+        }
+      },
+      {
+        $group: {
+          _id: '$accountId',
+          totalCredit: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'Credit'] }, '$amount', 0]
+            }
+          },
+          totalDebit: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'Debit'] }, '$amount', 0]
+            }
+          }
+        }
+      }
+    ]);
+
+    // Step 1: Build initial balance map
+    const balanceMap = {};
+    transactions.forEach(tx => {
+      balanceMap[tx._id.toString()] = {
+        credit: tx.totalCredit || 0,
+        debit: tx.totalDebit || 0,
+      };
+    });
+
+    // Step 2: Build account map with base currentBalance
+    const accountMap = {};
+    accounts.forEach(acc => {
+      const bal = balanceMap[acc._id.toString()] || { credit: 0, debit: 0 };
+      const currentBalance = (acc.openingBalance || 0) + bal.credit - bal.debit;
+
+      accountMap[acc._id.toString()] = {
+        ...acc._doc,
+        currentBalance,
+        children: []
+      };
+    });
+
+    // Step 3: Build parent-child relationships
+    Object.values(accountMap).forEach(acc => {
+      const parentId = acc.parentAccountId?._id?.toString();
+      if (parentId && accountMap[parentId]) {
+        accountMap[parentId].children.push(acc._id.toString());
+      }
+    });
+
+    // Step 4: Recursive function to add child balances to parent
+    const addChildBalances = (accountId) => {
+      const acc = accountMap[accountId];
+      if (!acc) return 0;
+
+      let total = acc.currentBalance;
+      for (const childId of acc.children) {
+        total += addChildBalances(childId);
+      }
+
+      acc.currentBalance = total;
+      return total;
+    };
+
+    // Step 5: Apply roll-up from top-level accounts (no parent)
+    Object.values(accountMap).forEach(acc => {
+      if (!acc.parentAccountId) {
+        addChildBalances(acc._id.toString());
+      }
+    });
+
+    // Step 6: Format final output
+    const result = Object.values(accountMap).map(acc => ({
       _id: acc._id,
       accountName: acc.accountName,
       accountType: acc.accountType,
       description: acc.description,
       openingBalance: acc.openingBalance,
       showInPos: acc.showInPos,
+      currentBalance: acc.currentBalance,
       parentAccountId: acc.parentAccountId?._id || null,
-      parentAccountName: acc.parentAccountId?.accountName || null
+      parentAccountName: acc.parentAccountId?.accountName || null,
+      createdAt: acc.createdAt,
+      createdBy: acc.createdBy,
     }));
 
     return res.status(200).json({ data: result });
@@ -188,10 +268,10 @@ export const createAccounts = async (req, res,next) => {
         return res.status(404).json({ message: "Account not found." });
       }
   
-      const hasTransactions = await TRANSACTION.exists({ accountId });
-      if (hasTransactions) {
-        return res.status(400).json({ message: "Cannot delete account linked to transactions." });
-      }
+      // const hasTransactions = await TRANSACTION.exists({ accountId });
+      // if (hasTransactions) {
+      //   return res.status(400).json({ message: "Cannot delete account linked to transactions." });
+      // }
   
       await ACCOUNTS.findByIdAndDelete(accountId);
   
@@ -202,18 +282,17 @@ export const createAccounts = async (req, res,next) => {
   };
   
 
-  export const defaultStatusAccounts = async (req,res,next)=>{
+
+
+
+  export const getTransactionList = async(req,res,next)=>{
     try {
 
-      const { accountId,defaultAccount } = req.params
+        const { accountId } = req.params
       const userId = req.user;
       const user = await USER.findOne({ _id: userId });
       if (!user) {
         return res.status(400).json({ message: "User not found!" });
-      }
-
-      if(!defaultAccount){
-        return res.status(400).json({ message:"status not found!"})
       }
 
       const acccount = await ACCOUNTS.findById(accountId);
@@ -221,17 +300,23 @@ export const createAccounts = async (req, res,next) => {
         return res.status(400).json({ message:'Account not found!'})
       }
 
-      acccount.defaultAccount = defaultAccount;
-      acccount.save();
+   const transactions = await TRANSACTION.find({ accountId })
+  .populate({
+    path: 'accountId',
+    select: 'accountName accountType parentAccountId',
+    populate: {
+      path: 'parentAccountId',
+      select: 'accountName accountType',
+    },
+  })
+  .sort({ createdAt: -1 });
 
-      return res.status(200).json({ message:'Updated successfully'})
-
+  return res.status(200).json({ data: transactions });
 
     } catch (err) {
       next(err)
     }
   }
-
 
 
   

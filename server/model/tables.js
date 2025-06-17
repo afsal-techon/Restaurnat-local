@@ -59,10 +59,9 @@ const tableSchema  =new mongoose.Schema({
 
 tableSchema.index(
     { name: 1, floorId: 1, restaurantId: 1 },
-    { unique: true, partialFilterExpression: { isDeleted: false } }
   );
 
-  tableSchema.index({ restaurantId: 1, floorId: 1, isDeleted: 1 });
+  tableSchema.index({ restaurantId: 1, floorId: 1 });
 
 const tableModel = mongoose.model('table',tableSchema);
 

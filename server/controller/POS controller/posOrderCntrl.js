@@ -14,6 +14,7 @@ import TABLES from '../../model/tables.js';
 import CUSTOMER from '../../model/customer.js';
 import PAYMENT from '../../model/paymentRecord.js'
 import { getIO  } from "../../config/socket.js";
+import TRANSACTION from '../../model/transaction.js'
 
 const generateOrderId = async () => {
     const latestOrder = await ORDER.findOne({ order_id: { $regex: /^#\d{5}$/ } })
@@ -517,22 +518,44 @@ const generateOrderId = async () => {
       }
   
           // Create payment records
-             const paymentRecord = {
-      restaurantId,
-      orderId,
-      accounts: accounts.map(a => ({
-        accountId: a.accountId,
-        amount: a.amount
-      })),
-      grandTotal,
-      paidAmount,
-      dueAmount,
-      changeAmount,
-      createdById: userId,
-      createdBy: user.name
-    };
+const paymentRecord = {
+  restaurantId,
+  orderId,
+  methods: accounts.map(acc => ({
+    accountId: acc.accountId,
+    amount: acc.amount,
+    ...(acc.accountType === 'Cash' && {
+      receivedAmount: acc.receivedAmount || acc.amount,
+      changeGiven: acc.receivedAmount- acc.amount
+    })
+  })),
+  grandTotal,
+  paidAmount,
+  dueAmount ,
+  changeAmount: accounts
+    .filter(acc => acc.accountType === 'Cash')
+    .reduce((sum, acc) => sum + ((acc.receivedAmount || acc.amount) - acc.amount), 0),
+  createdById: userId,
+  createdBy: user.name,
+};
       
-          await PAYMENT.create([paymentRecord]);
+     await PAYMENT.create([paymentRecord]);
+
+
+              // Add a Transaction for each account used
+    for (const acc of accounts) {
+      await TRANSACTION.create({
+        restaurantId,
+        accountId: acc.accountId,
+        amount: acc.amount,
+        type: "Credit",
+        description: `POS Sale for Order ${order.order_id}`,
+        referenceId: order._id,
+        referenceType: 'Sale',
+        createdById: userId,
+        createdBy: user.name,
+      });
+    }
   
              // Update order status
       order.status = "Completed";

@@ -5,7 +5,7 @@ import { createRestuarantBranch,getAllRestaurant,updateRestaurantBranch,deleteRe
     addCustomerType,updateCustomerTypes,deleteCustomerTypes ,getAllCustomerTypes
 } from '../controller/Restaurant/restaurant.js';
 
-import {createAccounts,getAccounts,updateAccount,deleteAccount,defaultStatusAccounts } from '../controller/Restaurant/accounts.js'
+import {createAccounts,getAccounts,updateAccount,deleteAccount,getTransactionList } from '../controller/Restaurant/accounts.js'
 
 import { createFloors,deleteFloor,getAllFloorsbyRest,updateFloorName ,createTables,getAllTablesbyRest,updateTable,deleteTable ,addKitchen,deleteKitchen,getAllKitchen,updateKitchen } from '../controller/Restaurant/floors&tables.js'
 import {createCategory,deleteCategory,getAllCategories,updateCategory } from '../controller/foodController/categoryCnrl.js'
@@ -157,7 +157,7 @@ router.post('/accounts',VerifyToken,createAccounts);
 router.get('/accounts/:restaurantId',VerifyToken,getAccounts);
 router.put('/accounts',VerifyToken,updateAccount);
 router.delete('/accounts/:accountId',VerifyToken,deleteAccount);
-router.patch('/accounts/status/:accountId',VerifyToken,defaultStatusAccounts)
+router.get('/accounts/transaction/:accountId',VerifyToken,getTransactionList)
 
 
 

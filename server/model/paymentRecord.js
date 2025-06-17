@@ -7,38 +7,23 @@ const paymentSchema = new mongoose.Schema({
       ref: "Order", 
       required: true 
     },
-    methods: [{
-      method: { 
-        type: String, 
-        enum: ["cash", "card", "online", "due"], 
-        required: true 
-      },
-      amount: { 
-        type: Number, 
-        required: true 
-      },
-      // Cash specific fields
-      receivedAmount: { 
+  methods: [{
+  accountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Accounts',
+    required: true
+  },
+  amount: {
+    type: Number,
+    required: true
+  },
+   receivedAmount: { 
         type: Number 
       },
       changeGiven: { 
         type: Number 
       },
-      // Card specific fields
-      last4Digits: { 
-        type: String 
-      },
-      transactionId: { 
-        type: String 
-      },
-      // Online payment fields
-      paymentGateway: { 
-        type: String 
-      },
-      gatewayReference: { 
-        type: String 
-      }
-    }],
+}],
     grandTotal: { 
       type: Number, 
       required: true 

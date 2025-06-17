@@ -5,11 +5,6 @@ const transactionSchema = new mongoose.Schema(
      restaurantId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Restaurant",
-    required: true,
-  },
-  orderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Order",
   },
   accountId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -22,13 +17,13 @@ const transactionSchema = new mongoose.Schema(
   },
   type: {
     type: String,
-    enum: ["Sales", "Purchase", "Expense", "Income"],
-    required: true,
   },
-  reference: {
+  referenceId: {
     type: String, // e.g., "POS Bill Payment"
   },
-  note: String,
+  referenceType:{
+    type:String
+  },
   createdById: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -38,5 +33,10 @@ const transactionSchema = new mongoose.Schema(
     type: String,
   },
 }, { timestamps: true });
+
+transactionSchema.index({ accountId: 1 });
+transactionSchema.index({ restaurantId: 1 });
+transactionSchema.index({ createdAt: -1 });
+
 const transactionModel =  mongoose.model("Transaction", transactionSchema);
 export default transactionModel;

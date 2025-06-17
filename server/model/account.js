@@ -13,7 +13,7 @@ const accountSchema = new mongoose.Schema({
   },
   parentAccountId: {
   type: mongoose.Schema.Types.ObjectId,
-  ref: 'accounts',
+  ref: 'Account',
   default: null
 },
 accountType: {
@@ -23,6 +23,8 @@ accountType: {
     "Current Asset",
     "Cash",
     "Bank",
+    "Card",
+    "Online",
     "Fixed Asset",
     "Stock",
     "Other Current Liabilities",
@@ -50,13 +52,24 @@ accountType: {
     type: Number,
     default: 0
   },
-  defaultAccount:{
-    type:Boolean,
-    default:false
-  },
+      createdById: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true, // CompanyAdmin or BranchAdmin who created it
+      },
+      createdBy:{
+          type:String,
+      },
 },{
     timestamps:true
 });
+
+accountSchema.index({ restaurantId: 1 });
+accountSchema.index({ parentAccountId: 1 });
+accountSchema.index({ accountType: 1 });
+accountSchema.index({ accountName: 1 });
+accountSchema.index({ showInPos: 1 });
+
 
 const accountModel =  mongoose.model('Account', accountSchema);
 export default accountModel;
