@@ -453,8 +453,7 @@ const generateOrderId = async () => {
         restaurantId,
         orderId,
         customerId, // optional
-        paymentMethods, // array of {method: 'cash/card/online', amount: Number}
-        changeAmount,
+        accounts, 
         grandTotal,
         dueAmount = 0 // default to 0 if not provided
       } = req.body;
@@ -482,9 +481,7 @@ const generateOrderId = async () => {
           }
   
               // Validate payment amounts
-              const paidAmount = paymentMethods
-              .filter(pm => pm.method !== 'due')
-              .reduce((sum, pm) => sum + pm.amount, 0);
+               const paidAmount = accounts.reduce((sum, acc) => sum + acc.amount, 0);
   
       
   
@@ -520,28 +517,20 @@ const generateOrderId = async () => {
       }
   
           // Create payment records
-          const paymentRecord = {
-            restaurantId,
-            orderId,
-            methods: paymentMethods.map(pm => ({
-              method: pm.method,
-              amount: pm.amount,
-              // Only add cash-specific fields
-              ...(pm.method === 'cash' && { 
-                receivedAmount: pm.receivedAmount || pm.amount,
-                changeGiven: pm.receivedAmount - pm.amount
-              })
-            })),
-            grandTotal,
-            paidAmount,
-            dueAmount,
-            paymentMethods,
-            changeAmount: paymentMethods
-            .filter(pm => pm.method === 'cash')
-            .reduce((sum, pm) => sum + ((pm.receivedAmount || pm.amount) - pm.amount), 0),
-            createdById: userId,
-            createdBy:user.name,
-          };
+             const paymentRecord = {
+      restaurantId,
+      orderId,
+      accounts: accounts.map(a => ({
+        accountId: a.accountId,
+        amount: a.amount
+      })),
+      grandTotal,
+      paidAmount,
+      dueAmount,
+      changeAmount,
+      createdById: userId,
+      createdBy: user.name
+    };
       
           await PAYMENT.create([paymentRecord]);
   

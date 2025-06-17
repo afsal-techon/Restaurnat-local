@@ -13,6 +13,7 @@ export const createAccounts = async (req, res,next) => {
         description,
         openingBalance,
         showInPos,
+        parentAccountId
       } = req.body;
 
       const userId = req.user;
@@ -37,6 +38,14 @@ export const createAccounts = async (req, res,next) => {
       if (existing) {
         return res.status(400).json({ message: 'Account name already exists.' });
       }
+
+          // Optional: Validate parent account exists
+    if (parentAccountId) {
+      const parent = await ACCOUNTS.findOne({ _id: parentAccountId, restaurantId });
+      if (!parent) {
+        return res.status(400).json({ message: "Parent account not found." });
+      }
+    }
   
       const newAccount = new ACCOUNTS({
         restaurantId,
@@ -44,7 +53,8 @@ export const createAccounts = async (req, res,next) => {
         accountType,
         description,
         openingBalance,
-        showInPos
+        showInPos,
+          parentAccountId: parentAccountId || null,
       });
   
       await newAccount.save();
@@ -73,8 +83,24 @@ export const createAccounts = async (req, res,next) => {
              }
 
     
-    const accounts = await ACCOUNTS.find({ restaurantId });
-    return res.status(200).json({ data:accounts})
+    
+    // Get accounts with parent account populated
+    const accounts = await ACCOUNTS.find({ restaurantId })
+      .populate({ path: 'parentAccountId', select: 'accountName' });
+
+    // Map to include parentAccountName
+    const result = accounts.map(acc => ({
+      _id: acc._id,
+      accountName: acc.accountName,
+      accountType: acc.accountType,
+      description: acc.description,
+      openingBalance: acc.openingBalance,
+      showInPos: acc.showInPos,
+      parentAccountId: acc.parentAccountId?._id || null,
+      parentAccountName: acc.parentAccountId?.accountName || null
+    }));
+
+    return res.status(200).json({ data: result });
     } catch (err) {
         next(err)
     }
@@ -83,13 +109,15 @@ export const createAccounts = async (req, res,next) => {
 
   export const updateAccount = async (req, res, next) => {
     try {
-      const { accountId } = req.params;
+
       const {
         restaurantId,
         accountName,
+        accountId,
         accountType,
         description,
         showInPos,
+        parentAccountId,
         openingBalance
       } = req.body;
   
@@ -112,6 +140,10 @@ export const createAccounts = async (req, res,next) => {
       if (existingAccount) {
         return res.status(400).json({ message: "Account name already exists." });
       }
+
+        if (parentAccountId && parentAccountId === accountId) {
+      return res.status(400).json({ message: "Parent account cannot be the same as the account being updated." });
+    }
   
       const updated = await ACCOUNTS.findByIdAndUpdate(
         accountId,
@@ -122,6 +154,7 @@ export const createAccounts = async (req, res,next) => {
           description,
           openingBalance,
           showInPos,
+          parentAccountId: parentAccountId || null,
         },
         { new: true }
       );

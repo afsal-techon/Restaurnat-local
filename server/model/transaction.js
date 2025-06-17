@@ -2,40 +2,41 @@ import mongoose from "mongoose";
 
 const transactionSchema = new mongoose.Schema(
   {
-    restaurantId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Restaurant",
-      required: true,
-    },
-    type: {
-      type: String,
-      enum: ["Sale", "Purchase", "Expense"],
-      required: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
-    },
-    accountId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Account",
-      required: true,
-    },
-    description: {
-      type: String,
-    },
-    referenceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: false, // Reference to Order ID, Purchase ID, etc.
-    },
-    referenceType: {
-      type: String, // e.g., "Order", "Purchase"
-    },
+     restaurantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Restaurant",
+    required: true,
   },
-  {
-    timestamps: true, // Adds createdAt and updatedAt
-  }
-);
-
+  orderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Order",
+  },
+  accountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Account",
+    required: true,
+  },
+  amount: {
+    type: Number,
+    required: true,
+  },
+  type: {
+    type: String,
+    enum: ["Sales", "Purchase", "Expense", "Income"],
+    required: true,
+  },
+  reference: {
+    type: String, // e.g., "POS Bill Payment"
+  },
+  note: String,
+  createdById: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  createdBy: {
+    type: String,
+  },
+}, { timestamps: true });
 const transactionModel =  mongoose.model("Transaction", transactionSchema);
 export default transactionModel;

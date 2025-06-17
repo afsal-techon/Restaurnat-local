@@ -155,9 +155,11 @@ router.post('/pos/order/billing',VerifyToken,posOrderBilling);
 //accounts
 router.post('/accounts',VerifyToken,createAccounts);
 router.get('/accounts/:restaurantId',VerifyToken,getAccounts);
-router.put('/accounts/:accountId',VerifyToken,updateAccount);
+router.put('/accounts',VerifyToken,updateAccount);
 router.delete('/accounts/:accountId',VerifyToken,deleteAccount);
 router.patch('/accounts/status/:accountId',VerifyToken,defaultStatusAccounts)
+
+
 
 
 

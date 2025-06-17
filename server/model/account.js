@@ -11,11 +11,33 @@ const accountSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  accountType: {
-    type: String,
-    enum: ['Asset', 'Liability', 'Income', 'Expense'],
-    required: true
-  },
+  parentAccountId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'accounts',
+  default: null
+},
+accountType: {
+  type: String,
+  enum: [
+    "Asset",
+    "Current Asset",
+    "Cash",
+    "Bank",
+    "Fixed Asset",
+    "Stock",
+    "Other Current Liabilities",
+    "Credit Card",
+    "Liabilities",
+    "Equity",
+    "Income",
+    "Other Income",
+    "Expense",
+    "Cost of Goods Sold",
+    "Other Expenses",
+    "Credit"
+  ],
+  required: true
+},
   showInPos:{
     type:Boolean,
     default:false
