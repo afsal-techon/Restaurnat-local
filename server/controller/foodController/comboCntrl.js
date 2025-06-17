@@ -167,7 +167,7 @@ export const createCompo = async (req,res,next)=>{
           
 
 
-          return res.status(201).json({ message: "Combo created successfully", data: newCombo });
+          return res.status(200).json({ message: "Combo created successfully", data: newCombo });
 
       
     } catch (err) {
@@ -351,7 +351,7 @@ export const createCompo = async (req,res,next)=>{
           return res.status(404).json({ message: "Restaurant not found!" });
         }
 
-        const combos  = await COMBO.find({ restaurantId: restaurant._id , isDeleted:false }).sort({ createdAt:-1})
+        const combos  = await COMBO.find({ restaurantId: restaurant._id }).sort({ createdAt:-1})
 
         return res.status(200).json({ data: combos });
        

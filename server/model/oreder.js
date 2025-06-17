@@ -1,21 +1,43 @@
 import mongoose from "mongoose";
 
 const orderItemSchema = new mongoose.Schema({
+  // Common fields for both food and combo items
+  isCombo: {
+    type: Boolean,
+    default: false,
+  },
   foodId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Food",
-    required: true,
+    required: function() { return !this.isCombo; } // Only required for non-combo items
   },
   foodName: {
     type: String,
-    required: true,
-  },
-  portion: {
-    type: String, // Name of the portion, like "Full", "Half", etc.
+    required: function() { return !this.isCombo; } // Only required for non-combo items
   },
   price: {
     type: Number,
-    required: true,
+    required: function() { return !this.isCombo; } // Only required for non-combo items
+  },
+  
+  // Combo-specific fields
+  comboId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Combo",
+    required: function() { return this.isCombo; } // Only required for combo items
+  },
+  comboName: {
+    type: String,
+    required: function() { return this.isCombo; } // Only required for combo items
+  },
+  comboPrice: {
+    type: Number,
+    required: function() { return this.isCombo; } // Only required for combo items
+  },
+  
+  // Common fields
+  portion: {
+    type: String, // Name of the portion, like "Full", "Half", etc.
   },
   qty: {
     type: Number,
@@ -38,8 +60,7 @@ const orderItemSchema = new mongoose.Schema({
       name: String,
       portion: String,
       price: Number,
-      qty:Number,
-      default:[],
+      qty: Number,
     },
   ],
   choices: [
@@ -49,11 +70,31 @@ const orderItemSchema = new mongoose.Schema({
         ref: "Choice"
       },
       name: String,
-      default:[],
     },
-    
-  ]
-});
+  ],
+  // Nested combo items
+  items: [{
+    foodId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Food",
+      required: true
+    },
+    foodName: {
+      type: String,
+      required: true
+    },
+    portion: String,
+    price: Number,
+    qty: Number,
+    total: Number,
+    conversionFactor: Number,
+    isComboItem: Boolean
+  }],
+  conversionFactor: {
+    type: Number,
+    default: 1
+  }
+}, { _id: true });
 
 const orderSchema = new mongoose.Schema(
   {

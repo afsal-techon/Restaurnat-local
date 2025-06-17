@@ -167,17 +167,22 @@ const generateOrderId = async () => {
               };
             }));
     
-            return {
-              isCombo: true,
-              comboId: combo._id,
-              comboName: combo.comboName,
-              comboPrice: item.comboPrice || combo.comboPrice,
-              items: comboItems,
-              addOns: item.addOns || [],
-              qty: item.qty ?? 1, 
-              total: item.total,
-              isAdditional: isAdditionalOrder
-            };
+                   return {
+                  foodId: combo._id, // Using combo ID as foodId for schema validation
+                  foodName: combo.comboName, // Using combo name as foodName
+                  price: item.comboPrice || combo.comboPrice, // Ensure price is set
+                  qty: item.qty ?? 1,
+                  total: item.total,
+                  discount: 0,
+                  addOns: item.addOns || [],
+                  choices: [],
+                  isAdditional: isAdditionalOrder,
+                  conversionFactor: 1, // Default for combo
+                  isCombo: true,
+                  comboId: combo._id,
+                  comboName: combo.comboName,
+                  items: comboItems // Nested combo items
+                 };
           }else{
       
         const food = foodMap[item.foodId];
