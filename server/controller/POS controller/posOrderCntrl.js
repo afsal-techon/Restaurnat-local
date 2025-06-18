@@ -755,3 +755,127 @@ const paymentRecord = {
      return next(err)
     }
   }
+
+
+
+
+  async function generateCustomerBillForDineIn(orderId) {
+  const order = await ORDER.findById(orderId).lean();
+  if (!order) throw new Error("Order not found");
+
+  const restaurant = await RESTAURANT.findById(order.restaurantId).lean();
+  const table = await TABLES.findById(order.tableId).lean();
+  const customerType = await CUSTOMER_TYPE.findById(order.customerTypeId).lean();
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString();
+  const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  // Start Printing
+  printer.clear();
+  printer.alignCenter();
+  printer.setTextDoubleHeight();
+  printer.println(restaurant?.name?.toUpperCase() || "RESTAURANT");
+  printer.setTextNormal();
+  if (restaurant?.phone) printer.println(`Tel: ${restaurant.phone}`);
+  if (restaurant?.trn) printer.println(`Trn:${restaurant.trn}`);
+  printer.drawLine();
+
+  printer.println(customerType?.type || "Dine-in");
+  printer.drawLine();
+
+  // Bill info
+  printer.alignLeft();
+  printer.println(`Bill No. : ${order.order_id || "-"}`);
+  printer.println(`Table No. : ${table?.name || "-"}`);
+  printer.println(`Bill Date : ${dateStr}  ${timeStr}`);
+  printer.println(`Operator Id. : ${order.createdBy || "Admin"}`);
+  printer.println(`Payment Mode : cash`);
+  printer.println(`Table No. : ${table?.name || "-"}`);
+
+  printer.drawLine();
+
+  // Item headers
+  printer.tableCustom([
+    { text: "Item", align: "LEFT", width: 0.30 },
+    { text: "Portion", align: "CENTER", width: 0.20 },
+    { text: "Rate", align: "RIGHT", width: 0.15 },
+    { text: "Qty.", align: "RIGHT", width: 0.15 },
+    { text: "Amount", align: "RIGHT", width: 0.20 },
+  ]);
+
+  printer.drawLine();
+
+  let totalQty = 0;
+  let itemCount = 0;
+
+  for (const item of order.items) {
+    if (item.isCombo) {
+      printer.tableCustom([
+        { text: item.comboName, align: "LEFT", width: 0.5 },
+        { text: "-", align: "CENTER", width: 0.2 },
+        { text: item.comboPrice.toFixed(2), align: "RIGHT", width: 0.15 },
+        { text: `x${item.qty}`, align: "RIGHT", width: 0.15 },
+        { text: item.total.toFixed(2), align: "RIGHT", width: 0.2 },
+      ]);
+    } else {
+      printer.tableCustom([
+        { text: item.foodName, align: "LEFT", width: 0.3 },
+        { text: item.portion || "-", align: "CENTER", width: 0.2 },
+        { text: item.price.toFixed(2), align: "RIGHT", width: 0.15 },
+        { text: `x${item.qty}`, align: "RIGHT", width: 0.15 },
+        { text: item.total.toFixed(2), align: "RIGHT", width: 0.2 },
+      ]);
+    }
+
+    totalQty += item.qty;
+    itemCount++;
+  }
+
+  printer.drawLine();
+  printer.tableCustom([
+    { text: `Item : ${itemCount}`, align: "LEFT", width: 0.5 },
+    { text: `Qty. : ${totalQty}`, align: "RIGHT", width: 0.5 },
+  ]);
+  printer.newLine();
+
+  // Totals
+  printer.alignRight();
+  printer.println(`Sub Total : ${order.subTotal?.toFixed(2) || "0.00"}`);
+  printer.println(`VAT ${order.vat || 0}% : ${(order.subTotal * (order.vat / 100)).toFixed(2)}`);
+  printer.println(`Grand Total : AED${order.totalAmount.toFixed(2)}`);
+
+  printer.newLine();
+  printer.alignCenter();
+  printer.println("Thank you! Visit Again");
+
+  printer.cut();
+
+  const isConnected = await printer.isPrinterConnected();
+  if (isConnected) {
+    await printer.execute();
+    console.log(`✅ Customer bill printed for table: ${table?.name}`);
+
+    if (order.tableId) {
+  const updatedTable = await TABLES.findOneAndUpdate(
+    { _id: order.tableId },
+    {
+      currentStatus: 'VacatingSoon',
+      totalAmount: order.totalAmount,
+    },
+    { new: true }
+  ).lean();
+
+  // Notify POS via socket
+  const io = getIO();
+  io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
+
+    }
+
+    
+
+
+  } else {
+    console.error("❌ Printer not connected.");
+  }
+}
