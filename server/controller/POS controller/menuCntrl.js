@@ -13,6 +13,7 @@ import COMBO from '../../model/combo.js'
 
 export const getAllByCategoryForPOS = async(req,res,next)=>{
     try {
+      //menu
 
             const { restaurantId } = req.params;
               const userId = req.user;
