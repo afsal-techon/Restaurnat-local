@@ -73,23 +73,23 @@ const orderItemSchema = new mongoose.Schema({
     },
   ],
   // Nested combo items
-  items: [{
-    foodId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Food",
-      required: true
-    },
-    foodName: {
-      type: String,
-      required: true
-    },
-    portion: String,
-    price: Number,
-    qty: Number,
-    total: Number,
-    conversionFactor: Number,
-    isComboItem: Boolean
-  }],
+  // items: [{
+  //   foodId: {
+  //     type: mongoose.Schema.Types.ObjectId,
+  //     ref: "Food",
+  //     required: true
+  //   },
+  //   foodName: {
+  //     type: String,
+  //     required: true
+  //   },
+  //   portion: String,
+  //   price: Number,
+  //   qty: Number,
+  //   total: Number,
+  //   conversionFactor: Number,
+  //   isComboItem: Boolean
+  // }],
   conversionFactor: {
     type: Number,
     default: 1
@@ -180,7 +180,6 @@ orderSchema.index({ order_id: 1, restaurantId: 1 }, { unique: true });
 orderSchema.index({ restaurantId: 1, status: 1, createdAt: -1 });
 orderSchema.index({ tableId: 1, status: 1 });
 orderSchema.index({ createdById: 1, createdAt: -1 });
-orderSchema.index({ restaurantId: 1, "items.kitchenId": 1, status: 1 });
 
  const orderModel = mongoose.model("Order", orderSchema);
  export default orderModel;
