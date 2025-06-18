@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const orderItemSchema = new mongoose.Schema({
-  // Common fields for both food and combo items
+  // Common fields for both food and combo ite
   isCombo: {
     type: Boolean,
     default: false,
