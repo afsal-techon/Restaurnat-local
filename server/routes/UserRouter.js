@@ -9,13 +9,14 @@ import {createAccounts,getAccounts,updateAccount,deleteAccount,getTransactionLis
 
 import { createFloors,deleteFloor,getAllFloorsbyRest,updateFloorName ,createTables,getAllTablesbyRest,updateTable,deleteTable ,addKitchen,deleteKitchen,getAllKitchen,updateKitchen } from '../controller/Restaurant/floors&tables.js'
 import {createCategory,deleteCategory,getAllCategories,updateCategory } from '../controller/foodController/categoryCnrl.js'
-import {CreateMenuType,getAllMenuTypes,updateMenuTypes,deleteMenuTypes,createCourse,getAllCourses,updateCourse,deleteCourse } from '../controller/foodController/menuTypeCntrls.js'
+import {CreateMenuType,getAllMenuTypes,updateMenuTypes,deleteMenuTypes } from '../controller/foodController/menuTypeCntrls.js'
 import { createAddOns,deleteAddOn,getAllAddOns,updateAddOns } from '../controller/foodController/AddOnsCntrl.js';
 import { createFood,deleteFood,getAllFoodbyRestaurat,getOneFood,updateFood } from '../controller/foodController/mainFood.js'
 import {getAllByCategoryForPOS,getAllComboForPOS,getAllFoodForPOS,getComboForPOS,getCourseForPOS,getMenusItemsForPOS,getOneComboForPOS } from '../controller/POS controller/menuCntrl.js';
 import {  getFloorsForPOS,getTablesForPOS ,createCustomerForPOS,getCustomerCreditHistory,getCustomerTypesForPOS,getCustomersForPOS,updateCustomerforPOS,} from '../controller/POS controller/posBasicCntrl.js';
-import {createOrder,getOneOrderDetails,getTodayOrdersForPOS,posOrderBilling } from '../controller/POS controller/posOrderCntrl.js';
+import {createOrder,getOneOrderDetails,getTodayOrdersForPOS,posOrderBilling,cancelOrder } from '../controller/POS controller/posOrderCntrl.js';
 import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../controller/foodController/comboCntrl.js'
+import { getQuickViewDashboard } from '../controller/DashbordController/dashbordCntrl.js'
 
 import upload from '../middleware/multer.js'
 const router = express.Router();
@@ -81,10 +82,10 @@ router.delete('/menu-type',VerifyToken,deleteMenuTypes);
 
 
 //course sections
-router.post('/course',VerifyToken,createCourse);
-router.get('/course/:restaurantId',VerifyToken,getAllCourses);
-router.put('/course',VerifyToken, updateCourse);
-router.delete('/course',VerifyToken, deleteCourse);
+// router.post('/course',VerifyToken,createCourse);
+// router.get('/course/:restaurantId',VerifyToken,getAllCourses);
+// router.put('/course',VerifyToken, updateCourse);
+// router.delete('/course',VerifyToken, deleteCourse);
 
 
 //add-ons 
@@ -146,7 +147,8 @@ router.get('/pos/order/:orderId',VerifyToken,getOneOrderDetails)
 router.post('/pos/order',VerifyToken,createOrder);
 // router.post('/pos/cancel-order',VerifyToken,cancelOrder)
 
-
+//pos-order
+router.post('/pos/cancel-order',VerifyToken,cancelOrder)
 
 //pos-billing
 router.post('/pos/order/billing',VerifyToken,posOrderBilling);
@@ -157,7 +159,12 @@ router.post('/accounts',VerifyToken,createAccounts);
 router.get('/accounts/:restaurantId',VerifyToken,getAccounts);
 router.put('/accounts',VerifyToken,updateAccount);
 router.delete('/accounts/:accountId',VerifyToken,deleteAccount);
-router.get('/accounts/transaction/:accountId',VerifyToken,getTransactionList)
+router.get('/accounts/transaction/:accountId',VerifyToken,getTransactionList);
+
+
+
+//dashboard apis 
+router.get('/dashboard/quick-view/:fromDate/:toDate',VerifyToken,getQuickViewDashboard )
 
 
 

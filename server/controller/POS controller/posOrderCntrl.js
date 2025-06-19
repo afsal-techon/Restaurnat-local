@@ -19,6 +19,7 @@ import { printer as ThermalPrinter, types as PrinterTypes } from "node-thermal-p
 
 
 
+
 const generateOrderId = async () => {
     const latestOrder = await ORDER.findOne({ order_id: { $regex: /^#\d{5}$/ } })
       .sort({ order_id: -1 })
@@ -350,7 +351,6 @@ const printer = new ThermalPrinter({
       // Emit real-time updates
       const io = getIO();
       const responseData = {
-        action,  // Include action for frontend handling if needed
         order: populatedOrder,  // Always nest under 'order' for consistency
       };
       
@@ -588,7 +588,17 @@ async function printKOTReceipt(order, restaurant) {
       const order = await ORDER.findById(orderId)
       .populate({ path: "tableId", select: "name" })
       .populate({ path: "customerTypeId", select: "type" })
-  
+   .populate({
+        path: "items.foodId",
+        select: "image",
+        options: { strictPopulate: false } // prevents error if foodId is null
+      })
+      .populate({
+        path: "items.comboId",
+        select: "image",
+        options: { strictPopulate: false } // prevents error if comboId is null
+      })
+      .lean();
       if(!order){
         return res.status(400).json({ message:'Order not found!'})
       }
@@ -735,17 +745,20 @@ const paymentRecord = {
         io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
       }
   
-      const updateOrder = await ORDER.findOneAndUpdate(
+      const updatedOrder= await ORDER.findOneAndUpdate(
         { _id: order._id },
         {
           status: 'Completed'
         },
         { new: true}
-      ).lean();
-  
+      )
+      .populate("tableId", "name")
+          .populate("customerId", "name mobileNo")
+          .lean();
+
       // Emit order completion
       const io = getIO();
-      io.to(`posOrder-${order.restaurantId}`).emit('order_completed', {order: updateOrder });
+      io.to(`posOrder-${order.restaurantId}`).emit('order_completed', {order: updatedOrder });
 
       return res.status(200).json({ 
         message: 'Order settled successfully',
@@ -877,5 +890,67 @@ const paymentRecord = {
 
   } else {
     console.error("❌ Printer not connected.");
+  }
+}
+
+
+export const cancelOrder = async(req,res,next)=>{
+  try {
+
+    const { orderId } = req.body
+
+      
+
+      const userId = req.user;
+  
+       // Validate user
+      const user = await USER.findOne({ _id: userId }).lean();
+      if (!user) return res.status(400).json({ message: "User not found" });
+
+      // Validate order
+      const order = await ORDER.findOne({ _id: orderId }).lean();
+      if (!order) return res.status(400).json({ message: "Order not found" });
+
+      if (order.status === "Cancelled") return res.status(400).json({ message: "Order already cancelled" });
+
+      if (order.status === "Completed") return res.status(400).json({ message: "Completed order cannot be cancelled" });
+
+         const updatedOrder = await ORDER.findByIdAndUpdate(
+            orderId,
+            { status: "Cancelled" },
+            { new: true }
+          )
+          .populate("tableId", "name")
+          .populate("customerId", "name mobileNo")
+          .lean();
+
+          // Emit to POS
+          const io = getIO();
+          io.to(`posOrder-${order.restaurantId}`).emit('order_cancelled', { order: updatedOrder });
+
+        // If table is linked, reset its status
+    if (order.tableId) {
+      const updatedTable = await TABLES.findOneAndUpdate(
+        { _id: order.tableId, currentOrderId: order._id },
+        {
+          currentStatus: "Available",
+          currentOrderId: null,
+          totalAmount: 0,
+          runningSince: null
+        },
+        { new: true }
+      ).lean();
+
+      // Send socket update to POS
+      const io = getIO();
+      io.to(`posTable-${order.restaurantId}`).emit("single_table_update", updatedTable);
+    }
+
+    return res.status(200).json({
+      message: "Order cancelled successfully",
+    });
+
+  } catch (err) {
+    next(err)
   }
 }

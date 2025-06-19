@@ -176,6 +176,7 @@ export const getAllFoodForPOS = async (req, res, next) => {
         const combo = await COMBO.aggregate([
           {
             $match: {
+              _id: new mongoose.Types.ObjectId(comboId),
               restaurantId: new mongoose.Types.ObjectId(restaurantId)
             },
           },
@@ -336,6 +337,7 @@ export const getAllFoodForPOS = async (req, res, next) => {
                     image: 1,
                     foodType: 1,
                     price: 1,
+                     basePrice: 1,
                     portions: 1,
                     choices: {
                       $map: {

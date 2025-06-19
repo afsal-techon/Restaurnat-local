@@ -558,6 +558,7 @@ export const createCompo = async (req,res,next)=>{
                   image: 1,
                   foodType: 1,
                   price: 1,
+                  basePrice:1,
                   portions: 1,
                   choices: {
                     $map: {
