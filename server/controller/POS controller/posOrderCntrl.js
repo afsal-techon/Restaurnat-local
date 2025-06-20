@@ -706,7 +706,7 @@ const paymentRecord = {
      await PAYMENT.create([paymentRecord]);
 
 
-              // Add a Transaction for each account used
+   // Add a Transaction for each account used
     for (const acc of accounts) {
       await TRANSACTION.create({
         restaurantId,

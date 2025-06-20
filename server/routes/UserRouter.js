@@ -16,7 +16,7 @@ import {getAllByCategoryForPOS,getAllComboForPOS,getAllFoodForPOS,getComboForPOS
 import {  getFloorsForPOS,getTablesForPOS ,createCustomerForPOS,getCustomerCreditHistory,getCustomerTypesForPOS,getCustomersForPOS,updateCustomerforPOS,} from '../controller/POS controller/posBasicCntrl.js';
 import {createOrder,getOneOrderDetails,getTodayOrdersForPOS,posOrderBilling,cancelOrder } from '../controller/POS controller/posOrderCntrl.js';
 import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../controller/foodController/comboCntrl.js'
-import { getQuickViewDashboard,getSalesOverview } from '../controller/DashbordController/dashbordCntrl.js'
+import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview} from '../controller/DashbordController/dashbordCntrl.js'
 
 import upload from '../middleware/multer.js'
 const router = express.Router();
@@ -166,6 +166,7 @@ router.get('/accounts/transaction/:accountId',VerifyToken,getTransactionList);
 //dashboard apis 
 router.get('/dashboard/quick-view/:fromDate/:toDate',VerifyToken,getQuickViewDashboard );
 router.get('/dashboard/sales-overview/:fromDate/:toDate',VerifyToken,getSalesOverview );
+router.get('/dashboard/payment-overview/:fromDate/:toDate',VerifyToken,getPaymentOverview );
 
 
 
