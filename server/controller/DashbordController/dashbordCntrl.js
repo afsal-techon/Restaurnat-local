@@ -4,13 +4,12 @@ import RESTAURANT from '../../model/restaurant.js'
 import CATEGORY from '../../model/category.js'
 import FOOD from '../../model/food.js'
 import CUSTOMER_TYPE from '../../model/customerTypes.js';
-import KITCHEN from '../../model/kitchen.js'
 import ORDER from '../../model/oreder.js';
 import COMBO from '../../model/combo.js'
-import TABLES from '../../model/tables.js';
 import CUSTOMER from '../../model/customer.js';
 import PAYMENT from '../../model/paymentRecord.js'
 import { getIO  } from "../../config/socket.js";
+import ACCOUNTS from '../../model/account.js'
 
 
 
@@ -305,7 +304,11 @@ export const getPaymentOverview = async(req,res,next)=>{
            const start = new Date(fromDate);
             const end = new Date(toDate);
 
-                const payments = await PAYMENT.aggregate([
+    //  Fetch all account names that can appear as payment methods
+    const accounts = await ACCOUNTS.find().select("accountName -_id").lean();
+    const expectedMethods = accounts.map((acc) => acc.accountName);
+
+        const payments = await PAYMENT.aggregate([
       {
         $match: {
          createdAt: { $gte: start, $lte: end }
@@ -336,21 +339,288 @@ export const getPaymentOverview = async(req,res,next)=>{
       }
     ]);
 
-          const totalReceived = payments.reduce((sum, p) => sum + p.amount, 0);
+   const totalReceived = payments.reduce((sum, p) => sum + p.amount, 0);
 
-      const enrichedPayments = payments.map(p => ({
-        ...p,
-        percentage: totalReceived ? parseFloat(((p.amount / totalReceived) * 100).toFixed(2)) : 0
-      }));
+    const paymentMap = new Map(payments.map((p) => [p.name, p.amount]));
+
+    const enrichedPayments = expectedMethods.map((method) => {
+      const amount = paymentMap.get(method) || null;
+      return {
+        name: method,
+        amount,
+        percentage: totalReceived
+          ? parseFloat(((amount / totalReceived) * 100).toFixed(2))
+          : null,
+      };
+    });
 
     return res.status(200).json({
       methods: enrichedPayments,
-      totalReceived
+      totalReceived,
     });
-
     } catch (err) {
         next(err)
     }
 }
 
+
+export const getOrderSummary = async(req,res,next)=>{
+     try {
+
+    const userId = req.user;
+
+    const user = await USER.findById(userId).lean();
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+        // 1. Count orders by status
+    const orderStats = await ORDER.aggregate([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    let completedCount = 0;
+    let canceledCount = 0;
+    
+      orderStats.forEach(stat => {
+      if (stat._id === "Completed") completedCount = stat.count;
+      else if (stat._id === "Cancelled") canceledCount = stat.count;
+    });
+
+       // 2. Get grandTotal sum of all payments linked to completed orders
+    const completedOrders = await ORDER.find({ status: "Completed" }).select("_id");
+    const completedOrderIds = completedOrders.map(order => order._id);
+
+    const paymentStats = await PAYMENT.aggregate([
+      {
+        $match: {
+          orderId: { $in: completedOrderIds }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: "$grandTotal" }
+        }
+      }
+    ]);
+
+    const totalSales = paymentStats[0]?.totalSales || 0;
+    const averageOrderValue =
+      completedCount > 0 ? parseFloat((totalSales / completedCount).toFixed(2)) : 0;
+
+    return res.status(200).json({
+      completedOrders: completedCount || 0,
+      canceledOrders: canceledCount ||0,
+      averageOrderValue :averageOrderValue ||0
+    });
+    
+     } catch (err) {
+      next(err)
+     }
+
+}
+
+export const getTopSellingItems = async(req,res,next)=>{
+    try {
+
+      const userId = req.user;
+    const user = await USER.findById(userId);
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+     const orders = await ORDER.find({ status: "Completed" })
+      .select("items")
+      .lean();
+
+    const foodCountMap = new Map();
+    const foodSalesMap = new Map();
+    const comboCountMap = new Map();
+    const comboSalesMap = new Map();
+
+
+
+    // 2. Loop through orders and classify counts/sales
+    for (const order of orders) {
+      for (const item of order.items) {
+        if (item.isCombo) {
+          //  Combo item
+          const comboId = item.comboId?.toString();
+          const comboQty = item.qty || 1;
+          const comboPrice = item.comboPrice || 0;
+
+          if (comboId) {
+            comboCountMap.set(
+              comboId,
+              (comboCountMap.get(comboId) || 0) + comboQty
+            );
+            comboSalesMap.set(
+              comboId,
+              (comboSalesMap.get(comboId) || 0) + comboPrice * comboQty
+            );
+          }
+
+          //  Count nested food items inside combo (only for count, not price)
+          if (item.items && Array.isArray(item.items)) {
+            for (const nestedItem of item.items) {
+              if (nestedItem.foodId) {
+                const foodId = nestedItem.foodId.toString();
+                const nestedQty = nestedItem.qty || 1;
+
+                foodCountMap.set(
+                  foodId,
+                  (foodCountMap.get(foodId) || 0) + nestedQty
+                );
+              }
+            }
+          }
+        } else {
+          //  Direct food item
+          const foodId = item.foodId?.toString();
+          const qty = item.qty || 1;
+          const total = item.total || 0;
+
+          if (foodId) {
+            foodCountMap.set(foodId, (foodCountMap.get(foodId) || 0) + qty);
+            foodSalesMap.set(
+              foodId,
+              (foodSalesMap.get(foodId) || 0) + total
+            );
+          }
+        }
+      }
+    }
+
+    // 3. Sort and get top 8 foods and combos
+    const topFoodIds = Array.from(foodCountMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+
+    const topComboIds = Array.from(comboCountMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+
+    // 4. Fetch food and combo details from DB
+    const topFoods = await FOOD.find({ _id: { $in: topFoodIds.map(([id]) => id) } })
+      .populate("categoryId", "name")
+      .select("foodName categoryId image")
+      .lean();
+
+    const topCombos = await COMBO.find({ _id: { $in: topComboIds.map(([id]) => id) } })
+      .select("comboName image")
+      .lean();
+
+        // 5. Merge count + sale into results in correct sorted order
+      const foodMap = new Map();
+      topFoods.forEach(food => foodMap.set(food._id.toString(), food));
+
+      const finalTopFoods = topFoodIds.map(([id]) => {
+        const food = foodMap.get(id);
+        return {
+          name: food?.foodName || "null",
+          category: food?.categoryId?.name || "null",
+          image: food?.image || null,
+          itemsSold: foodCountMap.get(id) || 0,
+          totalSale: parseFloat((foodSalesMap.get(id) || 0).toFixed(2)),
+        };
+      });
+
+      const comboMap = new Map();
+      topCombos.forEach(combo => comboMap.set(combo._id.toString(), combo));
+
+      const finalTopCombos = topComboIds.map(([id]) => {
+        const combo = comboMap.get(id);
+        return {
+          name: combo?.comboName || "null",
+          image: combo?.image || null,
+          itemsSold: comboCountMap.get(id) || 0,
+          totalSale: parseFloat((comboSalesMap.get(id) || 0).toFixed(2)),
+        };
+      });
+
+    // 6. Return response
+    return res.status(200).json({
+      topFoods: finalTopFoods,
+      topCombos: finalTopCombos,
+    });
+      
+    } catch (err) {
+        next(err)
+    }
+      
+  }
+
+
+
+export const getLatestCompletedOrders = async (req, res, next) => {
+  try {
+    const userId = req.user;
+    const user = await USER.findById(userId);
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const payments = await PAYMENT.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate({
+        path: "orderId",
+        select: "order_id tableId customerTypeId",
+        populate: [
+          { path: "tableId", select: "name" },
+          { path: "customerTypeId", select: "type" }
+        ]
+      })
+      .populate({
+        path: "methods.accountId",
+        select: "accountName"
+      })
+      .lean();
+
+    const latestOrders = payments.map(payment => {
+      const paymentTypes = payment.methods.map(method => method.accountId?.accountName).filter(Boolean);
+
+      return {
+        order_id: payment.orderId?.order_id || "N/A",
+        tableNo: payment.orderId?.tableId?.tableNo || "N/A",
+        customerType: payment.orderId?.customerTypeId?.type || "N/A",
+        amount: payment.grandTotal || 0,
+        paymentTypes, // array of names like ['Cash', 'UPI']
+        date: payment.createdAt
+      };
+    });
+
+
+ const data = {};
+
+    for (const payment of payments) {
+      const order = payment.orderId;
+      if (!order || !order.customerTypeId?.type) continue;
+
+      const customerType = order.customerTypeId.type;
+
+      const paymentTypes = payment.methods
+        .map(method => method.accountId?.accountName)
+        .filter(Boolean);
+
+      const entry = {
+        order_id: order.order_id || "N/A",
+        tableNo: order.tableId?.tableNo || order.tableId?.name || "N/A",
+        amount: payment.grandTotal || 0,
+        paymentTypes, // e.g., ['Cash', 'UPI']
+        date: payment.createdAt,
+      };
+
+      if (!data[customerType]) {
+        data[customerType] = [];
+      }
+
+      data[customerType].push(entry);
+    }
+
+    return res.status(200).json(data);
+  } catch (err) {
+    next(err);
+  }
+};
 

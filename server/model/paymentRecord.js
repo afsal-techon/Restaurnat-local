@@ -10,7 +10,7 @@ const paymentSchema = new mongoose.Schema({
   methods: [{
   accountId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Accounts',
+    ref: 'Account',
     required: true
   },
   amount: {
