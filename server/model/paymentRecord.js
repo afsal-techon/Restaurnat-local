@@ -10,7 +10,7 @@ const paymentSchema = new mongoose.Schema({
   methods: [{
   accountId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Accounts',
+    ref: 'Account',
     required: true
   },
   amount: {
@@ -49,6 +49,11 @@ const paymentSchema = new mongoose.Schema({
            type:String,
        },
   }, { timestamps: true });
+
+
+paymentSchema.index({ createdAt: 1 });
+paymentSchema.index({ orderId: 1 });
+paymentSchema.index({ createdById: 1 });
 
 
   const paymentModel = mongoose.model('paymentRecord',paymentSchema);

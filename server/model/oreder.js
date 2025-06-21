@@ -73,23 +73,23 @@ const orderItemSchema = new mongoose.Schema({
     },
   ],
   // Nested combo items
-  // items: [{
-  //   foodId: {
-  //     type: mongoose.Schema.Types.ObjectId,
-  //     ref: "Food",
-  //     required: true
-  //   },
-  //   foodName: {
-  //     type: String,
-  //     required: true
-  //   },
-  //   portion: String,
-  //   price: Number,
-  //   qty: Number,
-  //   total: Number,
-  //   conversionFactor: Number,
-  //   isComboItem: Boolean
-  // }],
+  items: [{
+    foodId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Food",
+      required: true
+    },
+    foodName: {
+      type: String,
+      required: true
+    },
+    portion: String,
+    price: Number,
+    qty: Number,
+    total: Number,
+    conversionFactor: Number,
+    isComboItem: Boolean
+  }],
   conversionFactor: {
     type: Number,
     default: 1
