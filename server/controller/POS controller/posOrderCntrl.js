@@ -51,7 +51,7 @@ const generateOrderId = async () => {
   };
   
   const getNextOrderNo = async () => {
-    const lastOrder = await ORDER.findOne({ orderType: "Take Away" })
+    const lastOrder = await ORDER.findOne({ orderNo: { $regex: /^\d{2}$/ } })
     .sort({ createdAt: -1 })
     .select("orderNo");
   
@@ -259,14 +259,16 @@ const printer = new ThermalPrinter({
   
         ctypeName = custType.type;
         const generatedOrderId = await generateOrderId();
+         ticketNo = await getNextTicketNo();
+         orderNo = await getNextOrderNo();
   
         // Generate Ticket/Order No based on order type
-        if (ctypeName.includes("Dine-In")) {
-          ticketNo = await getNextTicketNo();
-        } else if (ctypeName.includes("Take Away")) {
-          ticketNo = await getNextTicketNo();
-          orderNo = await getNextOrderNo();
-        }
+        // if (ctypeName.includes("Dine-In")) {
+        //   ticketNo = await getNextTicketNo();
+        // } else if (ctypeName.includes("Take Away")) {
+        //   ticketNo = await getNextTicketNo();
+        //   orderNo = await getNextOrderNo();
+        // }
   
         [order] = await ORDER.create([{
           restaurantId,
@@ -611,6 +613,21 @@ async function printKOTReceipt(order, restaurant) {
   };
 
 
+export const generateUniqueRefId = async () => {
+  let refId;
+  let isUnique = false;
+
+  while (!isUnique) {
+    const randomNum = Math.floor(100000 + Math.random() * 900000); // 6 digit number
+    refId = `REF${randomNum}`;
+    
+    const exists = await TRANSACTION.exists({ referenceId: refId });
+    if (!exists) isUnique = true;
+  }
+
+  return refId;
+};
+
   export const posOrderBilling = async (req,res,next)=>{
     try {
   
@@ -708,13 +725,16 @@ const paymentRecord = {
 
    // Add a Transaction for each account used
     for (const acc of accounts) {
+
+      const refId = await generateUniqueRefId();
+      
       await TRANSACTION.create({
         restaurantId,
         accountId: acc.accountId,
         amount: acc.amount,
         type: "Credit",
         description: `POS Sale for Order ${order.order_id}`,
-        referenceId: order._id,
+        referenceId: refId,
         referenceType: 'Sale',
         createdById: userId,
         createdBy: user.name,

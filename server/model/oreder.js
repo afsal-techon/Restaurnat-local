@@ -85,7 +85,10 @@ const orderItemSchema = new mongoose.Schema({
     },
     portion: String,
     price: Number,
-    qty: Number,
+    qty: {
+      type:Number,
+      default: 1
+    },
     total: Number,
     conversionFactor: Number,
     isComboItem: Boolean
@@ -103,6 +106,7 @@ const orderSchema = new mongoose.Schema(
       ref: "table",
       default:null
     },
+    
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
@@ -142,7 +146,6 @@ const orderSchema = new mongoose.Schema(
     },
     orderNo: {
       type: String, // For takeaway, could be "108"
-      unique: true,
     },
     order_id: {
       type: String, // e.g., "ORD-343SS"
