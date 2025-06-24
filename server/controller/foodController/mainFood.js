@@ -314,7 +314,6 @@ export const updateFood = async (req, res, next) => {
       offer,
     } = req.body;
 
-    const foodImg = req.file ? `/uploads/${req.file.filename}` : null;
 
 
 
@@ -432,11 +431,14 @@ export const updateFood = async (req, res, next) => {
       }
     }
 
+      const foodImg = req.file ? `/uploads/${req.file.filename}` : food.image;
+
     food.foodName = foodName;
     food.restaurantId = restaurantId;
     food.categoryId = categoryId;
     food.foodType = foodType;
     food.menuTypeIds = menuTypeIds;
+      food.image = foodImg
     food.image = foodImg;
     food.courseIds = courseIds;
     food.prices = portions && portions.length > 0 ? null : prices;
