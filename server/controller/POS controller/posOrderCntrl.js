@@ -661,9 +661,16 @@ export const generateUniqueRefId = async () => {
           if (!order) {
             return res.status(404).json({ message: "Order not found or already completed/cancelled" });
           }
+          console.log(accounts,'accounts')
+
+               const notValuePaidTypes = ['Due'];
   
               // Validate payment amounts
-               const paidAmount = accounts.reduce((sum, acc) => sum + acc.amount, 0);
+               const paidAmount = accounts.reduce((sum, acc) => {
+                  if (notValuePaidTypes.includes(acc.accountType)) return sum;
+                  return sum + acc.amount;
+                }, 0);
+            
   
       
   
@@ -705,17 +712,10 @@ const paymentRecord = {
   methods: accounts.map(acc => ({
     accountId: acc.accountId,
     amount: acc.amount,
-    ...(acc.accountType === 'Cash' && {
-      receivedAmount: acc.receivedAmount || acc.amount,
-      changeGiven: acc.receivedAmount- acc.amount
-    })
   })),
   grandTotal,
   paidAmount,
   dueAmount ,
-  changeAmount: accounts
-    .filter(acc => acc.accountType === 'Cash')
-    .reduce((sum, acc) => sum + ((acc.receivedAmount || acc.amount) - acc.amount), 0),
   createdById: userId,
   createdBy: user.name,
 };

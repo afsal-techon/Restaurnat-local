@@ -24,6 +24,7 @@ accountType: {
     "Cash",
     "Bank",
     "Card",
+    "Due",
     "Online",
     "Fixed Asset",
     "Stock",

@@ -19,7 +19,7 @@ import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../c
 import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSummary,getTopSellingItems,getLatestCompletedOrders} from '../controller/DashbordController/dashbordCntrl.js'
 
 import upload from '../middleware/multer.js'
-import { getCategoryWiseSalesReport, getDailySalesReport } from '../controller/ReportsController/salesReportCntrl.js';
+import { getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
 const router = express.Router();
 
 
@@ -177,6 +177,8 @@ router.get('/dashboard/latest-orders',VerifyToken,getLatestCompletedOrders );
 //sales
 router.get('/reports/daily-sale',VerifyToken,getDailySalesReport);
 router.get('/reports/category-sale',VerifyToken,getCategoryWiseSalesReport);
+router.get('/reports/item-sale',VerifyToken,getItemWiseSalesReport);
+router.get('/reports/customerType-sale',VerifyToken,getCustomerTypeWiseSalesReport)
 
 
 

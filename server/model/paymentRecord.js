@@ -17,12 +17,6 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-   receivedAmount: { 
-        type: Number 
-      },
-      changeGiven: { 
-        type: Number 
-      },
 }],
     grandTotal: { 
       type: Number, 
@@ -33,10 +27,6 @@ const paymentSchema = new mongoose.Schema({
       required: true 
     },
     dueAmount: { 
-      type: Number, 
-      default: 0 
-    },
-    changeAmount: { 
       type: Number, 
       default: 0 
     },

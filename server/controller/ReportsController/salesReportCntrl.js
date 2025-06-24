@@ -84,7 +84,7 @@ export const getDailySalesReport = async(req,res,next)=>{
           customer:{$first:"$order.customerId.name"},
           table: { $first: "$table.name" },
           customerType: { $first: "$customerType.type" },
-          amount: { $first: "$grandTotal" },
+          amount: { $first: "$paidAmount" },
           date: { $first: "$createdAt" },
           paymentMethods: {
             $push: {
@@ -92,7 +92,6 @@ export const getDailySalesReport = async(req,res,next)=>{
               amount: "$methods.amount"
             }
           },
-          paidAmount: { $first: "$paidAmount" },
           dueAmount: { $first: "$dueAmount" },
           createdBy: { $first: "$createdBy" }
         }
@@ -329,6 +328,24 @@ export const getItemWiseSalesReport = async (req, res, next) => {
         $facet: {
           directItems: [
             { $match: { "items.isCombo": false } },
+              {
+              $lookup: {
+                from: "foods",
+                localField: "items.foodId",
+                foreignField: "_id",
+                as: "foodInfo"
+              }
+            },
+            { $unwind: "$foodInfo" },
+            {
+              $lookup: {
+                from: "categories",
+                localField: "foodInfo.categoryId",
+                foreignField: "_id",
+                as: "categoryInfo"
+              }
+            },
+            { $unwind: "$categoryInfo" },
             {
               $group: {
                 _id: {
@@ -336,6 +353,7 @@ export const getItemWiseSalesReport = async (req, res, next) => {
                   orderId: "$_id"
                 },
                 itemName: { $first: "$items.foodName" },
+                category : { $first: "$categoryInfo.name" },
                 qty: { $sum: "$items.qty" },
                 total: { $sum: "$items.total" }
               }
@@ -344,6 +362,7 @@ export const getItemWiseSalesReport = async (req, res, next) => {
               $group: {
                 _id: "$_id.itemId",
                 itemName: { $first: "$itemName" },
+                category: { $first: "$category" },
                 totalQty: { $sum: "$qty" },
                 totalSales: { $sum: "$total" },
                 orderIds: { $addToSet: "$_id.orderId" }
@@ -358,6 +377,24 @@ export const getItemWiseSalesReport = async (req, res, next) => {
           comboItems: [
             { $match: { "items.isCombo": true } },
             { $unwind: "$items.items" },
+                   {
+              $lookup: {
+                from: "foods",
+                localField: "items.items.foodId",
+                foreignField: "_id",
+                as: "foodInfo"
+              }
+            },
+            { $unwind: "$foodInfo" },
+            {
+              $lookup: {
+                from: "categories",
+                localField: "foodInfo.categoryId",
+                foreignField: "_id",
+                as: "categoryInfo"
+              }
+            },
+            { $unwind: "$categoryInfo" },
             {
               $group: {
                 _id: {
@@ -365,6 +402,7 @@ export const getItemWiseSalesReport = async (req, res, next) => {
                   orderId: "$_id"
                 },
                 itemName: { $first: "$items.items.foodName" },
+                category :{ $first: "$categoryInfo.name" },
                 qty: { $sum: "$items.items.qty" },
                 total: { $sum: "$items.items.total" }
               }
@@ -373,6 +411,7 @@ export const getItemWiseSalesReport = async (req, res, next) => {
               $group: {
                 _id: "$_id.itemId",
                 itemName: { $first: "$itemName" },
+                category: { $first: "$category" },
                 totalQty: { $sum: "$qty" },
                 totalSales: { $sum: "$total" },
                 orderIds: { $addToSet: "$_id.orderId" }
@@ -396,6 +435,7 @@ export const getItemWiseSalesReport = async (req, res, next) => {
         $group: {
           _id: "$all._id",
           itemName: { $first: "$all.itemName" },
+          category: { $first: "$all.category" },
           totalQty: { $sum: "$all.totalQty" },
           totalSales: { $sum: "$all.totalSales" },
           orderCount: { $sum: "$all.orderCount" }
@@ -430,4 +470,92 @@ export const getItemWiseSalesReport = async (req, res, next) => {
   }
 
 }
+
+
+export const getCustomerTypeWiseSalesReport = async (req, res, next) => {
+  try {
+    const userId = req.user;
+    const user = await USER.findById(userId);
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    const data = await ORDER.aggregate([
+      { $match: { status: "Completed" } },
+      { $unwind: "$items" },
+      {
+        $lookup: {
+          from: "customertypes",
+          localField: "customerTypeId",
+          foreignField: "_id",
+          as: "customerType"
+        }
+      },
+      { $unwind: "$customerType" },
+      {
+        $group: {
+          _id: {
+            customerTypeId: "$customerType._id",
+            orderId: "$_id"
+          },
+          customerType: { $first: "$customerType.type" },
+          totalQty: { $sum: "$items.qty" },
+          totalSales: { $sum: "$items.total" }
+        }
+      },
+      {
+        $group: {
+          _id: "$_id.customerTypeId",
+          customerType: { $first: "$customerType" },
+          totalQty: { $sum: "$totalQty" },
+          totalSales: { $sum: "$totalSales" },
+          orderIds: { $addToSet: "$_id.orderId" }
+        }
+      },
+      {
+        $addFields: {
+          orderCount: { $size: "$orderIds" }
+        }
+      },
+
+            {
+        $project: {
+          _id: 0,
+          customerType: 1,
+          totalQty: 1,
+          totalSales: 1,
+          orderCount: 1
+          // orderIds not included here
+        }
+      },
+      { $sort: { totalSales: -1 } }, // or totalQty for popularity
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: limit }],
+          totalCount: [{ $count: "count" }]
+        }
+      },
+      {
+        $project: {
+          data: 1,
+          totalCount: { $arrayElemAt: ["$totalCount.count", 0] }
+        }
+      }
+    ]);
+
+    const response = {
+      data: data[0]?.data || [],
+      totalCount: data[0]?.totalCount || 0,
+      page,
+      limit
+    };
+
+    return res.status(200).json(response);
+
+  } catch (err) {
+    next(err);
+  }
+};
 

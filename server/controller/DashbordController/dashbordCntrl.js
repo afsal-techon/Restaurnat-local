@@ -69,7 +69,7 @@ export const getQuickViewDashboard = async(req,res,next)=>{
       {
         $group: {
           _id: "$orderInfo.customerTypeId",
-          total: { $sum: "$grandTotal" },
+          total: { $sum: "$paidAmount" },
           count: { $sum: 1 }
         }
       }
@@ -211,7 +211,7 @@ export const getSalesOverview = async(req,res,next)=>{
       { $unwind: "$orderInfo" },
       {
         $project: {
-          grandTotal: 1,
+          paidAmount: 1,
           createdAt: 1,
           customerTypeId: "$orderInfo.customerTypeId",
           date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
@@ -240,7 +240,7 @@ export const getSalesOverview = async(req,res,next)=>{
             slot: "$slot",
             customerTypeId: "$customerTypeId",
           },
-          total: { $sum: "$grandTotal" },
+          total: { $sum: "$paidAmount" },
         },
       },
     ]);
@@ -403,7 +403,7 @@ export const getOrderSummary = async(req,res,next)=>{
       {
         $group: {
           _id: null,
-          totalSales: { $sum: "$grandTotal" }
+          totalSales: { $sum: "$paidAmount" }
         }
       }
     ]);
@@ -560,14 +560,15 @@ export const getLatestCompletedOrders = async (req, res, next) => {
     const user = await USER.findById(userId);
     if (!user) return res.status(400).json({ message: "User not found" });
 
+    // Fetch more than 10 to allow filtering and grouping
     const payments = await PAYMENT.find()
       .sort({ createdAt: -1 })
-      .limit(10)
+      .limit(100)
       .populate({
         path: "orderId",
         select: "order_id tableId customerTypeId",
         populate: [
-          { path: "tableId", select: "name" },
+          { path: "tableId", select: "tableNo name" },
           { path: "customerTypeId", select: "type" }
         ]
       })
@@ -577,21 +578,7 @@ export const getLatestCompletedOrders = async (req, res, next) => {
       })
       .lean();
 
-    const latestOrders = payments.map(payment => {
-      const paymentTypes = payment.methods.map(method => method.accountId?.accountName).filter(Boolean);
-
-      return {
-        order_id: payment.orderId?.order_id || "N/A",
-        tableNo: payment.orderId?.tableId?.tableNo || "N/A",
-        customerType: payment.orderId?.customerTypeId?.type || "N/A",
-        amount: payment.grandTotal || 0,
-        paymentTypes, // array of names like ['Cash', 'UPI']
-        date: payment.createdAt
-      };
-    });
-
-
- const data = {};
+    const data = {};
 
     for (const payment of payments) {
       const order = payment.orderId;
@@ -607,7 +594,8 @@ export const getLatestCompletedOrders = async (req, res, next) => {
         order_id: order.order_id || "N/A",
         tableNo: order.tableId?.tableNo || order.tableId?.name || "N/A",
         amount: payment.grandTotal || 0,
-        paymentTypes, // e.g., ['Cash', 'UPI']
+        paid: payment.paidAmount,
+        paymentTypes,
         date: payment.createdAt,
       };
 
@@ -615,7 +603,10 @@ export const getLatestCompletedOrders = async (req, res, next) => {
         data[customerType] = [];
       }
 
-      data[customerType].push(entry);
+      // Only push if less than 10 items collected for this customerType
+      if (data[customerType].length < 10) {
+        data[customerType].push(entry);
+      }
     }
 
     return res.status(200).json(data);
@@ -623,4 +614,5 @@ export const getLatestCompletedOrders = async (req, res, next) => {
     next(err);
   }
 };
+
 
