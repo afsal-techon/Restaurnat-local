@@ -106,6 +106,7 @@ export const createCompo = async (req,res,next)=>{
                      mainItem: item.mainItem,
                      additionalPrice: item.additionalPrice || 0,
                      qty:item.qty || 1,
+                     price:item.price,
                      portionId: item.portionId,
                      pieceCount: null,
                      singlePieceRate: null,
@@ -116,6 +117,7 @@ export const createCompo = async (req,res,next)=>{
                      mainItem: item.mainItem,
                      additionalPrice: item.additionalPrice || 0,
                      qty:item.qty || 1,
+                     price:item.price,
                      portionId: null,
                      pieceCount: item.pieceCount,
                      singlePieceRate: item.singlePieceRate,
@@ -276,6 +278,7 @@ export const createCompo = async (req,res,next)=>{
               mainItem: item.mainItem,
               additionalPrice: item.additionalPrice || 0,
                qty:item.qty || 1,
+               price:item.price,
               portionId: item.portionId,
               pieceCount: null,
               singlePieceRate: null,
@@ -286,6 +289,7 @@ export const createCompo = async (req,res,next)=>{
               mainItem: item.mainItem,
               additionalPrice: item.additionalPrice || 0,
                qty:item.qty || 1,
+               price:item.price,
               portionId: null,
               pieceCount: item.pieceCount,
               singlePieceRate: item.singlePieceRate,
@@ -671,6 +675,10 @@ export const createCompo = async (req,res,next)=>{
       next(error);
     }
   };
+
+
+
+
 
 
   export const deleteCombo = async (req, res, next) => {

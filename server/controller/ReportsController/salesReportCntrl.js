@@ -204,16 +204,13 @@ export const getCategoryWiseSalesReport = async (req, res, next) => {
             { $unwind: "$items.items" },
             // ======= FIX STARTS HERE =======
             {
-              $addFields: {
+            $addFields: {
                 "items.items.computedQty": {
-                  $multiply: ["$items.items.qty", "$items.qty"], // Multiply by combo quantity
+                  $multiply: ["$items.items.qty", "$items.qty"]
                 },
                 "items.items.computedTotal": {
-                  $divide: [
-                    "$items.total",
-                    { $size: "$items.items" }, // Distribute combo price equally
-                  ],
-                },
+                  $multiply: ["$items.items.price", "$items.qty"]
+                }
               },
             },
             // ======= FIX ENDS HERE 
@@ -374,55 +371,66 @@ export const getItemWiseSalesReport = async (req, res, next) => {
               }
             }
           ],
-          comboItems: [
-            { $match: { "items.isCombo": true } },
-            { $unwind: "$items.items" },
-                   {
-              $lookup: {
-                from: "foods",
-                localField: "items.items.foodId",
-                foreignField: "_id",
-                as: "foodInfo"
-              }
-            },
-            { $unwind: "$foodInfo" },
-            {
-              $lookup: {
-                from: "categories",
-                localField: "foodInfo.categoryId",
-                foreignField: "_id",
-                as: "categoryInfo"
-              }
-            },
-            { $unwind: "$categoryInfo" },
-            {
-              $group: {
-                _id: {
-                  itemId: "$items.items.foodId",
-                  orderId: "$_id"
-                },
-                itemName: { $first: "$items.items.foodName" },
-                category :{ $first: "$categoryInfo.name" },
-                qty: { $sum: "$items.items.qty" },
-                total: { $sum: "$items.items.total" }
-              }
-            },
-            {
-              $group: {
-                _id: "$_id.itemId",
-                itemName: { $first: "$itemName" },
-                category: { $first: "$category" },
-                totalQty: { $sum: "$qty" },
-                totalSales: { $sum: "$total" },
-                orderIds: { $addToSet: "$_id.orderId" }
-              }
-            },
-            {
-              $addFields: {
-                orderCount: { $size: "$orderIds" }
+            comboItems: [
+          { $match: { "items.isCombo": true } },
+          { $unwind: "$items.items" },
+          {
+            $addFields: {
+              "items.items.computedQty": {
+                $multiply: ["$items.items.qty", "$items.qty"]
+              },
+              "items.items.computedTotal": {
+                $multiply: ["$items.items.price", "$items.qty"]
               }
             }
-          ]
+          },
+          {
+            $lookup: {
+              from: "foods",
+              localField: "items.items.foodId",
+              foreignField: "_id",
+              as: "foodInfo"
+            }
+          },
+          { $unwind: "$foodInfo" },
+          {
+            $lookup: {
+              from: "categories",
+              localField: "foodInfo.categoryId",
+              foreignField: "_id",
+              as: "categoryInfo"
+            }
+          },
+          { $unwind: "$categoryInfo" },
+          {
+            $group: {
+              _id: {
+                itemId: "$items.items.foodId",
+                orderId: "$_id"
+              },
+              itemName: { $first: "$items.items.foodName" },
+              category: { $first: "$categoryInfo.name" },
+              qty: { $sum: "$items.items.computedQty" },
+              total: { $sum: "$items.items.computedTotal" }
+            }
+          },
+          {
+            $group: {
+              _id: "$_id.itemId",
+              itemName: { $first: "$itemName" },
+              category: { $first: "$category" },
+              totalQty: { $sum: "$qty" },
+              totalSales: { $sum: "$total" },
+              orderIds: { $addToSet: "$_id.orderId" }
+            }
+          },
+          {
+            $addFields: {
+              orderCount: { $size: "$orderIds" }
+            }
+          }
+        ]
+
         }
       },
       {

@@ -6,6 +6,7 @@ const foodItemSchema = new mongoose.Schema({
   foodId: { type: mongoose.Schema.Types.ObjectId, ref: "Food" },
   portionId: { type: mongoose.Schema.Types.ObjectId } ,
   additionalPrice: Number ,
+  price:Number,
   qty:Number,
   pieceCount: Number, 
   singlePieceRate: Number, 

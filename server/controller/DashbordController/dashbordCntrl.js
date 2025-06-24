@@ -467,7 +467,7 @@ export const getTopSellingItems = async(req,res,next)=>{
             for (const nestedItem of item.items) {
               if (nestedItem.foodId) {
                 const foodId = nestedItem.foodId.toString();
-                const nestedQty = (nestedItem.qty || 1) * comboQty;;
+                const nestedQty = (nestedItem.qty || 1) * comboQty;
 
                 foodCountMap.set(
                   foodId,
