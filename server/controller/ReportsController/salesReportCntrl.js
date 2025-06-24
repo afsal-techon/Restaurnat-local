@@ -217,7 +217,7 @@ export const getCategoryWiseSalesReport = async (req, res, next) => {
                 },
               },
             },
-            // ======= FIX ENDS HERE =======
+            // ======= FIX ENDS HERE 
             {
               $lookup: {
                 from: "foods",
