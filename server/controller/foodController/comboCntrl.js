@@ -22,7 +22,7 @@ export const createCompo = async (req,res,next)=>{
       } = req.body;
 
 
-      const comboImg = req.file ? `/uploads/${req.file.filename}` : null;
+      const comboImg = req.file ? `/uploads/${req.file.filename}` : null
 
 
       if (typeof offer === "string")  offer = JSON.parse(offer); // Parse string into array if necessary
@@ -105,6 +105,7 @@ export const createCompo = async (req,res,next)=>{
                      foodId: item.foodId,
                      mainItem: item.mainItem,
                      additionalPrice: item.additionalPrice || 0,
+                     qty:item.qty || 1,
                      portionId: item.portionId,
                      pieceCount: null,
                      singlePieceRate: null,
@@ -114,6 +115,7 @@ export const createCompo = async (req,res,next)=>{
                      foodId: item.foodId,
                      mainItem: item.mainItem,
                      additionalPrice: item.additionalPrice || 0,
+                     qty:item.qty || 1,
                      portionId: null,
                      pieceCount: item.pieceCount,
                      singlePieceRate: item.singlePieceRate,
@@ -188,7 +190,7 @@ export const createCompo = async (req,res,next)=>{
         comboPrice,
       } = req.body;
 
-      const comboImg = req.file ? `/uploads/${req.file.filename}` : null;
+    
   
       if (!comboId) return res.status(400).json({ message: "Combo ID is required!" });
   
@@ -226,6 +228,8 @@ export const createCompo = async (req,res,next)=>{
       if (duplicateCombo) {
         return res.status(400).json({ message: "Another combo with this name already exists!" });
       }
+
+    
   
       // Role-based restaurant access
       let filter = {};
@@ -271,6 +275,7 @@ export const createCompo = async (req,res,next)=>{
               foodId: item.foodId,
               mainItem: item.mainItem,
               additionalPrice: item.additionalPrice || 0,
+               qty:item.qty || 1,
               portionId: item.portionId,
               pieceCount: null,
               singlePieceRate: null,
@@ -280,12 +285,14 @@ export const createCompo = async (req,res,next)=>{
               foodId: item.foodId,
               mainItem: item.mainItem,
               additionalPrice: item.additionalPrice || 0,
+               qty:item.qty || 1,
               portionId: null,
               pieceCount: item.pieceCount,
               singlePieceRate: item.singlePieceRate,
             });
           }
         }
+        
   
         const createdGroup = await COMPOGROUP.create({
           groupName,
@@ -298,6 +305,8 @@ export const createCompo = async (req,res,next)=>{
   
         comboGroupIds.push(createdGroup._id);
       }
+
+       const comboImg = req.file ? `/uploads/${req.file.filename}` : existingCombo.image;
   
       // Update the COMBO
       existingCombo.comboName = comboName;
@@ -310,6 +319,8 @@ export const createCompo = async (req,res,next)=>{
       existingCombo.createdById = user._id;
       existingCombo.createdBy = user.name;
       await existingCombo.save();
+
+      console.log(existingCombo,'exist')
   
       return res.status(200).json({ message: "Combo updated successfully!", data: existingCombo });
   

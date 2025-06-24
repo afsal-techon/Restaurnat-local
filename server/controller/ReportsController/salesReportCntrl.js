@@ -138,28 +138,20 @@ export const getDailySalesReport = async(req,res,next)=>{
 }
 
 
-export const getCategoryWiseSalesReport = async(req,res,next)=>{
+export const getCategoryWiseSalesReport = async (req, res, next) => {
+  try {
+    const user = await USER.findOne({ _id: req.user });
+    if (!user) {
+      return res.status(400).json({ message: "User not found!" });
+    }
 
-    try {
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
 
-        const user = await USER.findOne({ _id: req.user });
-        if (!user) {
-            return res.status(400).json({ message: "User not found!" });
-        }
-
-        const limit = parseInt(req.query.limit) || 10;
-        const page = parseInt(req.query.page) || 1;
-        const skip = (page - 1) * limit;
-
-         const data = await ORDER.aggregate([
-      {
-        $match: {
-          status: "Completed",
-        },
-      },
-      {
-        $unwind: "$items",
-      },
+    const data = await ORDER.aggregate([
+      { $match: { status: "Completed" } },
+      { $unwind: "$items" },
       {
         $facet: {
           directFood: [
@@ -182,7 +174,7 @@ export const getCategoryWiseSalesReport = async(req,res,next)=>{
               },
             },
             { $unwind: "$categoryInfo" },
-          {
+            {
               $group: {
                 _id: {
                   categoryId: "$categoryInfo._id",
@@ -193,7 +185,7 @@ export const getCategoryWiseSalesReport = async(req,res,next)=>{
                 totalSales: { $sum: "$items.total" },
               },
             },
-                    {
+            {
               $group: {
                 _id: "$_id.categoryId",
                 categoryName: { $first: "$categoryName" },
@@ -210,11 +202,22 @@ export const getCategoryWiseSalesReport = async(req,res,next)=>{
           ],
           comboFood: [
             { $match: { "items.isCombo": true } },
+            { $unwind: "$items.items" },
+            // ======= FIX STARTS HERE =======
             {
-              $unwind: {
-                path: "$items.items", // nested items inside combo
+              $addFields: {
+                "items.items.computedQty": {
+                  $multiply: ["$items.items.qty", "$items.qty"], // Multiply by combo quantity
+                },
+                "items.items.computedTotal": {
+                  $divide: [
+                    "$items.total",
+                    { $size: "$items.items" }, // Distribute combo price equally
+                  ],
+                },
               },
             },
+            // ======= FIX ENDS HERE =======
             {
               $lookup: {
                 from: "foods",
@@ -240,11 +243,11 @@ export const getCategoryWiseSalesReport = async(req,res,next)=>{
                   orderId: "$_id",
                 },
                 categoryName: { $first: "$categoryInfo.name" },
-                totalQty: { $sum: "$items.items.qty" },
-                totalSales: { $sum: "$items.items.total" },
+                totalQty: { $sum: "$items.items.computedQty" }, // Use computedQty
+                totalSales: { $sum: "$items.items.computedTotal" }, // Use computedTotal
               },
             },
-                {
+            {
               $group: {
                 _id: "$_id.categoryId",
                 categoryName: { $first: "$categoryName" },
@@ -263,9 +266,7 @@ export const getCategoryWiseSalesReport = async(req,res,next)=>{
       },
       {
         $project: {
-          all: {
-            $concatArrays: ["$directFood", "$comboFood"],
-          },
+          all: { $concatArrays: ["$directFood", "$comboFood"] },
         },
       },
       { $unwind: "$all" },
@@ -279,25 +280,21 @@ export const getCategoryWiseSalesReport = async(req,res,next)=>{
         },
       },
       { $sort: { totalSales: -1 } },
-
-       
       {
         $facet: {
           data: [{ $skip: skip }, { $limit: limit }],
-          totalCount: [{ $count: "count" }]
-        }
+          totalCount: [{ $count: "count" }],
+        },
       },
       {
         $project: {
           data: 1,
-          totalCount: { $arrayElemAt: ["$totalCount.count", 0] }
-        }
-      }
-
-
+          totalCount: { $arrayElemAt: ["$totalCount.count", 0] },
+        },
+      },
     ]);
 
-       const response = {
+    const response = {
       data: data[0]?.data || [],
       totalCount: data[0]?.totalCount || 0,
       page,
@@ -305,11 +302,10 @@ export const getCategoryWiseSalesReport = async(req,res,next)=>{
     };
 
     return res.status(200).json(response);
-        
-    } catch (error) {
-        next(err)
-    }
-}
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 export const getItemWiseSalesReport = async (req, res, next) => {

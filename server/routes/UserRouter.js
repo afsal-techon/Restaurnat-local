@@ -68,6 +68,7 @@ router.get('/user/:restaurantId',VerifyToken,getAllUsers);
 router.put('/user-update',VerifyToken, updateUser);
 router.delete('/user',VerifyToken, deleteUser);
 
+
 //category
 router.post('/category',VerifyToken,createCategory);
 router.get('/category/:restaurantId' ,VerifyToken,getAllCategories)
