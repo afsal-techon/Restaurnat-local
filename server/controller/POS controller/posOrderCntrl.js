@@ -692,18 +692,18 @@ export const generateUniqueRefId = async () => {
   
   
         // Record credit transaction
-        // await CUSTOMER_CREDIT_HISTORY.create([{
-        //   restaurantId,
-        //   customerId,
-        //   orderId,
-        //   amount: dueAmount,
-        //   type: 'credit',
-        //   notes: `Bill settlement for order ${order.order_id}`,
-        //   createdById: userId,
-        //   createdBy:user.name,
-        //   previousBalance: previousBalance,
-        //   newBalance: customer.credit
-        // }]);
+        await CUSTOMER_CREDIT_HISTORY.create([{
+          restaurantId,
+          customerId,
+          orderId,
+          amount: dueAmount,
+          type: 'credit',
+          notes: `Bill settlement for order ${order.order_id}`,
+          createdById: userId,
+          createdBy:user.name,
+          previousBalance: previousBalance,
+          newBalance: customer.credit
+        }]);
       }
   
           // Create payment records

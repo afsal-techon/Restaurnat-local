@@ -188,6 +188,9 @@ router.get('/reports/order-summary',VerifyToken,getALLOrderSummary);
 router.get('/reports/one-order/:orderId',VerifyToken,getSingleOrder);
 router.get('/reports/cancelled-order',VerifyToken,getCancelledOrders)
 
+//Payment  Report 
+
+
 
 
 

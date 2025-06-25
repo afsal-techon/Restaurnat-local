@@ -17,7 +17,7 @@ export const getALLOrderSummary = async(req,res,next)=>{
 
 
    
-    const result = await ORDER.aggregate([
+ const result = await ORDER.aggregate([
       { $sort: { createdAt: -1 } },
       { $skip: skip },
       { $limit: limit },
@@ -67,7 +67,7 @@ export const getALLOrderSummary = async(req,res,next)=>{
       },
       { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
 
-            // Customer Name
+      // Customer lookup
       {
         $lookup: {
           from: "customers",
@@ -78,8 +78,8 @@ export const getALLOrderSummary = async(req,res,next)=>{
       },
       { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
 
-      // Group to consolidate records
-      {
+            // Group to consolidate records
+        {
         $group: {
           _id: "$_id",
           order_id: { $first: "$order_id" },
@@ -92,38 +92,40 @@ export const getALLOrderSummary = async(req,res,next)=>{
           discount: { $first: "$discount" },
           subTotal: { $first: "$subTotal" },
           grandTotal: { $first: "$paymentInfo.grandTotal" },
-         paidAmount: { $first: "$paymentInfo.paidAmount" },
-           customer: { $first: "$customer.name" },
+          paidAmount: { $first: "$paymentInfo.paidAmount" },
+          customer: { $first: "$customer.name" },
           status: { $first: "$status" },
           createdAt: { $first: "$createdAt" },
           paymentMethods: {
             $push: {
-              type: { $ifNull: ["$account.accountName", null] },
-              amount: { $ifNull: ["$paymentInfo.methods.amount", null] }
+              $cond: [
+                {
+                  $and: [
+                    { $ne: ["$paymentInfo.methods.amount", null] },
+                    { $ne: ["$account.accountName", null] }
+                  ]
+                },
+                {
+                  type: "$account.accountName",
+                  amount: "$paymentInfo.methods.amount"
+                },
+                "$$REMOVE"
+              ]
             }
           }
         }
       },
-
-      // Ensure paymentMethods has at least one object
-        {
+      // Default fallback for missing values
+      {
         $addFields: {
-            grandTotal: { $ifNull: ["$grandTotal", 0] },
-            paidAmount: { $ifNull: ["$paidAmount", 0] },
-            paymentMethods: {
-            $cond: {
-                if: { $gt: [{ $size: "$paymentMethods" }, 0] },
-                then: "$paymentMethods",
-                else: [{ type: null, amount: null }]
-            }
-            }
+          grandTotal: { $ifNull: ["$grandTotal", 0] },
+          paidAmount: { $ifNull: ["$paidAmount", 0] }
         }
-        },
+      },
 
       // Final sort
       { $sort: { createdAt: -1 } }
     ]);
-
     const totalCount = await ORDER.countDocuments({});
 
 
@@ -154,9 +156,9 @@ export const getSingleOrder = async (req, res, next) => {
     }
 
       const order = await ORDER.aggregate([
-      {
-        $match: { _id: new mongoose.Types.ObjectId(orderId) }
-      },
+      { $match: { _id: new mongoose.Types.ObjectId(orderId) } },
+
+      // Lookup payment info
       {
         $lookup: {
           from: "paymentrecords",
@@ -176,6 +178,17 @@ export const getSingleOrder = async (req, res, next) => {
         }
       },
       { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+
+      // Table / customer type / customer
+      {
+        $lookup: {
+          from: "tables",
+          localField: "tableId",
+          foreignField: "_id",
+          as: "table"
+        }
+      },
+      { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: "customertypes",
@@ -187,17 +200,6 @@ export const getSingleOrder = async (req, res, next) => {
       { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: "tables",
-          localField: "tableId",
-          foreignField: "_id",
-          as: "table"
-        }
-      },
-      { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
-
-          // Customer Info
-      {
-        $lookup: {
           from: "customers",
           localField: "customerId",
           foreignField: "_id",
@@ -206,7 +208,27 @@ export const getSingleOrder = async (req, res, next) => {
       },
       { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
 
-      // Grouping to structure result
+      // Look up food image
+      {
+        $lookup: {
+          from: "foods",
+          localField: "items.foodId",
+          foreignField: "_id",
+          as: "foodItems"
+        }
+      },
+
+      // Look up combo image
+      {
+        $lookup: {
+          from: "combos",
+          localField: "items.comboId",
+          foreignField: "_id",
+          as: "comboItems"
+        }
+      },
+
+      // Group and reshape
       {
         $group: {
           _id: "$_id",
@@ -219,12 +241,15 @@ export const getSingleOrder = async (req, res, next) => {
           createdBy: { $first: "$createdBy" },
           discount: { $first: "$discount" },
           subTotal: { $first: "$subTotal" },
+          vat: { $first: "$vat" },
           grandTotal: { $first: "$paymentInfo.grandTotal" },
           paidAmount: { $first: "$paymentInfo.paidAmount" },
           status: { $first: "$status" },
           createdAt: { $first: "$createdAt" },
-          items: { $first: "$items" },
-            customer: {
+          rawItems: { $first: "$items" },
+          foodItems: { $first: "$foodItems" },
+          comboItems: { $first: "$comboItems" },
+          customer: {
             $first: {
               name: "$customer.name",
               address: "$customer.address",
@@ -232,33 +257,91 @@ export const getSingleOrder = async (req, res, next) => {
             }
           },
           paymentMethodList: {
-            $push: {
-              type: { $ifNull: ["$account.accountName", null] },
-              amount: { $ifNull: ["$paymentInfo.methods.amount", null] }
+            $addToSet: {
+              $cond: [
+                {
+                  $and: [
+                    { $ne: ["$paymentInfo.methods", null] },
+                    { $ne: ["$paymentInfo.methods.amount", null] },
+                    { $ne: ["$account.accountName", null] }
+                  ]
+                },
+                {
+                  type: "$account.accountName",
+                  amount: "$paymentInfo.methods.amount"
+                },
+                "$$REMOVE"
+              ]
             }
           }
         }
       },
 
-      // Handle missing payment methods
+      // Final stage to attach food & combo images into each item
       {
         $addFields: {
-          grandTotal: { $ifNull: ["$grandTotal", 0] },
-          paidAmount: { $ifNull: ["$paidAmount", 0] },
-          paymentMethods: {
-            $cond: {
-              if: { $gt: [{ $size: "$paymentMethodList" }, 0] },
-              then: "$paymentMethodList",
-              else: [{ type: null, amount: null }]
+          items: {
+            $map: {
+              input: "$rawItems",
+              as: "item",
+              in: {
+                $mergeObjects: [
+                  "$$item",
+                  {
+                    foodImage: {
+                      $let: {
+                        vars: {
+                          found: {
+                            $arrayElemAt: [
+                              {
+                                $filter: {
+                                  input: "$foodItems",
+                                  as: "fi",
+                                  cond: { $eq: ["$$fi._id", "$$item.foodId"] }
+                                }
+                              },
+                              0
+                            ]
+                          }
+                        },
+                        in: "$$found.image"
+                      }
+                    },
+                    comboImage: {
+                      $let: {
+                        vars: {
+                          found: {
+                            $arrayElemAt: [
+                              {
+                                $filter: {
+                                  input: "$comboItems",
+                                  as: "ci",
+                                  cond: { $eq: ["$$ci._id", "$$item.comboId"] }
+                                }
+                              },
+                              0
+                            ]
+                          }
+                        },
+                        in: "$$found.image"
+                      }
+                    }
+                  }
+                ]
+              }
             }
-          }
+          },
+          grandTotal: { $ifNull: ["$grandTotal", 0] },
+          paidAmount: { $ifNull: ["$paidAmount", 0] }
         }
       },
 
-      // Hide intermediate array
+      // Cleanup: remove `rawItems`, `foodItems`, `comboItems` if needed
       {
         $project: {
-          paymentMethodList: 0
+          rawItems: 0,
+          foodItems: 0,
+          comboItems: 0
         }
       }
     ]);
