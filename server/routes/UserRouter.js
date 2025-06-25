@@ -20,7 +20,7 @@ import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSumm
 
 import upload from '../middleware/multer.js'
 import { getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
-import { getALLOrderSummary, getSingleOrder } from '../controller/ReportsController/orederReport.js';
+import { getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
 const router = express.Router();
 
 
@@ -186,6 +186,7 @@ router.get('/reports/customerType-sale',VerifyToken,getCustomerTypeWiseSalesRepo
 //order report 
 router.get('/reports/order-summary',VerifyToken,getALLOrderSummary);
 router.get('/reports/one-order/:orderId',VerifyToken,getSingleOrder);
+router.get('/reports/cancelled-order',VerifyToken,getCancelledOrders)
 
 
 
