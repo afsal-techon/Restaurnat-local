@@ -89,6 +89,7 @@ const printer = new ThermalPrinter({
         subTotal,
         orderId, // For additional orders
         counterId,
+        discount,
         action = 'create', // 'create', 'kot', 'save', 'kot_print'
         printConfig = {} // Printer settings for KOT print
       } = req.body;
@@ -180,7 +181,7 @@ const printer = new ThermalPrinter({
                 price: comboItem.price || 0,
                 qty: comboItem.qty,
                 total: comboItem.total,
-                discount: 0,
+                discount:comboItem.discountAmount || 0,
                 choices: [],
                 isAdditional: isAdditionalOrder,
                 conversionFactor: conversion,
@@ -197,7 +198,7 @@ const printer = new ThermalPrinter({
                   comboPrice: item.comboPrice || combo.comboPrice,
                   qty: item.qty ?? 1,
                   total: item.total,
-                  discount: 0,
+                  discount: item.discountAmount || 0,
                   addOns: item.addOns || [],
                   choices: [],
                   isAdditional: isAdditionalOrder,
@@ -223,7 +224,7 @@ const printer = new ThermalPrinter({
           price: item.price,
           qty: item.qty ?? 1,
           total: item.total,
-          discount: food.discount || 0,
+          discount: item.discountAmount || 0,
           addOns: item.addOns || [],
           choices: item.choices || [],
           isAdditional: isAdditionalOrder,
@@ -276,7 +277,7 @@ const printer = new ThermalPrinter({
           customerTypeId,
           subMethod,
           items: [], // Will be populated after validation
-          discount: 0,
+          discount: discount || 0,
           vat,
           subTotal,
           totalAmount: total,
@@ -590,7 +591,7 @@ async function printKOTReceipt(order, restaurant) {
       const order = await ORDER.findById(orderId)
       .populate({ path: "tableId", select: "name" })
       .populate({ path: "customerTypeId", select: "type" })
-   .populate({
+        .populate({
         path: "items.foodId",
         select: "image",
         options: { strictPopulate: false } // prevents error if foodId is null
@@ -743,6 +744,7 @@ const paymentRecord = {
   
              // Update order status
       order.status = "Completed";
+      order.customerId = customerId || null;
       order.paymentStatus = dueAmount > 0 ? "Partial" : "Paid";
       await order.save();
   

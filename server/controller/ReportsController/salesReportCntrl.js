@@ -1,15 +1,8 @@
 import mongoose from "mongoose";
 import USER from '../../model/userModel.js';
-import RESTAURANT from '../../model/restaurant.js'
-import CATEGORY from '../../model/category.js'
-import FOOD from '../../model/food.js'
-import CUSTOMER_TYPE from '../../model/customerTypes.js';
 import ORDER from '../../model/oreder.js';
-import COMBO from '../../model/combo.js'
-import CUSTOMER from '../../model/customer.js';
 import PAYMENT from '../../model/paymentRecord.js'
-import { getIO  } from "../../config/socket.js";
-import ACCOUNTS from '../../model/account.js'
+
 
 
 
@@ -24,7 +17,7 @@ export const getDailySalesReport = async(req,res,next)=>{
             return res.status(400).json({ message: "User not found!" });
         }
 
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
@@ -144,7 +137,7 @@ export const getCategoryWiseSalesReport = async (req, res, next) => {
       return res.status(400).json({ message: "User not found!" });
     }
 
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
@@ -310,7 +303,7 @@ export const getItemWiseSalesReport = async (req, res, next) => {
     const user = await USER.findById(userId);
     if (!user) return res.status(400).json({ message: "User not found" });  
 
-     const limit = parseInt(req.query.limit) || 10;
+     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
@@ -486,7 +479,7 @@ export const getCustomerTypeWiseSalesReport = async (req, res, next) => {
     const user = await USER.findById(userId);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
