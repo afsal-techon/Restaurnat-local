@@ -101,10 +101,15 @@ export const getPaymentSummary = async (req, res, next) => {
 
 export const getDailyCollectionReport = async (req, res, next) => {
   try {
-    const { fromDate, toDate } = req.params;
+    const { fromDate, toDate } = req.query;
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
+
+
+    if (!fromDate || !toDate) {
+  return res.status(400).json({ message: "Please provide fromDate and toDate" });
+}
 
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found" });

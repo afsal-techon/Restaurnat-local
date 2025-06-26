@@ -140,7 +140,8 @@ router.get('/pos-customer/:restaurantId',VerifyToken,getCustomersForPOS);
 router.put('/pos-customer',VerifyToken,updateCustomerforPOS);
 router.get('/pos-customerTypes/:restaurantId',VerifyToken,getCustomerTypesForPOS)
 router.get('/pos-customer/history/:customerId',VerifyToken,getCustomerCreditHistory)
-router.post('/pos-customer/due',VerifyToken,payCustomerDue)
+router.post('/pos-customer/due',VerifyToken,payCustomerDue);
+
 
 
 //pos-order-listing
@@ -193,7 +194,7 @@ router.get('/reports/cancelled-order',VerifyToken,getCancelledOrders)
 
 //Payment  Report 
 router.get('/reports/payment-summary',VerifyToken,getPaymentSummary);
-router.get('/reports/daily-payment',VerifyToken,getDailyCollectionReport)
+router.get('/reports/daily-payment',VerifyToken,getDailyCollectionReport);
 
 
 

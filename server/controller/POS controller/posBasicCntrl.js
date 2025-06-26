@@ -405,6 +405,7 @@ export const payCustomerDue = async(req,res,next)=>{
 
       const currentCredit = customer.credit || 0;
 
+
       if(amount > currentCredit){
          return res.status(400).json({ message: "Amount exceeds customer's due" });
       }
@@ -436,3 +437,112 @@ export const payCustomerDue = async(req,res,next)=>{
      next(err)
   }
 }
+
+export const getCustomerOrderHistory = async (req, res, next) => {
+  try {
+    const { customerId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    if (!customerId) {
+      return res.status(400).json({ message: "Customer ID is required" });
+    }
+
+    // 1️ Count total completed orders
+    const totalCount = await ORDER.countDocuments({
+      customerId,
+      status: "Completed",
+    });
+
+    // 2️ Fetch paginated completed orders
+    const orders = await ORDER.find({
+      customerId,
+      status: "Completed",
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const orderIds = orders.map(order => order._id);
+    const customerTypeIds = orders.map(order => order.customerTypeId);
+
+    // 3️ Fetch payment details
+    const payments = await PAYMENT.aggregate([
+      {
+        $match: {
+          orderId: { $in: orderIds },
+        },
+      },
+      {
+        $unwind: "$methods",
+      },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "methods.accountId",
+          foreignField: "_id",
+          as: "account",
+        },
+      },
+      { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$orderId",
+          grandTotal: { $first: "$grandTotal" },
+          paidAmount: { $first: "$paidAmount" },
+          dueAmount: { $first: "$dueAmount" },
+          createdAt: { $first: "$createdAt" },
+          methods: {
+            $push: {
+              accountName: "$account.accountName",
+              amount: "$methods.amount",
+            },
+          },
+        },
+      },
+    ]);
+
+    // 4️ Map payment info by orderId
+    const paymentMap = {};
+    payments.forEach(p => {
+      paymentMap[p._id.toString()] = {
+        grandTotal: p.grandTotal,
+        paidAmount: p.paidAmount,
+        dueAmount: p.dueAmount,
+        methods: p.methods,
+      };
+    });
+
+    // 5️ Get customerType names from customerTypeId
+    const customerTypes = await CUSTOMER_TYPE.find({
+      _id: { $in: customerTypeIds },
+    }).lean();
+
+    const customerTypeMap = {};
+    customerTypes.forEach(type => {
+      customerTypeMap[type._id.toString()] = type.type;
+    });
+
+    // 6️ Combine orders + payment + customerType (return full order object)
+    const fullData = orders.map(order => ({
+      ...order,
+      customerType: customerTypeMap[order.customerTypeId?.toString()] || null,
+      payment: paymentMap[order._id.toString()] || null,
+    }));
+
+    return res.status(200).json({
+      data: fullData,
+      totalCount,
+      page,
+      limit,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
