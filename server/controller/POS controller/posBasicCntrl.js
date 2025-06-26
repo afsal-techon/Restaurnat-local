@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import RESTAURANT from '../../model/restaurant.js';
 import CUSTOMER_TYPE from '../../model/customerTypes.js'
 import CUSTOMER from '../../model/customer.js'
+import { generateUniqueRefId } from '../../controller/POS controller/posOrderCntrl.js'
 
 
 
@@ -311,10 +312,66 @@ export const getCustomersForPOS = async (req, res, next) => {
         }
 
         // Get all customer types for this restaurant
-        const customerTypes = await CUSTOMER_TYPE.find({ restaurantId: restaurant._id })
+        const customerTypes = await CUSTOMER_TYPE.find({})
 
         return res.status(200).json({data:customerTypes});
     } catch (err) {
         next(err);
     }
 };
+
+
+export const payCustomerDue = async(req,res,next)=>{
+  try {
+
+    const userId = req.user;
+
+    const { restaurantId,customerId, amount, accountId, notes } = req.body;
+
+    const user = await USER.findById(userId).lean();
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+       const customer = await CUSTOMER.findOne({ _id: customerId });
+     if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+     if(!amount){
+      return res.status(400).json({ message:'Amount is required!'})
+     }
+
+     if(!accountId){
+      return res.status(400).json({message:'Account Id is required'})
+     }
+
+      const currentCredit = customer.credit || 0;
+
+      if(amount > currentCredit){
+         return res.status(400).json({ message: "Amount exceeds customer's due" });
+      }
+
+      customer.credit = currentCredit - amount;
+      await customer.save();
+
+
+       const refId = await generateUniqueRefId();
+
+          await TRANSACTION.create({
+          restaurantId,
+          accountId,
+          amount,
+          type: "Credit",
+          referenceId: refId,
+          referenceType: "Due Payment",
+          description: notes || `Customer Due Payment by ${customer.name}`,
+          createdById: userId,
+          createdBy: user.name,
+          customerId: customer._id,
+    });
+
+       return res.status(200).json({
+      message: "Due payment recorded successfully",
+    });
+    
+  } catch (err) {
+     next(err)
+  }
+}

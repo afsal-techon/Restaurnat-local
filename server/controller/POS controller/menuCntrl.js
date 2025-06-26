@@ -113,6 +113,8 @@ export const getAllFoodForPOS = async (req, res, next) => {
 
           const { restaurantId } = req.params;
 
+     console.log(restaurantId,'andi')
+
           const userId = req.user;
             const user = await USER.findOne({ _id: userId, })
           if (!user) {
@@ -725,6 +727,7 @@ export const getAllFoodForPOS = async (req, res, next) => {
                       image: 1,
                       foodType: 1,
                       price: 1,
+                      basePrice:1,
                       portions: 1,
                       choices: {
                         $map: {

@@ -160,10 +160,10 @@ const printer = new ThermalPrinter({
             if (!combo) throw new Error(`Invalid combo item: ${item.comboId}`);
 
 
-              // Get the first food item's name to use as the foodName
-    const firstFoodItemId = item.items[0]?.foodId;
-    const firstFoodItem = foodMap[firstFoodItemId];
-    if (!firstFoodItem) throw new Error(`Invalid food item in combo: ${firstFoodItemId}`);
+                      // Get the first food item's name to use as the foodName
+            const firstFoodItemId = item.items[0]?.foodId;
+            const firstFoodItem = foodMap[firstFoodItemId];
+            if (!firstFoodItem) throw new Error(`Invalid food item in combo: ${firstFoodItemId}`);
 
 
             const comboItems = await Promise.all(item.items.map(async (comboItem) => {
@@ -692,18 +692,18 @@ export const generateUniqueRefId = async () => {
   
   
         // Record credit transaction
-        await CUSTOMER_CREDIT_HISTORY.create([{
-          restaurantId,
-          customerId,
-          orderId,
-          amount: dueAmount,
-          type: 'credit',
-          notes: `Bill settlement for order ${order.order_id}`,
-          createdById: userId,
-          createdBy:user.name,
-          previousBalance: previousBalance,
-          newBalance: customer.credit
-        }]);
+        // await CUSTOMER_CREDIT_HISTORY.create([{
+        //   restaurantId,
+        //   customerId,
+        //   orderId,
+        //   amount: dueAmount,
+        //   type: 'credit',
+        //   notes: `Bill settlement for order ${order.order_id}`,
+        //   createdById: userId,
+        //   createdBy:user.name,
+        //   previousBalance: previousBalance,
+        //   newBalance: customer.credit
+        // }]);
       }
   
           // Create payment records

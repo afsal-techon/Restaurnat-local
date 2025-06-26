@@ -13,7 +13,7 @@ import {CreateMenuType,getAllMenuTypes,updateMenuTypes,deleteMenuTypes } from '.
 import { createAddOns,deleteAddOn,getAllAddOns,updateAddOns } from '../controller/foodController/AddOnsCntrl.js';
 import { createFood,deleteFood,getAllFoodbyRestaurat,getOneFood,updateFood } from '../controller/foodController/mainFood.js'
 import {getAllByCategoryForPOS,getAllComboForPOS,getAllFoodForPOS,getComboForPOS,getCourseForPOS,getMenusItemsForPOS,getOneComboForPOS } from '../controller/POS controller/menuCntrl.js';
-import {  getFloorsForPOS,getTablesForPOS ,createCustomerForPOS,getCustomerCreditHistory,getCustomerTypesForPOS,getCustomersForPOS,updateCustomerforPOS,} from '../controller/POS controller/posBasicCntrl.js';
+import {  getFloorsForPOS,getTablesForPOS ,createCustomerForPOS,getCustomerCreditHistory,getCustomerTypesForPOS,getCustomersForPOS,updateCustomerforPOS, payCustomerDue,} from '../controller/POS controller/posBasicCntrl.js';
 import {createOrder,getOneOrderDetails,getTodayOrdersForPOS,posOrderBilling,cancelOrder } from '../controller/POS controller/posOrderCntrl.js';
 import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../controller/foodController/comboCntrl.js'
 import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSummary,getTopSellingItems,getLatestCompletedOrders} from '../controller/DashbordController/dashbordCntrl.js'
@@ -21,6 +21,7 @@ import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSumm
 import upload from '../middleware/multer.js'
 import { getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
 import { getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
+import { getDailyCollectionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
 const router = express.Router();
 
 
@@ -124,7 +125,7 @@ router.get('/pos-course/:restaurantId',VerifyToken,getCourseForPOS);
 router.get('/pos-combo/:restaurantId',VerifyToken,getComboForPOS)
 
 //pos-combo
-router.get('/pos-combo/:restaurantId',VerifyToken,getAllComboForPOS);
+// router.get('/pos-combo/:restaurantId',VerifyToken,getAllComboForPOS);
 router.get('/pos-combo/:restaurantId/:comboId',VerifyToken,getOneComboForPOS)
 
 
@@ -139,6 +140,7 @@ router.get('/pos-customer/:restaurantId',VerifyToken,getCustomersForPOS);
 router.put('/pos-customer',VerifyToken,updateCustomerforPOS);
 router.get('/pos-customerTypes/:restaurantId',VerifyToken,getCustomerTypesForPOS)
 router.get('/pos-customer/history/:customerId',VerifyToken,getCustomerCreditHistory)
+router.get('/pos-customer/due',VerifyToken,payCustomerDue)
 
 
 //pos-order-listing
@@ -189,7 +191,8 @@ router.get('/reports/one-order/:orderId',VerifyToken,getSingleOrder);
 router.get('/reports/cancelled-order',VerifyToken,getCancelledOrders)
 
 //Payment  Report 
-
+router.get('/reports/payment-summary',VerifyToken,getPaymentSummary);
+router.get('/reports/daily-payment',VerifyToken,getDailyCollectionReport)
 
 
 
