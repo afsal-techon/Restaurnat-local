@@ -135,7 +135,8 @@ export const getDailyCollectionReport = async(req,res,next)=>{
       {
         $group: {
           _id: { date: "$date", type: "$accountName" },
-          amount: { $sum: "$amount" }
+          amount: { $sum: "$amount" },
+           count: { $sum: 1 },
         }
       },
       {

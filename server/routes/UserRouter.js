@@ -177,6 +177,7 @@ router.get('/dashboard/top-selling',VerifyToken,getTopSellingItems );
 router.get('/dashboard/latest-orders',VerifyToken,getLatestCompletedOrders );
 
 //Report          
+
 //sales
 router.get('/reports/daily-sale',VerifyToken,getDailySalesReport);
 router.get('/reports/category-sale',VerifyToken,getCategoryWiseSalesReport);
