@@ -7,20 +7,23 @@ import CUSTOMER from '../../model/customer.js'
 
 
 
-export const getPaymentSummary = async(req,res,next)=>{
-    try {
+export const getPaymentSummary = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found" });
 
-        const user = await USER.findById(req.user).lean();
-       if (!user) return res.status(400).json({ message: "User not found" });
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
 
-    const payments = await TRANSACTION.aggregate([
-      {
-        $match: {
-          type: "Credit",
-          referenceType: { $in: ["Sale", "Due Payment"] },
-        },
-      },
+    const matchStage = {
+      type: "Credit",
+      referenceType: { $in: ["Sale", "Due Payment"] },
+    };
 
+    // Full data for totalCollected and count
+    const allPayments = await TRANSACTION.aggregate([
+      { $match: matchStage },
       {
         $group: {
           _id: "$accountId",
@@ -51,7 +54,7 @@ export const getPaymentSummary = async(req,res,next)=>{
           _id: 0,
           type: "$accountInfo.accountName",
           amount: 1,
-          count:1,
+          count: 1,
           groupUnder: {
             accountName: "$parentInfo.accountName",
             accountType: "$parentInfo.accountType",
@@ -60,9 +63,11 @@ export const getPaymentSummary = async(req,res,next)=>{
       },
     ]);
 
-     const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalCollected = allPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalCount = allPayments.length;
 
-         // 2️ Get Total Due from customers
+    const paginatedData = allPayments.slice(skip, skip + limit);
+
     const dueResult = await CUSTOMER.aggregate([
       {
         $match: {
@@ -77,42 +82,46 @@ export const getPaymentSummary = async(req,res,next)=>{
       },
     ]);
 
-        const totalDue = dueResult[0]?.totalDue || 0;
+    const totalDue = dueResult[0]?.totalDue || 0;
 
-            return res.status(200).json({
+    return res.status(200).json({
       totalCollected,
       totalDue,
-      data: payments,
+      data: paginatedData,
+      totalCount,
+      page,
+      limit,
     });
-        
-    } catch (err) {
-        next(err)
-    }
-}
+  } catch (err) {
+    next(err);
+  }
+};
 
 
-export const getDailyCollectionReport = async(req,res,next)=>{
-    try {
 
-        const { fromDate ,toDate } = req.params;
+export const getDailyCollectionReport = async (req, res, next) => {
+  try {
+    const { fromDate, toDate } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
 
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found" });
 
-     const start = new Date(fromDate);
-     const end = new Date(toDate);
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
 
-       const match = {
+    const match = {
       type: "Credit",
       referenceType: { $in: ["Sale", "Due Payment"] },
     };
 
-    
     if (fromDate && toDate) {
       match.createdAt = { $gte: start, $lte: end };
     }
 
-        const result = await TRANSACTION.aggregate([
+    const groupedResult = await TRANSACTION.aggregate([
       { $match: match },
       {
         $lookup: {
@@ -136,7 +145,7 @@ export const getDailyCollectionReport = async(req,res,next)=>{
         $group: {
           _id: { date: "$date", type: "$accountName" },
           amount: { $sum: "$amount" },
-           count: { $sum: 1 },
+          count: { $sum: 1 },
         }
       },
       {
@@ -145,10 +154,11 @@ export const getDailyCollectionReport = async(req,res,next)=>{
           collections: {
             $push: {
               type: "$_id.type",
-              amount: "$amount"
+              amount: "$amount",
+              count: "$count"
             }
           },
-          total: { $sum: "$amount" }
+          total: { $sum: "$amount" },
         }
       },
       {
@@ -162,10 +172,16 @@ export const getDailyCollectionReport = async(req,res,next)=>{
       { $sort: { date: -1 } }
     ]);
 
-     return res.status(200).json({ data: result });
+    const paginatedData = groupedResult.slice(skip, skip + limit);
+    const totalCount = groupedResult.length;
 
-        
-    } catch (err) {
-        next(err)
-    }
-}
+    return res.status(200).json({
+      data: paginatedData,
+      totalCount,
+      page,
+      limit
+    });
+  } catch (err) {
+    next(err);
+  }
+};
