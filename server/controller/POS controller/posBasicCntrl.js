@@ -5,7 +5,10 @@ import mongoose from 'mongoose';
 import RESTAURANT from '../../model/restaurant.js';
 import CUSTOMER_TYPE from '../../model/customerTypes.js'
 import CUSTOMER from '../../model/customer.js'
-import { generateUniqueRefId } from '../../controller/POS controller/posOrderCntrl.js'
+import { generateUniqueRefId } from '../../controller/POS controller/posOrderCntrl.js';
+import ORDER from '../../model/oreder.js';
+import PAYMENT from '../../model/paymentRecord.js'
+import TRANSACTION from '../../model/transaction.js'
 
 
 
@@ -155,33 +158,89 @@ export const createCustomerForPOS = async (req,res,next)=>{
 }
 
 export const getCustomersForPOS = async (req, res, next) => {
-    try {
-      const { restaurantId } = req.params;
-      const userId = req.user;
-  
-      // Validate user
-      const user = await USER.findOne({ _id: userId,  });
-      if (!user) {
-        return res.status(400).json({ message: "User not found!" });
-      }
-  
-      if (!restaurantId) {
-        return res.status(400).json({ message: "Restaurant Id is required!" });
-      }
-  
-    
-  
-      // Get all customers for the restaurant
-      const customers = await CUSTOMER.find({
-        restaurantId
-      }).sort({ createdAt: -1 });
-  
-      return res.status(200).json({ data: customers });
-  
-    } catch (err) {
-      next(err);
+  try {
+    const { restaurantId } = req.params;
+    const userId = req.user;
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    // Validate user
+    const user = await USER.findOne({ _id: userId });
+    if (!user) {
+      return res.status(400).json({ message: "User not found!" });
     }
-  };
+
+    if (!restaurantId) {
+      return res.status(400).json({ message: "Restaurant Id is required!" });
+    }
+
+    // Total count
+    const totalCount = await CUSTOMER.countDocuments({ restaurantId });
+
+    // Get paginated customers
+    const customers = await CUSTOMER.find({ restaurantId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const customerIds = customers.map(c => c._id);
+
+    // Total orders per customer
+    const orderStats = await ORDER.aggregate([
+      { $match: { customerId: { $in: customerIds } } },
+      {
+        $group: {
+          _id: "$customerId",
+          totalOrders: { $sum: 1 },
+        }
+      }
+    ]);
+
+    // Total spent per customer
+    const paymentStats = await PAYMENT.aggregate([
+      {
+        $match: {
+          customerId: { $in: customerIds },
+          paidAmount: { $gt: 0 },
+        }
+      },
+      {
+        $group: {
+          _id: "$customerId",
+          totalSpent: { $sum: "$paidAmount" },
+        }
+      }
+    ]);
+
+    const orderMap = {};
+    orderStats.forEach(stat => {
+      orderMap[stat._id.toString()] = stat.totalOrders;
+    });
+
+    const paymentMap = {};
+    paymentStats.forEach(stat => {
+      paymentMap[stat._id.toString()] = stat.totalSpent;
+    });
+
+    const customerSummary = customers.map(c => ({
+      ...c._doc,
+      totalOrders: orderMap[c._id.toString()] || 0,
+      totalSpent: paymentMap[c._id.toString()] || 0,
+    }));
+
+    return res.status(200).json({
+      data: customerSummary,
+      totalCount,
+      page,
+      limit
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
   
 
   
@@ -314,6 +373,8 @@ export const getCustomersForPOS = async (req, res, next) => {
         // Get all customer types for this restaurant
         const customerTypes = await CUSTOMER_TYPE.find({})
 
+
+
         return res.status(200).json({data:customerTypes});
     } catch (err) {
         next(err);
@@ -326,7 +387,7 @@ export const payCustomerDue = async(req,res,next)=>{
 
     const userId = req.user;
 
-    const { restaurantId,customerId, amount, accountId, notes } = req.body;
+    const { restaurantId,customerId, amount, accountId, note } = req.body;
 
     const user = await USER.findById(userId).lean();
     if (!user) return res.status(400).json({ message: "User not found" });
@@ -361,7 +422,7 @@ export const payCustomerDue = async(req,res,next)=>{
           type: "Credit",
           referenceId: refId,
           referenceType: "Due Payment",
-          description: notes || `Customer Due Payment by ${customer.name}`,
+          description: note || `Customer Due Payment by ${customer.name}`,
           createdById: userId,
           createdBy: user.name,
           customerId: customer._id,

@@ -424,6 +424,7 @@ export const getOrderSummary = async(req,res,next)=>{
 
 }
 
+
 export const getTopSellingItems = async(req,res,next)=>{
     try {
 
@@ -519,8 +520,8 @@ export const getTopSellingItems = async(req,res,next)=>{
       const finalTopFoods = topFoodIds.map(([id]) => {
         const food = foodMap.get(id);
         return {
-          name: food?.foodName || "null",
-          category: food?.categoryId?.name || "null",
+          name: food?.foodName || null,
+          category: food?.categoryId?.name || null,
           image: food?.image || null,
           itemsSold: foodCountMap.get(id) || 0,
           totalSale: parseFloat((foodSalesMap.get(id) || 0).toFixed(2)),
@@ -529,16 +530,16 @@ export const getTopSellingItems = async(req,res,next)=>{
 
       const comboMap = new Map();
       topCombos.forEach(combo => comboMap.set(combo._id.toString(), combo));
-
       const finalTopCombos = topComboIds.map(([id]) => {
         const combo = comboMap.get(id);
         return {
-          name: combo?.comboName || "null",
+          name: combo?.comboName || null,
           image: combo?.image || null,
           itemsSold: comboCountMap.get(id) || 0,
           totalSale: parseFloat((comboSalesMap.get(id) || 0).toFixed(2)),
         };
       });
+
 
     // 6. Return response
     return res.status(200).json({

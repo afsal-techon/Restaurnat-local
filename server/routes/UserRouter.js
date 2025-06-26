@@ -140,7 +140,7 @@ router.get('/pos-customer/:restaurantId',VerifyToken,getCustomersForPOS);
 router.put('/pos-customer',VerifyToken,updateCustomerforPOS);
 router.get('/pos-customerTypes/:restaurantId',VerifyToken,getCustomerTypesForPOS)
 router.get('/pos-customer/history/:customerId',VerifyToken,getCustomerCreditHistory)
-router.get('/pos-customer/due',VerifyToken,payCustomerDue)
+router.post('/pos-customer/due',VerifyToken,payCustomerDue)
 
 
 //pos-order-listing
