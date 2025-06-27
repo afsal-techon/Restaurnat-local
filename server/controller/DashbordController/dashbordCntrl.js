@@ -69,7 +69,7 @@ export const getQuickViewDashboard = async(req,res,next)=>{
       {
         $group: {
           _id: "$orderInfo.customerTypeId",
-          total: { $sum: "$paidAmount" },
+          total: { $sum: "$grandTotal" },
           count: { $sum: 1 }
         }
       }
@@ -240,7 +240,7 @@ export const getSalesOverview = async(req,res,next)=>{
             slot: "$slot",
             customerTypeId: "$customerTypeId",
           },
-          total: { $sum: "$paidAmount" },
+          total: { $sum: "$grandTotal" },
         },
       },
     ]);
@@ -403,7 +403,7 @@ export const getOrderSummary = async(req,res,next)=>{
       {
         $group: {
           _id: null,
-          totalSales: { $sum: "$paidAmount" }
+          totalSales: { $sum: "$grandTotal" }
         }
       }
     ]);

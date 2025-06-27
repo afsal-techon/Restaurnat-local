@@ -78,7 +78,7 @@ export const getDailySalesReport = async(req,res,next)=>{
           table: { $first: "$table.name" },
           customerType: { $first: "$customerType.type" },
           discount: { $first:"$order.discount"},
-          amount: { $first: "$paidAmount" },
+          amount: { $first: "$grandTotal" },
           date: { $first: "$createdAt" },
           paymentMethods: {
             $push: {
