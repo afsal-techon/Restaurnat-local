@@ -238,19 +238,19 @@ export const getCustomersForPOS = async (req, res, next) => {
     try {
       const { customerId } = req.params;
   
-      if (!customerId) {
-        return res.status(400).json({ message: "Customer ID is required!" });
-      }
+      // if (!customerId) {
+      //   return res.status(400).json({ message: "Customer ID is required!" });
+      // }
   
   
-      const creditHistory = await CUSTOMER_CREDIT_HISTORY.find({ customerId })
-        .sort({ createdAt: -1 }) 
-        .populate("orderId order_id") 
-        .lean();
+      // const creditHistory = await CUSTOMER_CREDIT_HISTORY.find({ customerId })
+      //   .sort({ createdAt: -1 }) 
+      //   .populate("orderId order_id") 
+      //   .lean();
 
-      return res.status(200).json({
-        data: creditHistory,
-      });
+      // return res.status(200).json({
+      //   data: creditHistory,
+      // });
   
     } catch (err) {
       next(err);
@@ -362,8 +362,6 @@ export const getCustomersForPOS = async (req, res, next) => {
         // Get all customer types for this restaurant
         const customerTypes = await CUSTOMER_TYPE.find({})
 
-
-
         return res.status(200).json({data:customerTypes});
     } catch (err) {
         next(err);
@@ -430,6 +428,7 @@ export const payCustomerDue = async(req,res,next)=>{
 
 export const getCustomerOrderHistory = async (req, res, next) => {
   try {
+
     const { customerId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -456,6 +455,15 @@ export const getCustomerOrderHistory = async (req, res, next) => {
           data: [
             { $skip: skip },
             { $limit: limit },
+              {
+          $lookup: {
+            from: "tables",
+            localField: "tableId",
+            foreignField: "_id",
+            as: "table"
+          }
+        },
+        { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
             // Join customer type
             {
               $lookup: {
@@ -506,6 +514,7 @@ export const getCustomerOrderHistory = async (req, res, next) => {
                 discount: { $first: "$discount" },
                 createdAt: { $first: "$createdAt" },
                 status: { $first: "$status" },
+                table: { $first: "$table.name" },
                 customerType: { $first: "$customerType.type" },
                 grandTotal: { $first: "$payment.grandTotal" },
                 paidAmount: { $first: "$payment.paidAmount" },
@@ -520,12 +529,13 @@ export const getCustomerOrderHistory = async (req, res, next) => {
             },
             {
               $project: {
-                _id: 0,
+                _id: 1,
                 order_id: 1,
                 orderNo: 1,
                 ticketNo: 1,
                 discount: 1,
                 createdAt: 1,
+                table:1,
                 status: 1,
                 customerType: 1,
                   grandTotal: "$grandTotal",

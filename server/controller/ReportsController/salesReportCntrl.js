@@ -11,18 +11,40 @@ import PAYMENT from '../../model/paymentRecord.js'
 export const getDailySalesReport = async(req,res,next)=>{
     try {
 
-        const userId = req.user;
-        const user = await USER.findOne({ _id: userId, });
-        if (!user) {
-            return res.status(400).json({ message: "User not found!" });
-        }
+      const userId = req.user;
+    const user = await USER.findOne({ _id: userId });
+    if (!user) return res.status(400).json({ message: "User not found!" });
 
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
+            const {
+          fromDate,
+          toDate,
+          customerTypeId,
+          paymentMethod,
+          search
+        } = req.query;
 
-       const pipeline = [
+        const matchStage = { "order.status": "Completed" };
+
+        if (fromDate && toDate) {
+          const start = new Date(fromDate);
+          const end = new Date(toDate);
+          end.setHours(23, 59, 59, 999);
+
+          matchStage.createdAt = {
+            $gte: start,
+            $lte: end
+          };
+        }
+
+    if (customerTypeId) {
+      matchStage["order.customerTypeId"] = new mongoose.Types.ObjectId(customerTypeId);
+    }
+
+    const pipeline = [
       {
         $lookup: {
           from: "orders",
@@ -32,7 +54,7 @@ export const getDailySalesReport = async(req,res,next)=>{
         }
       },
       { $unwind: "$order" },
-      { $match: { "order.status": "Completed" } },
+      { $match: matchStage },
       {
         $lookup: {
           from: "tables",
@@ -49,15 +71,9 @@ export const getDailySalesReport = async(req,res,next)=>{
           as: "customerType"
         }
       },
-      {
-        $unwind: { path: "$table", preserveNullAndEmptyArrays: true }
-      },
-      {
-        $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true }
-      },
-      {
-        $unwind: "$methods"
-      },
+      { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
+      { $unwind: "$methods" },
       {
         $lookup: {
           from: "accounts",
@@ -66,18 +82,38 @@ export const getDailySalesReport = async(req,res,next)=>{
           as: "account"
         }
       },
-      {
-        $unwind: { path: "$account", preserveNullAndEmptyArrays: true }
-      },
+      { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+    ];
+
+    if (paymentMethod) {
+      pipeline.push({ $match: { "account.accountName": paymentMethod } });
+    }
+
+    if (search) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { "order.orderNo": { $regex: search, $options: "i" } },
+            { "order.order_id": { $regex: search, $options: "i" } },
+            { "customerType.type": { $regex: search, $options: "i" } },
+            { "table.name": { $regex: search, $options: "i" } },
+            { "account.accountName": { $regex: search, $options: "i" } },
+            { "createdBy": { $regex: search, $options: "i" } }
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
       {
         $group: {
           _id: "$_id",
           orderNo: { $first: "$order.orderNo" },
           orderId: { $first: "$order.order_id" },
-          customer:{$first:"$order.customerId.name"},
+          customer: { $first: "$order.customerId.name" },
           table: { $first: "$table.name" },
           customerType: { $first: "$customerType.type" },
-          discount: { $first:"$order.discount"},
+          discount: { $first: "$order.discount" },
           amount: { $first: "$grandTotal" },
           date: { $first: "$createdAt" },
           paymentMethods: {
@@ -93,42 +129,35 @@ export const getDailySalesReport = async(req,res,next)=>{
       { $sort: { date: -1 } },
       { $skip: skip },
       { $limit: limit }
-    ];
+    );
 
-      const data = await PAYMENT.aggregate(pipeline);
+    const data = await PAYMENT.aggregate(pipeline);
 
-         const totalCountPipeline = [
+    const totalCountPipeline = [
       {
         $lookup: {
           from: "orders",
           localField: "orderId",
           foreignField: "_id",
-
-
           as: "order"
         }
       },
       { $unwind: "$order" },
-      { $match: { "order.status": "Completed" } },
+      { $match: matchStage },
       { $count: "total" }
     ];
 
-        const totalResult = await PAYMENT.aggregate(totalCountPipeline);
+    const totalResult = await PAYMENT.aggregate(totalCountPipeline);
     const totalCount = totalResult[0]?.total || 0;
 
-        res.status(200).json({
-      page,
-      limit,
-      totalCount,
-      data
-    });
-
+    res.status(200).json({ page, limit, totalCount, data });
 
         
     } catch (err) {
         next(err)
     }
 }
+
 
 
 export const getCategoryWiseSalesReport = async (req, res, next) => {

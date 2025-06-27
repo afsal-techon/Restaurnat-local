@@ -111,11 +111,13 @@ export const getDailyCollectionReport = async (req, res, next) => {
   return res.status(400).json({ message: "Please provide fromDate and toDate" });
 }
 
+
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const start = new Date(fromDate);
-    const end = new Date(toDate);
+     const start = new Date(fromDate);
+     const end = new Date(toDate);
+     end.setHours(23, 59, 59, 999);
 
     const match = {
       type: "Credit",
