@@ -13,7 +13,7 @@ import {CreateMenuType,getAllMenuTypes,updateMenuTypes,deleteMenuTypes } from '.
 import { createAddOns,deleteAddOn,getAllAddOns,updateAddOns } from '../controller/foodController/AddOnsCntrl.js';
 import { createFood,deleteFood,getAllFoodbyRestaurat,getOneFood,updateFood } from '../controller/foodController/mainFood.js'
 import {getAllByCategoryForPOS,getAllComboForPOS,getAllFoodForPOS,getComboForPOS,getCourseForPOS,getMenusItemsForPOS,getOneComboForPOS } from '../controller/POS controller/menuCntrl.js';
-import {  getFloorsForPOS,getTablesForPOS ,createCustomerForPOS,getCustomerCreditHistory,getCustomerTypesForPOS,getCustomersForPOS,updateCustomerforPOS, payCustomerDue,} from '../controller/POS controller/posBasicCntrl.js';
+import {  getFloorsForPOS,getTablesForPOS ,createCustomerForPOS,getCustomerCreditHistory,getCustomerTypesForPOS,getCustomersForPOS,updateCustomerforPOS, payCustomerDue, getCustomerOrderHistory,} from '../controller/POS controller/posBasicCntrl.js';
 import {createOrder,getOneOrderDetails,getTodayOrdersForPOS,posOrderBilling,cancelOrder } from '../controller/POS controller/posOrderCntrl.js';
 import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../controller/foodController/comboCntrl.js'
 import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSummary,getTopSellingItems,getLatestCompletedOrders} from '../controller/DashbordController/dashbordCntrl.js'
@@ -141,6 +141,7 @@ router.put('/pos-customer',VerifyToken,updateCustomerforPOS);
 router.get('/pos-customerTypes/:restaurantId',VerifyToken,getCustomerTypesForPOS)
 router.get('/pos-customer/history/:customerId',VerifyToken,getCustomerCreditHistory)
 router.post('/pos-customer/due',VerifyToken,payCustomerDue);
+router.get('/pos-customer/history/:customerId',VerifyToken,getCustomerOrderHistory)
 
 
 
