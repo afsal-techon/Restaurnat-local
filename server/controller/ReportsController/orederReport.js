@@ -2,7 +2,9 @@ import mongoose from "mongoose";
 import USER from '../../model/userModel.js';
 import ORDER from '../../model/oreder.js';
 import PAYMENT from '../../model/paymentRecord.js'
-
+import RESTAURANT from "../../model/restaurant.js";
+import CUSTOMER_TYPE from '../../model/customerTypes.js'
+import {  generatePDF } from '../../config/pdfGeneration.js'
 
 
 export const getALLOrderSummary = async(req,res,next)=>{
@@ -15,7 +17,7 @@ export const getALLOrderSummary = async(req,res,next)=>{
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
-    const {
+   const {
       fromDate,
       toDate,
       customerTypeId,
@@ -26,7 +28,7 @@ export const getALLOrderSummary = async(req,res,next)=>{
 
     const matchStage = {};
 
-    //  Date range filter
+    // Date filter
     if (fromDate && toDate) {
       const start = new Date(fromDate);
       const end = new Date(toDate);
@@ -34,23 +36,19 @@ export const getALLOrderSummary = async(req,res,next)=>{
       matchStage.createdAt = { $gte: start, $lte: end };
     }
 
-    // 👥 Customer type filter
+    // Customer Type filter
     if (customerTypeId) {
       matchStage.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
     }
 
-    //  Order status filter
+    // Status filter
     if (status) {
       matchStage.status = status;
     }
 
     const pipeline = [
       { $match: matchStage },
-      { $sort: { createdAt: -1 } },
-      { $skip: skip },
-      { $limit: limit },
 
-      // Payment Records
       {
         $lookup: {
           from: "paymentrecords",
@@ -62,7 +60,6 @@ export const getALLOrderSummary = async(req,res,next)=>{
       { $unwind: { path: "$paymentInfo", preserveNullAndEmptyArrays: true } },
       { $unwind: { path: "$paymentInfo.methods", preserveNullAndEmptyArrays: true } },
 
-      // Account lookup for payment methods
       {
         $lookup: {
           from: "accounts",
@@ -73,7 +70,6 @@ export const getALLOrderSummary = async(req,res,next)=>{
       },
       { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
 
-      // Table lookup
       {
         $lookup: {
           from: "tables",
@@ -84,7 +80,6 @@ export const getALLOrderSummary = async(req,res,next)=>{
       },
       { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
 
-      // Customer type lookup
       {
         $lookup: {
           from: "customertypes",
@@ -95,7 +90,6 @@ export const getALLOrderSummary = async(req,res,next)=>{
       },
       { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
 
-      // Customer lookup
       {
         $lookup: {
           from: "customers",
@@ -105,9 +99,16 @@ export const getALLOrderSummary = async(req,res,next)=>{
         }
       },
       { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
+
+      // Convert order_id to string for regex search
+      {
+        $addFields: {
+          order_id_str: { $toString: "$order_id" }
+        }
+      }
     ];
 
-    //  Payment method filter
+    // Payment Method filter
     if (paymentMethod) {
       pipeline.push({
         $match: {
@@ -116,13 +117,13 @@ export const getALLOrderSummary = async(req,res,next)=>{
       });
     }
 
-    //  Search filter
+    // Search filter
     if (search) {
       pipeline.push({
         $match: {
           $or: [
             { orderNo: { $regex: search, $options: "i" } },
-            { order_id: { $regex: search, $options: "i" } },
+            { order_id_str: { $regex: search, $options: "i" } },
             { ticketNo: { $regex: search, $options: "i" } },
             { "table.name": { $regex: search, $options: "i" } },
             { "customer.name": { $regex: search, $options: "i" } },
@@ -134,7 +135,6 @@ export const getALLOrderSummary = async(req,res,next)=>{
       });
     }
 
-    // Grouping + Cleanup
     pipeline.push(
       {
         $group: {
@@ -178,35 +178,35 @@ export const getALLOrderSummary = async(req,res,next)=>{
           paidAmount: { $ifNull: ["$paidAmount", 0] }
         }
       },
-      { $sort: { createdAt: -1 } }
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit }
+          ],
+          totalCount: [
+            { $count: "count" }
+          ]
+        }
+      },
+      {
+        $project: {
+          data: 1,
+          totalCount: { $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0] }
+        }
+      }
     );
 
     const result = await ORDER.aggregate(pipeline);
 
-    const totalCountMatch = {};
-
-    if (fromDate && toDate) {
-      const start = new Date(fromDate);
-      const end = new Date(toDate);
-      end.setHours(23, 59, 59, 999);
-      totalCountMatch.createdAt = { $gte: start, $lte: end };
-    }
-
-    if (customerTypeId) {
-      totalCountMatch.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
-    }
-
-    if (status) {
-      totalCountMatch.status = status;
-    }
-
-    const totalCount = await ORDER.countDocuments(totalCountMatch);
-
-    res.json({
+    return res.json({
       page,
       limit,
-      totalCount,
-      data: result
+      totalCount: result[0]?.totalCount || 0,
+      data: result[0]?.data || []
     });
     
   } catch (err) {
@@ -545,3 +545,272 @@ export const getCancelledOrders = async (req, res, next) => {
     next(error);
   }
 };
+
+
+
+//pdf
+
+export const generateOrderSummaryPDF = async (req, res, next) => {
+  try {
+    const {
+      fromDate,
+      toDate,
+      customerTypeId,
+      paymentMethod,
+      status,
+      search
+    } = req.query;
+
+    const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const restaurant = await RESTAURANT.findOne();
+    const currency = restaurant?.currency || 'AED';
+
+    const matchStage = {};
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+    if (customerTypeId) {
+      matchStage.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
+    }
+    if (status) {
+      matchStage.status = status;
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: "paymentrecords",
+          localField: "_id",
+          foreignField: "orderId",
+          as: "paymentInfo"
+        }
+      },
+      { $unwind: { path: "$paymentInfo", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$paymentInfo.methods", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentInfo.methods.accountId",
+          foreignField: "_id",
+          as: "account"
+        }
+      },
+      { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "tables",
+          localField: "tableId",
+          foreignField: "_id",
+          as: "table"
+        }
+      },
+      { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "customertypes",
+          localField: "customerTypeId",
+          foreignField: "_id",
+          as: "customerType"
+        }
+      },
+      { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "customers",
+          localField: "customerId",
+          foreignField: "_id",
+          as: "customer"
+        }
+      },
+      { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } }
+    ];
+
+    if (paymentMethod) {
+      pipeline.push({
+        $match: {
+          "account.accountName": paymentMethod
+        }
+      });
+    }
+
+    if (search) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { orderNo: { $regex: search, $options: "i" } },
+            { order_id: { $regex: search, $options: "i" } },
+            { ticketNo: { $regex: search, $options: "i" } },
+            { "table.name": { $regex: search, $options: "i" } },
+            { "customer.name": { $regex: search, $options: "i" } },
+            { "customerType.type": { $regex: search, $options: "i" } },
+            { "account.accountName": { $regex: search, $options: "i" } },
+            { createdBy: { $regex: search, $options: "i" } }
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
+      {
+        $group: {
+          _id: "$_id",
+          order_id: { $first: "$order_id" },
+          orderNo: { $first: "$orderNo" },
+          customer: { $first: "$customer.name" },
+          ticketNo: { $first: "$ticketNo" },
+          table: { $first: "$table.name" },
+          customerType: { $first: "$customerType.type" },
+          discount: { $first: "$discount" },
+          amount: { $first: "$paymentInfo.grandTotal" },
+          status: { $first: "$status" },
+          createdAt: { $first: "$createdAt" },
+          paymentMethods: {
+            $push: {
+              $cond: [
+                {
+                  $and: [
+                    { $ne: ["$paymentInfo.methods.amount", null] },
+                    { $ne: ["$account.accountName", null] }
+                  ]
+                },
+                {
+                  type: "$account.accountName",
+                  amount: "$paymentInfo.methods.amount"
+                },
+                "$$REMOVE"
+              ]
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          amount: { $ifNull: ["$amount", 0] }
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    );
+
+    const result = await ORDER.aggregate(pipeline);
+
+    const customerType = customerTypeId
+      ? (await CUSTOMER_TYPE.findById(customerTypeId).lean())?.type
+      : null;
+
+    const pdfBuffer = await generatePDF("orderSummaryTemp", {
+      data: result,
+      currency,
+      filters: { fromDate, toDate, paymentMethod, customerType, status, search }
+    });
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="Order-Summary-${Date.now()}.pdf"`
+    });
+
+    res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const generateCancelledOrdersPDF = async (req, res, next) => {
+  try {
+    const {
+      fromDate,
+      toDate,
+      customerTypeId,
+      search = '',
+    } = req.query;
+
+    const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const restaurant = await RESTAURANT.findOne({ _id: user.restaurantId });
+    const currency = restaurant?.currency || 'AED';
+
+    // Build match stage
+    const matchStage = { status: "Cancelled" };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (customerTypeId) {
+      matchStage.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: "customertypes",
+          localField: "customerTypeId",
+          foreignField: "_id",
+          as: "customerType"
+        }
+      },
+      { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          order_id: 1,
+          orderNo: 1,
+          createdAt: 1,
+          customerType: "$customerType.type",
+          totalAmount: 1,
+          kot: "$ticketNo"
+        }
+      },
+      {
+        $addFields: {
+          createdDate: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          }
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { order_id: { $regex: search, $options: "i" } },
+            { orderNo: { $regex: search, $options: "i" } },
+            { kot: { $regex: search, $options: "i" } },
+            { customerType: { $regex: search, $options: "i" } },
+          ]
+        }
+      },
+      { $sort: { createdAt: -1 } },
+    ];
+
+    const result = await ORDER.aggregate(pipeline);
+
+    const pdfBuffer = await generatePDF("cancelledOrdersTemp", {
+      data: result,
+      currency,
+      filters: {
+        fromDate: fromDate ? new Date(fromDate).toLocaleDateString() : null,
+        toDate: toDate ? new Date(toDate).toLocaleDateString() : null,
+        search,
+      },
+    });
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="Cancelled-orders-report-${Date.now()}.pdf"`,
+    });
+
+    return res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+};
+

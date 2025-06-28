@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Order Summary Report</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      color: #333;
+      margin: 1px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .filters {
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <h2>Order Summary Report</h2>
+
+  <div class="filters">
+    <% if (filters.fromDate && filters.toDate) { %>
+      <strong>Date Range:</strong> <%= filters.fromDate %> to <%= filters.toDate %><br/>
+    <% } %>
+    <% if (filters.paymentMethod) { %>
+      <strong>Payment Method:</strong> <%= filters.paymentMethod %><br/>
+    <% } %>
+    <% if (filters.customerType) { %>
+      <strong>Customer Type:</strong> <%= filters.customerType %><br/>
+    <% } %>
+    <% if (filters.status) { %>
+      <strong>Status:</strong> <%= filters.status %><br/>
+    <% } %>
+    <% if (filters.search) { %>
+      <strong>Search:</strong> <%= filters.search %><br/>
+    <% } %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Order ID</th>
+        <th>Customer</th>
+        <th>Customer Type</th>
+        <th>Discount (<%= currency %>)</th>
+        <th>Amount (<%= currency %>)</th>
+        <th>Payment Methods (<%= currency %>)</th>
+        <th>Status</th>
+        <th>KOT</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach((item, index) => { %>
+        <tr>
+          <td class="nowrap"><%= index + 1 %></td>
+          <td class="nowrap"><%= new Date(item.createdAt).toLocaleDateString() %></td>
+          <td class="nowrap"><%= item.order_id || "-" %></td>
+          <td><%= item.customer || "-" %></td>
+         <td>
+            <% if (item.customerType === "Dine-In") { %>
+                Dine-In<br/>
+                <small>(<%= item.table || "No Table" %>)</small>
+            <% } else { %>
+                <%= item.customerType || "--" %>
+            <% } %>
+            </td>
+
+          <td class="nowrap"><%= item.discount?.toFixed(2) || "0.00" %></td>
+          <td class="nowrap"><%= item.amount?.toFixed(2) || "0.00" %></td>
+          <td>
+            <% item.paymentMethods?.forEach(method => { %>
+              <div><%= method.type %>: <%= method.amount?.toFixed(2) || "0.00" %></div>
+            <% }) %>
+          </td>
+          <td><%= item.status || "-" %></td>
+          <td class="nowrap"><%= item.ticketNo || "-" %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</body>
+</html>

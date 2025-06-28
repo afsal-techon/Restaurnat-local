@@ -19,8 +19,8 @@ import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../c
 import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSummary,getTopSellingItems,getLatestCompletedOrders} from '../controller/DashbordController/dashbordCntrl.js'
 
 import upload from '../middleware/multer.js'
-import { generateCategorySalesPDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
-import { getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
+import { generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
+import { generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
 import { getDailyCollectionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
 const router = express.Router();
 
@@ -187,7 +187,8 @@ router.get('/reports/item-sale',VerifyToken,getItemWiseSalesReport);
 router.get('/reports/customerType-sale',VerifyToken,getCustomerTypeWiseSalesReport);
 router.get('/daily-sale/pdf',VerifyToken,generateDailySalesPDF);
 router.get('/category-sale/pdf',VerifyToken,generateCategorySalesPDF);
-router.get('/item-sale/pdf',VerifyToken,generateItemWiseSalesPDF)
+router.get('/item-sale/pdf',VerifyToken,generateItemWiseSalesPDF);
+router.get('/customertype-sale/pdf',VerifyToken,generateCustomerTypeWisePDF)
 
 
 
@@ -195,6 +196,7 @@ router.get('/item-sale/pdf',VerifyToken,generateItemWiseSalesPDF)
 router.get('/reports/order-summary',VerifyToken,getALLOrderSummary);
 router.get('/reports/one-order/:orderId',VerifyToken,getSingleOrder);
 router.get('/reports/cancelled-order',VerifyToken,getCancelledOrders)
+router.get('/order-summary/pdf',VerifyToken,generateOrderSummaryPDF)
 
 //Payment  Report 
 router.get('/reports/payment-summary',VerifyToken,getPaymentSummary);
