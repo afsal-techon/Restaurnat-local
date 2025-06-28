@@ -19,7 +19,7 @@ import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../c
 import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSummary,getTopSellingItems,getLatestCompletedOrders} from '../controller/DashbordController/dashbordCntrl.js'
 
 import upload from '../middleware/multer.js'
-import { getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
+import { generateCategorySalesPDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
 import { getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
 import { getDailyCollectionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
 const router = express.Router();
@@ -185,6 +185,9 @@ router.get('/reports/daily-sale',VerifyToken,getDailySalesReport);
 router.get('/reports/category-sale',VerifyToken,getCategoryWiseSalesReport);
 router.get('/reports/item-sale',VerifyToken,getItemWiseSalesReport);
 router.get('/reports/customerType-sale',VerifyToken,getCustomerTypeWiseSalesReport);
+router.get('/daily-sale/pdf',VerifyToken,generateDailySalesPDF);
+router.get('/category-sale/pdf',VerifyToken,generateCategorySalesPDF);
+router.get('/item-sale/pdf',VerifyToken,generateItemWiseSalesPDF)
 
 
 

@@ -8,16 +8,44 @@ import PAYMENT from '../../model/paymentRecord.js'
 export const getALLOrderSummary = async(req,res,next)=>{
   try {
 
-        const user = await USER.findById(req.user);
+    const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const limit = parseInt(req.query.limit) || 20;
+   const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
+    const {
+      fromDate,
+      toDate,
+      customerTypeId,
+      paymentMethod,
+      status,
+      search
+    } = req.query;
 
-   
- const result = await ORDER.aggregate([
+    const matchStage = {};
+
+    //  Date range filter
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    // 👥 Customer type filter
+    if (customerTypeId) {
+      matchStage.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
+    }
+
+    //  Order status filter
+    if (status) {
+      matchStage.status = status;
+    }
+
+    const pipeline = [
+      { $match: matchStage },
       { $sort: { createdAt: -1 } },
       { $skip: skip },
       { $limit: limit },
@@ -77,9 +105,38 @@ export const getALLOrderSummary = async(req,res,next)=>{
         }
       },
       { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
+    ];
 
-            // Group to consolidate records
-        {
+    //  Payment method filter
+    if (paymentMethod) {
+      pipeline.push({
+        $match: {
+          "account.accountName": paymentMethod
+        }
+      });
+    }
+
+    //  Search filter
+    if (search) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { orderNo: { $regex: search, $options: "i" } },
+            { order_id: { $regex: search, $options: "i" } },
+            { ticketNo: { $regex: search, $options: "i" } },
+            { "table.name": { $regex: search, $options: "i" } },
+            { "customer.name": { $regex: search, $options: "i" } },
+            { "customerType.type": { $regex: search, $options: "i" } },
+            { "account.accountName": { $regex: search, $options: "i" } },
+            { createdBy: { $regex: search, $options: "i" } }
+          ]
+        }
+      });
+    }
+
+    // Grouping + Cleanup
+    pipeline.push(
+      {
         $group: {
           _id: "$_id",
           order_id: { $first: "$order_id" },
@@ -115,20 +172,35 @@ export const getALLOrderSummary = async(req,res,next)=>{
           }
         }
       },
-      // Default fallback for missing values
       {
         $addFields: {
           grandTotal: { $ifNull: ["$grandTotal", 0] },
           paidAmount: { $ifNull: ["$paidAmount", 0] }
         }
       },
-
-      // Final sort
       { $sort: { createdAt: -1 } }
-    ]);
-    const totalCount = await ORDER.countDocuments({});
+    );
 
+    const result = await ORDER.aggregate(pipeline);
 
+    const totalCountMatch = {};
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      totalCountMatch.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (customerTypeId) {
+      totalCountMatch.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
+    }
+
+    if (status) {
+      totalCountMatch.status = status;
+    }
+
+    const totalCount = await ORDER.countDocuments(totalCountMatch);
 
     res.json({
       page,
@@ -363,23 +435,39 @@ export const getCancelledOrders = async (req, res, next) => {
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const limit = parseInt(req.query.limit) || 20;
+        const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
-    const result = await ORDER.aggregate([
-      {
-        $match: { status: "Cancelled" }
-      },
-      {
-        $sort: { createdAt: -1 }
-      },
-      {
-        $skip: skip
-      },
-      {
-        $limit: limit
-      },
+
+    const {
+      fromDate,
+      toDate,
+      customerTypeId,
+      search
+    } = req.query;
+
+
+
+    // Build match stage
+    const matchStage = { status: "Cancelled" };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (customerTypeId) {
+      matchStage.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
       {
         $lookup: {
           from: "customertypes",
@@ -421,9 +509,30 @@ export const getCancelledOrders = async (req, res, next) => {
           createdAt: 1
         }
       }
-    ]);
+    ];
 
-    const totalCount = await ORDER.countDocuments({ status: "Cancelled" });
+    // Add search stage
+    if (search) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { order_id: { $regex: search, $options: "i" } },
+            { orderNo: { $regex: search, $options: "i" } },
+            { ticketNo: { $regex: search, $options: "i" } },
+            { customerType: { $regex: search, $options: "i" } },
+            { table: { $regex: search, $options: "i" } },
+            { createdBy: { $regex: search, $options: "i" } }
+          ]
+        }
+      });
+    }
+
+    const result = await ORDER.aggregate(pipeline);
+
+    // Count based on match stage (filtered)
+    const countPipeline = [{ $match: matchStage }, { $count: "total" }];
+    const countResult = await ORDER.aggregate(countPipeline);
+    const totalCount = countResult[0]?.total || 0;
 
     return res.json({
       page,
@@ -431,6 +540,7 @@ export const getCancelledOrders = async (req, res, next) => {
       totalCount,
       data: result
     });
+
   } catch (error) {
     next(error);
   }

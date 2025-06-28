@@ -20,7 +20,8 @@
     "multer": "^2.0.1",
     "node-thermal-printer": "^4.5.0",
     "nodemon": "^3.1.10",
-    "puppeteer": "^24.11.0",
+    "puppeteer": "^24.11.1",
+    "puppeteer-core": "^24.11.1",
     "socket.io": "^4.8.1"
   }
 }

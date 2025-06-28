@@ -12,16 +12,18 @@ export const getPaymentSummary = async (req, res, next) => {
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found" });
 
+   
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
+
+    const { search } = req.query;
 
     const matchStage = {
       type: "Credit",
       referenceType: { $in: ["Sale", "Due Payment"] },
     };
 
-    // Full data for totalCollected and count
     const allPayments = await TRANSACTION.aggregate([
       { $match: matchStage },
       {
@@ -61,6 +63,16 @@ export const getPaymentSummary = async (req, res, next) => {
           },
         },
       },
+      // Add search stage
+      ...(search
+        ? [
+            {
+              $match: {
+                type: { $regex: search, $options: "i" },
+              },
+            },
+          ]
+        : []),
     ]);
 
     const totalCollected = allPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -101,34 +113,33 @@ export const getPaymentSummary = async (req, res, next) => {
 
 export const getDailyCollectionReport = async (req, res, next) => {
   try {
-    const { fromDate, toDate } = req.query;
+
+    
+
+
+   const { fromDate, toDate, search } = req.query;
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
-
     if (!fromDate || !toDate) {
-  return res.status(400).json({ message: "Please provide fromDate and toDate" });
-}
-
+      return res.status(400).json({ message: "Please provide fromDate and toDate" });
+    }
 
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found" });
 
-     const start = new Date(fromDate);
-     const end = new Date(toDate);
-     end.setHours(23, 59, 59, 999);
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    end.setHours(23, 59, 59, 999);
 
     const match = {
       type: "Credit",
       referenceType: { $in: ["Sale", "Due Payment"] },
+      createdAt: { $gte: start, $lte: end }
     };
 
-    if (fromDate && toDate) {
-      match.createdAt = { $gte: start, $lte: end };
-    }
-
-    const groupedResult = await TRANSACTION.aggregate([
+    const pipeline = [
       { $match: match },
       {
         $lookup: {
@@ -148,6 +159,12 @@ export const getDailyCollectionReport = async (req, res, next) => {
           }
         }
       },
+      // Optional filter for search
+      ...(search ? [{
+        $match: {
+          accountName: { $regex: search, $options: "i" }
+        }
+      }] : []),
       {
         $group: {
           _id: { date: "$date", type: "$accountName" },
@@ -165,7 +182,7 @@ export const getDailyCollectionReport = async (req, res, next) => {
               count: "$count"
             }
           },
-          total: { $sum: "$amount" },
+          total: { $sum: "$amount" }
         }
       },
       {
@@ -176,15 +193,26 @@ export const getDailyCollectionReport = async (req, res, next) => {
           total: 1
         }
       },
-      { $sort: { date: -1 } }
-    ]);
+      { $sort: { date: -1 } },
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: limit }],
+          totalCount: [{ $count: "count" }]
+        }
+      },
+      {
+        $project: {
+          data: 1,
+          totalCount: { $arrayElemAt: ["$totalCount.count", 0] }
+        }
+      }
+    ];
 
-    const paginatedData = groupedResult.slice(skip, skip + limit);
-    const totalCount = groupedResult.length;
+    const result = await TRANSACTION.aggregate(pipeline);
 
     return res.status(200).json({
-      data: paginatedData,
-      totalCount,
+      data: result[0]?.data || [],
+      totalCount: result[0]?.totalCount || 0,
       page,
       limit
     });

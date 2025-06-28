@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Daily Sales Report</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      color: #333;
+      margin: 20px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .filters {
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <h2>Daily Sales Report</h2>
+
+  <div class="filters">
+    <% if (filters.fromDate && filters.toDate) { %>
+      <strong>Date Range:</strong> <%= filters.fromDate %> to <%= filters.toDate %><br/>
+    <% } %>
+    <% if (filters.paymentMethod) { %>
+      <strong>Payment Method:</strong> <%= filters.paymentMethod %><br/>
+    <% } %>
+   <% if (filters.customerType) { %>
+  <p><strong>Customer Type:</strong> <%= filters.customerType %></p>
+<% } %>
+    <% if (filters.search) { %>
+      <strong>Search:</strong> <%= filters.search %><br/>
+    <% } %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Order ID</th>
+        <th>Customer Type</th>
+        <th>Order No</th>
+        <th>Discount (<%= currency %>)</th>
+        <th>Amount (<%= currency %>)</th>
+        <th>Payment Methods (<%= currency %>)</th>
+        <th>Due Amount (<%= currency %>)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach((item, index) => { %>
+        <tr>
+          <td class="nowrap"><%= index + 1 %></td>
+          <td class="nowrap"><%= new Date(item.date).toLocaleDateString() %></td>
+          <td class="nowrap"><%= item.orderId || "-" %></td>
+          <td><%= item.customerType || "-" %></td>
+          <td class="nowrap"><%= item.orderNo || "-" %></td>
+          <td class="nowrap"><%= item.discount?.toFixed(2) || "0.00" %></td>
+          <td class="nowrap"><%= item.amount?.toFixed(2) || "0.00" %></td>
+          <td>
+            <% item.paymentMethods.forEach(method => { %>
+              <div><%= method.type %>: <%= method.amount?.toFixed(2) || "0.00" %></div>
+            <% }) %>
+          </td>
+          <td class="nowrap"><%= item.dueAmount?.toFixed(2) || "0.00" %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</body>
+</html>
