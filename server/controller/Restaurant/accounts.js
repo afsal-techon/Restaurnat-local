@@ -4,6 +4,7 @@ import RESTAURANT from '../../model/restaurant.js';
 import TRANSACTION from '../../model/transaction.js';
 import mongoose from 'mongoose';
 import { generatePDF } from '../../config/pdfGeneration.js';
+import {  generateUniqueRefId } from '../../controller/POS controller/posOrderCntrl.js'
 
 
 
@@ -286,22 +287,27 @@ export const createAccounts = async (req, res,next) => {
 
 
 
- export const getTransactionList = async (req, res, next) => {
+export const getTransactionList = async (req, res, next) => {
   try {
-     const { accountId, fromDate, toDate, search = '' } = req.query;
+    const { accountId, fromDate, toDate, search = '' } = req.query;
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
-
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found!" });
 
-    const account = await ACCOUNTS.findById(accountId);
-    if (!account) return res.status(400).json({ message: 'Account not found!' });
+    const mainAccount = await ACCOUNTS.findById(accountId);
+    if (!mainAccount) return res.status(400).json({ message: 'Account not found!' });
+
+    // Get all child accounts if any
+    const childAccounts = await ACCOUNTS.find({ parentAccountId: accountId }, { _id: 1 });
+
+    // Prepare accountId list to match in transactions
+    const accountIdsToMatch = [mainAccount._id, ...childAccounts.map(acc => acc._id)];
 
     const matchStage = {
-      accountId: new mongoose.Types.ObjectId(accountId)
+      accountId: { $in: accountIdsToMatch }
     };
 
     if (fromDate && toDate) {
@@ -370,6 +376,272 @@ export const createAccounts = async (req, res,next) => {
             { $skip: skip },
             { $limit: limit }
           ],
+          totalCount: [{ $count: "count" }],
+          totalAmount: [{
+            $group: {
+              _id: null,
+              sum: { $sum: "$amount" }
+            }
+          }]
+        }
+      },
+      {
+        $project: {
+          data: 1,
+          totalCount: { $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0] },
+          totalAmount: { $ifNull: [{ $arrayElemAt: ["$totalAmount.sum", 0] }, 0] }
+        }
+      }
+    ];
+
+    const result = await TRANSACTION.aggregate(pipeline);
+
+    return res.status(200).json({
+      data: result[0]?.data || [],
+      totalCount: result[0]?.totalCount || 0,
+      totalAmount: result[0]?.totalAmount || 0,
+      page,
+      limit
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+export const generateTransactionListPDF = async (req, res, next) => {
+  try {
+    const { accountId, fromDate, toDate, search = '' } = req.query;
+
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: 'User not found!' });
+
+    const mainAccount = await ACCOUNTS.findById(accountId).lean();
+    if (!mainAccount) return res.status(400).json({ message: 'Account not found!' });
+
+    // Fetch currency from restaurant
+    const restaurant = await RESTAURANT.findOne().lean();
+    const currency = restaurant?.currency || 'AED';
+
+    // Get child accounts under the selected parent
+    const childAccounts = await ACCOUNTS.find({ parentAccountId: accountId }).lean();
+    const accountIdsToMatch = [mainAccount._id, ...childAccounts.map(a => a._id)];
+
+    const matchStage = {
+      accountId: { $in: accountIdsToMatch }
+    };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const searchStage = search
+      ? {
+          $or: [
+            { referenceId: { $regex: search, $options: 'i' } },
+            { referenceType: { $regex: search, $options: 'i' } },
+            { narration: { $regex: search, $options: 'i' } }
+          ]
+        }
+      : null;
+
+    const pipeline = [
+      { $match: matchStage },
+      ...(searchStage ? [{ $match: searchStage }] : []),
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: 'accounts',
+          localField: 'accountId',
+          foreignField: '_id',
+          as: 'acct'
+        }
+      },
+      { $unwind: '$acct' },
+      {
+        $project: {
+          date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          referenceId: 1,
+          referenceType: 1,
+          accountType: '$acct.accountType',
+          paymentType: '$acct.accountName',
+          amount: 1
+        }
+      }
+    ];
+
+    const data = await TRANSACTION.aggregate(pipeline);
+    const totalAmount = data.reduce((sum, tx) => sum + tx.amount, 0);
+
+    const pdfBuffer = await generatePDF('transactionListTemp', {
+      data,
+      currency,
+      totalAmount,
+      filters: {
+        fromDate,
+        toDate,
+        search
+      }
+    });
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="transactions-${Date.now()}.pdf"`
+    });
+
+    return res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+  
+
+export const createTransactionModule= async(req,res,next)=>{
+  try {
+    console.log(req.body)
+
+    const  { date,accountId,note,amount} = req.body;
+
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: 'User not found!' });
+
+    if(!date){
+      return res.status(400).json({ message:"Date is required!"})
+    }
+    if(!accountId){
+      return res.status(400).json({ message:'Account Id is required!'})
+    }
+
+    if(!amount){
+      return res.status({message:'Amount is required!'})
+    }
+
+
+    const account = ACCOUNTS.findById(accountId).lean();
+
+    if(!account){
+      return res.status(400).json({ message:'Account not found!'})
+    }
+
+    const refId = await generateUniqueRefId();
+
+    await TRANSACTION.create({
+      restaurantId: account.restaurantId || null,
+      accountId: accountId,
+      amount,
+      type:"Debit", // it's an outgoing expense/purchase
+      referenceId: refId,
+      referenceType: account.accountType || "Expense", // Use account type as reference
+      description: note || `Manual ${account.accountType} entry`,
+      createdById: user._id,
+      createdBy: user.name,
+      createdAt: new Date(date),
+    });
+
+    return res.status(200).json({ message: "Transaction created successfully!" });
+    
+  } catch (err) {
+    next(err)
+  }
+}
+
+
+export const getPurchseExpenceList = async (req, res, next) => {
+  try {
+    const { accountId, fromDate, toDate, search = '' } = req.query;
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const account = await ACCOUNTS.findById(accountId);
+    if (!account) return res.status(400).json({ message: 'Account not found!' });
+
+    const matchStage = {
+      accountId: new mongoose.Types.ObjectId(accountId)
+    };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const searchStage = search
+      ? {
+          $or: [
+            { referenceId: { $regex: search, $options: 'i' } },
+            { referenceType: { $regex: search, $options: 'i' } },
+            { narration: { $regex: search, $options: 'i' } },
+          ]
+        }
+      : null;
+
+    const pipeline = [
+      { $match: matchStage },
+      ...(searchStage ? [{ $match: searchStage }] : []),
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+
+      // Filter only Expense or Purchase transactions
+      {
+        $match: {
+          "accountInfo.accountType": { $in: ["Expense", "Purchase"] }
+        }
+      },
+
+      {
+        $lookup: {
+          from: "accounts",
+          let: { parentId: "$accountInfo.parentAccountId" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$parentId"] } } }
+          ],
+          as: "parentInfo"
+        }
+      },
+      { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          referenceType: 1,
+          referenceId: 1,
+          type: 1,
+          amount: 1,
+          narration: 1,
+          createdAt: 1,
+          account: {
+            name: "$accountInfo.accountName",
+            type: "$accountInfo.accountType"
+          },
+          parentAccount: {
+            name: "$parentInfo.accountName",
+            type: "$parentInfo.accountType"
+          }
+        }
+      },
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit }
+          ],
           totalCount: [
             { $count: "count" }
           ],
@@ -408,106 +680,4 @@ export const createAccounts = async (req, res,next) => {
 };
 
 
-export const generateTransactionListPDF = async (req, res, next) => {
-  try {
-    const { accountId, fromDate, toDate, search = '' } = req.query;
 
-   
-
-    const user = await USER.findById(req.user).lean();
-    if (!user) return res.status(400).json({ message: 'User not found!' });
-
-    const account = await ACCOUNTS.findById(accountId).lean();
-    if (!account) return res.status(400).json({ message: 'Account not found!' });
-
-    // Fetch currency from restaurant
-    const restaurant = await RESTAURANT.find().lean();
-    const currency = restaurant?.currency || 'AED';
-
-    // Build match stage
-    const matchStage = {
-      accountId: new mongoose.Types.ObjectId(accountId)
-    };
-    if (fromDate && toDate) {
-      const start = new Date(fromDate);
-      const end = new Date(toDate);
-      end.setHours(23, 59, 59, 999);
-      matchStage.createdAt = { $gte: start, $lte: end };
-    }
-
-    const searchStage = search
-      ? {
-          $or: [
-            { referenceId: { $regex: search, $options: 'i' } },
-            { referenceType: { $regex: search, $options: 'i' } },
-          ],
-        }
-      : null;
-
-    const pipeline = [
-      { $match: matchStage },
-      ...(searchStage ? [{ $match: searchStage }] : []),
-      { $sort: { createdAt: -1 } },
-      {
-        $lookup: {
-          from: 'accounts',
-          localField: 'accountId',
-          foreignField: '_id',
-          as: 'acct'
-        }
-      },
-      { $unwind: '$acct' },
-      {
-        $project: {
-          date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-          referenceId: 1,
-          referenceType: 1,
-          accountType: '$acct.accountType',
-          paymentType: '$acct.accountName',
-          amount: 1
-        }
-      }
-    ];
-
-    const data = await TRANSACTION.aggregate(pipeline);
-
-    const totalAmount = data.reduce((sum, tx) => sum + tx.amount, 0);
-
-    const pdfBuffer = await generatePDF('transactionListTemp', {
-      data,
-      currency,
-      totalAmount,
-      filters: {
-        fromDate,
-        toDate,
-        search
-      }
-    });
-
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="transactions-${Date.now()}.pdf"`
-    });
-    return res.send(pdfBuffer);
-  } catch (err) {
-    next(err);
-  }
-};
-  
-
-export const createTransactionModule= async(req,res,next)=>{
-  try {
-
-    const  { date,accountId,not,amount} = req.body;
-
-    const user = await USER.findById(req.user).lean();
-    if (!user) return res.status(400).json({ message: 'User not found!' });
-
-    
-
-
-    
-  } catch (err) {
-    next(err)
-  }
-}

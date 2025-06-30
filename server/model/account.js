@@ -33,6 +33,7 @@ accountType: {
     "Equity",
     "Income",
     "Other Income",
+    "Purchase",
     "Expense",
     "Cost of Goods Sold",
     "Other Expenses",
