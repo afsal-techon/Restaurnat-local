@@ -506,7 +506,7 @@ export const createTransactionModule= async(req,res,next)=>{
   try {
     console.log(req.body)
 
-    const  { date,accountId,note,amount} = req.body;
+    const  { date,accountId,note,amount,accountType} = req.body;
 
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: 'User not found!' });
@@ -517,10 +517,14 @@ export const createTransactionModule= async(req,res,next)=>{
     if(!accountId){
       return res.status(400).json({ message:'Account Id is required!'})
     }
+    if(!accountType){
+      return res.status(400).json({ message:'Account Type is required!'})
+    }
 
     if(!amount){
-      return res.status({message:'Amount is required!'})
+      return res.status(400).json({message:'Amount is required!'})
     }
+
 
 
     const account = ACCOUNTS.findById(accountId).lean();
@@ -537,7 +541,7 @@ export const createTransactionModule= async(req,res,next)=>{
       amount,
       type:"Debit", // it's an outgoing expense/purchase
       referenceId: refId,
-      referenceType: account.accountType || "Expense", // Use account type as reference
+      referenceType: accountType, // Use account type as reference
       description: note || `Manual ${account.accountType} entry`,
       createdById: user._id,
       createdBy: user.name,
@@ -554,7 +558,7 @@ export const createTransactionModule= async(req,res,next)=>{
 
 export const getPurchseExpenceList = async (req, res, next) => {
   try {
-    const { accountId, fromDate, toDate, search = '' } = req.query;
+    const { fromDate, toDate, search = '' } = req.query;
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
@@ -562,12 +566,7 @@ export const getPurchseExpenceList = async (req, res, next) => {
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found!" });
 
-    const account = await ACCOUNTS.findById(accountId);
-    if (!account) return res.status(400).json({ message: 'Account not found!' });
-
-    const matchStage = {
-      accountId: new mongoose.Types.ObjectId(accountId)
-    };
+    const matchStage = {};
 
     if (fromDate && toDate) {
       const start = new Date(fromDate);
@@ -636,6 +635,7 @@ export const getPurchseExpenceList = async (req, res, next) => {
           }
         }
       },
+      { $sort: { createdAt: -1 } },
       {
         $facet: {
           data: [
@@ -678,6 +678,7 @@ export const getPurchseExpenceList = async (req, res, next) => {
     next(err);
   }
 };
+
 
 
 
