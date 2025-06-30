@@ -5,7 +5,7 @@ import { createRestuarantBranch,getAllRestaurant,updateRestaurantBranch,deleteRe
     addCustomerType,updateCustomerTypes,deleteCustomerTypes ,getAllCustomerTypes
 } from '../controller/Restaurant/restaurant.js';
 
-import {createAccounts,getAccounts,updateAccount,deleteAccount,getTransactionList } from '../controller/Restaurant/accounts.js'
+import {createAccounts,getAccounts,updateAccount,deleteAccount,getTransactionList, generateTransactionListPDF } from '../controller/Restaurant/accounts.js'
 
 import { createFloors,deleteFloor,getAllFloorsbyRest,updateFloorName ,createTables,getAllTablesbyRest,updateTable,deleteTable ,addKitchen,deleteKitchen,getAllKitchen,updateKitchen } from '../controller/Restaurant/floors&tables.js'
 import {createCategory,deleteCategory,getAllCategories,updateCategory } from '../controller/foodController/categoryCnrl.js'
@@ -21,7 +21,7 @@ import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSumm
 import upload from '../middleware/multer.js'
 import { generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
 import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
-import { getDailyCollectionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
+import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
 const router = express.Router();
 
 
@@ -141,7 +141,7 @@ router.put('/pos-customer',VerifyToken,updateCustomerforPOS);
 router.get('/pos-customerTypes/:restaurantId',VerifyToken,getCustomerTypesForPOS)
 router.get('/pos-customer/history/:customerId',VerifyToken,getCustomerCreditHistory)
 router.post('/pos-customer/due',VerifyToken,payCustomerDue);
-router.get('/customer/history/:customerId',VerifyToken,getCustomerOrderHistory)
+router.get('/customer/history',VerifyToken,getCustomerOrderHistory)
 
 
 
@@ -166,7 +166,8 @@ router.post('/accounts',VerifyToken,createAccounts);
 router.get('/accounts/:restaurantId',VerifyToken,getAccounts);
 router.put('/accounts',VerifyToken,updateAccount);
 router.delete('/accounts/:accountId',VerifyToken,deleteAccount);
-router.get('/accounts/transaction/:accountId',VerifyToken,getTransactionList);
+router.get('/accounts/transaction/data',VerifyToken,getTransactionList);
+router.get('/transaction/pdf',VerifyToken,generateTransactionListPDF)
 
 
 
@@ -202,6 +203,8 @@ router.get('/cancel-order/pdf',VerifyToken,generateCancelledOrdersPDF)
 //Payment  Report 
 router.get('/reports/payment-summary',VerifyToken,getPaymentSummary);
 router.get('/reports/daily-payment',VerifyToken,getDailyCollectionReport);
+router.get('/payment-summary/pdf',VerifyToken,generatePaymentSummaryPDF);
+router.get('/payment-collection/pdf',VerifyToken,generateDailyCollectionPDF)
 
 
 

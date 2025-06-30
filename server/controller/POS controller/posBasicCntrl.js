@@ -428,43 +428,80 @@ export const payCustomerDue = async(req,res,next)=>{
 
 export const getCustomerOrderHistory = async (req, res, next) => {
   try {
-
-    const { customerId } = req.params;
+  
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
+    const {customerId, fromDate, toDate, search = '' } = req.query;
 
     if (!customerId) {
       return res.status(400).json({ message: "Customer ID is required" });
     }
 
-    
-    const result = await ORDER.aggregate([
-      {
-        $match: {
-          customerId: new mongoose.Types.ObjectId(customerId),
-          status: "Completed",
-        },
-      },
-      {
-        $sort: { createdAt: -1 },
-      },
+    const matchStage = {
+      customerId: new mongoose.Types.ObjectId(customerId),
+      status: "Completed",
+    };
+
+    // Date filter
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      { $sort: { createdAt: -1 } },
+
+      // Search filtering stage (if search is applied)
+      ...(search
+        ? [
+            {
+              $lookup: {
+                from: "customertypes",
+                localField: "customerTypeId",
+                foreignField: "_id",
+                as: "customerTypeSearch",
+              },
+            },
+            {
+              $unwind: {
+                path: "$customerTypeSearch",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+            {
+              $match: {
+                $or: [
+                  { order_id: { $regex: search, $options: "i" } },
+                  { orderNo: { $regex: search, $options: "i" } },
+                  { ticketNo: { $regex: search, $options: "i" } },
+                  { "customerTypeSearch.type": { $regex: search, $options: "i" } },
+                ],
+              },
+            },
+          ]
+        : []),
+
       {
         $facet: {
           metadata: [{ $count: "totalCount" }],
           data: [
             { $skip: skip },
             { $limit: limit },
-              {
-          $lookup: {
-            from: "tables",
-            localField: "tableId",
-            foreignField: "_id",
-            as: "table"
-          }
-        },
-        { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
-            // Join customer type
+
+            {
+              $lookup: {
+                from: "tables",
+                localField: "tableId",
+                foreignField: "_id",
+                as: "table",
+              },
+            },
+            { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
+
             {
               $lookup: {
                 from: "customertypes",
@@ -474,7 +511,7 @@ export const getCustomerOrderHistory = async (req, res, next) => {
               },
             },
             { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
-            // Join payment
+
             {
               $lookup: {
                 from: "paymentrecords",
@@ -484,13 +521,14 @@ export const getCustomerOrderHistory = async (req, res, next) => {
               },
             },
             { $unwind: { path: "$payment", preserveNullAndEmptyArrays: true } },
-            // Unwind payment methods
+
             {
               $unwind: {
                 path: "$payment.methods",
                 preserveNullAndEmptyArrays: true,
               },
             },
+
             {
               $lookup: {
                 from: "accounts",
@@ -505,6 +543,7 @@ export const getCustomerOrderHistory = async (req, res, next) => {
                 preserveNullAndEmptyArrays: true,
               },
             },
+
             {
               $group: {
                 _id: "$_id",
@@ -535,28 +574,30 @@ export const getCustomerOrderHistory = async (req, res, next) => {
                 ticketNo: 1,
                 discount: 1,
                 createdAt: 1,
-                table:1,
+                table: 1,
                 status: 1,
                 customerType: 1,
-                  grandTotal: "$grandTotal",
-                  paidAmount: "$paidAmount",
-                  dueAmount: "$dueAmount",
-                  methods: {
-                    $filter: {
-                      input: "$methods",
-                      as: "m",
-                      cond: { $ne: ["$$m.accountName", null] },
-                    },
+                grandTotal: 1,
+                paidAmount: 1,
+                dueAmount: 1,
+                methods: {
+                  $filter: {
+                    input: "$methods",
+                    as: "m",
+                    cond: { $ne: ["$$m.accountName", null] },
                   },
+                },
               },
             },
           ],
         },
       },
-    ]);
+    ];
 
-    const fullData = result[0].data || [];
-    const totalCount = result[0].metadata[0]?.totalCount || 0;
+    const result = await ORDER.aggregate(pipeline);
+
+    const fullData = result[0]?.data || [];
+    const totalCount = result[0]?.metadata[0]?.totalCount || 0;
 
     return res.status(200).json({
       data: fullData,
@@ -564,7 +605,6 @@ export const getCustomerOrderHistory = async (req, res, next) => {
       page,
       limit,
     });
-
   } catch (err) {
     next(err);
   }

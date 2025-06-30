@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Transaction List</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 20px; }
+    h2 { text-align: center; }
+    .filters { margin-bottom: 15px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background-color: #f2f2f2; }
+    .nowrap { white-space: nowrap; }
+    .summary { margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Transaction List</h2>
+
+  <div class="filters">
+    <% if (filters.fromDate && filters.toDate) { %>
+      <strong>Date Range:</strong> <%= filters.fromDate %> – <%= filters.toDate %><br/>
+    <% } %>
+    <% if (filters.search) { %>
+      <strong>Search:</strong> <%= filters.search %><br/>
+    <% } %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="nowrap">Date</th>
+        <th class="nowrap">Reference No</th>
+        <th class="nowrap">Reference Type</th>
+        <th class="nowrap">Account Type</th>
+        <th class="nowrap">Payment Type</th>
+        <th class="nowrap">Amount (<%= currency %>)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data.length) { %>
+        <tr><td colspan="6" style="text-align:center;">No records found.</td></tr>
+      <% } else { %>
+        <% data.forEach(item => { %>
+          <tr>
+            <td><%= item.date %></td>
+            <td><%= item.referenceId %></td>
+            <td><%= item.referenceType %></td>
+            <td><%= item.accountType %></td>
+            <td><%= item.paymentType %></td>
+            <td><%= item.amount.toFixed(2) %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+
+  <% if (typeof totalAmount !== 'undefined') { %>
+    <div class="summary">
+      Total Amount: <%= totalAmount.toFixed(2) %> <%= currency %>
+    </div>
+  <% } %>
+</body>
+</html>

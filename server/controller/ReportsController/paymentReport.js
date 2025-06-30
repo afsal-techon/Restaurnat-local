@@ -3,7 +3,9 @@ import USER from '../../model/userModel.js';
 import ORDER from '../../model/oreder.js';
 import PAYMENT from '../../model/paymentRecord.js'
 import TRANSACTION from '../../model/transaction.js'
-import CUSTOMER from '../../model/customer.js'
+import CUSTOMER from '../../model/customer.js';
+import RESTAURANT from '../../model/restaurant.js'
+import {  generatePDF } from '../../config/pdfGeneration.js'
 
 
 
@@ -216,6 +218,200 @@ export const getDailyCollectionReport = async (req, res, next) => {
       page,
       limit
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+//pdf generation
+export const generatePaymentSummaryPDF = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const { search = '' } = req.query;
+
+    
+    const restaurant = await RESTAURANT.findOne({ }).lean();
+    const currency = restaurant?.currency || "AED";
+
+    const matchStage = {
+      type: "Credit",
+      referenceType: { $in: ["Sale", "Due Payment"] },
+    };
+
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $group: {
+          _id: "$accountId",
+          amount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "_id",
+          foreignField: "_id",
+          as: "accountInfo",
+        },
+      },
+      { $unwind: { path: "$accountInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountInfo.parentAccountId",
+          foreignField: "_id",
+          as: "parentInfo",
+        },
+      },
+      { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          type: "$accountInfo.accountName",
+          amount: 1,
+          count: 1,
+          groupUnder: {
+            accountName: "$parentInfo.accountName",
+            accountType: "$parentInfo.accountType",
+          },
+        },
+      },
+      ...(search
+        ? [
+            {
+              $match: {
+                type: { $regex: search, $options: "i" },
+              },
+            },
+          ]
+        : []),
+    ];
+
+    const payments = await TRANSACTION.aggregate(pipeline);
+
+    const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
+
+    const pdfBuffer = await generatePDF("paymentSummaryTemp", {
+      data: payments,
+      totalCollected,
+      currency,
+      filters: { search },
+    });
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="Payment-summary-${Date.now()}.pdf"`,
+    });
+
+    return res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+export const generateDailyCollectionPDF = async (req, res, next) => {
+  try {
+    const { fromDate, toDate, search = '' } = req.query;
+
+    if (!fromDate || !toDate) {
+      return res.status(400).json({ message: "Please provide fromDate and toDate" });
+    }
+
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const restaurant = await RESTAURANT.findOne({ }).lean();
+    const currency = restaurant?.currency || 'AED';
+
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    end.setHours(23, 59, 59, 999);
+
+    const match = {
+      type: "Credit",
+      referenceType: { $in: ["Sale", "Due Payment"] },
+      createdAt: { $gte: start, $lte: end }
+    };
+
+    const pipeline = [
+      { $match: match },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "account"
+        }
+      },
+      { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          amount: 1,
+          accountName: "$account.accountName",
+          date: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          }
+        }
+      },
+      ...(search ? [{
+        $match: {
+          accountName: { $regex: search, $options: "i" }
+        }
+      }] : []),
+      {
+        $group: {
+          _id: { date: "$date", type: "$accountName" },
+          amount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        }
+      },
+      {
+        $group: {
+          _id: "$_id.date",
+          collections: {
+            $push: {
+              type: "$_id.type",
+              amount: "$amount",
+              count: "$count"
+            }
+          },
+          total: { $sum: "$amount" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: "$_id",
+          collections: 1,
+          total: 1
+        }
+      },
+      { $sort: { date: -1 } }
+    ];
+
+    const data = await TRANSACTION.aggregate(pipeline);
+
+    const pdfBuffer = await generatePDF("dailyCollectionTemp", {
+      data,
+      currency,
+      filters: {
+        fromDate,
+        toDate,
+        search,
+      },
+    });
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="Daily-collection-report-${Date.now()}.pdf"`,
+    });
+
+    return res.send(pdfBuffer);
   } catch (err) {
     next(err);
   }
