@@ -167,7 +167,9 @@ router.get('/accounts/:restaurantId',VerifyToken,getAccounts);
 router.put('/accounts',VerifyToken,updateAccount);
 router.delete('/accounts/:accountId',VerifyToken,deleteAccount);
 router.get('/accounts/transaction/data',VerifyToken,getTransactionList);
-router.get('/transaction/pdf',VerifyToken,generateTransactionListPDF)
+router.get('/transaction/pdf',VerifyToken,generateTransactionListPDF);
+
+
 
 
 

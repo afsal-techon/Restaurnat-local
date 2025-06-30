@@ -494,3 +494,20 @@ export const generateTransactionListPDF = async (req, res, next) => {
   }
 };
   
+
+export const createTransactionModule= async(req,res,next)=>{
+  try {
+
+    const  { date,accountId,not,amount} = req.body;
+
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: 'User not found!' });
+
+    
+
+
+    
+  } catch (err) {
+    next(err)
+  }
+}
