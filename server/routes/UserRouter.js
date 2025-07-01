@@ -5,7 +5,7 @@ import { createRestuarantBranch,getAllRestaurant,updateRestaurantBranch,deleteRe
     addCustomerType,updateCustomerTypes,deleteCustomerTypes ,getAllCustomerTypes
 } from '../controller/Restaurant/restaurant.js';
 
-import {createAccounts,getAccounts,updateAccount,deleteAccount,getTransactionList, generateTransactionListPDF, createTransactionModule, getPurchseExpenceList } from '../controller/Restaurant/accounts.js'
+import {createAccounts,getAccounts,updateAccount,deleteAccount,getTransactionList, generateTransactionListPDF, createTransactionModule, getPurchseExpenceList, generatePurchseExpencePDF } from '../controller/Restaurant/accounts.js'
 
 import { createFloors,deleteFloor,getAllFloorsbyRest,updateFloorName ,createTables,getAllTablesbyRest,updateTable,deleteTable ,addKitchen,deleteKitchen,getAllKitchen,updateKitchen } from '../controller/Restaurant/floors&tables.js'
 import {createCategory,deleteCategory,getAllCategories,updateCategory } from '../controller/foodController/categoryCnrl.js'
@@ -169,7 +169,8 @@ router.delete('/accounts/:accountId',VerifyToken,deleteAccount);
 router.get('/accounts/transaction/data',VerifyToken,getTransactionList);
 router.get('/transaction/pdf',VerifyToken,generateTransactionListPDF);
 router.post('/transaction/exp-pur',VerifyToken,createTransactionModule);
-router.get('/transaction/exp-pur',VerifyToken,getPurchseExpenceList)
+router.get('/transaction/exp-pur',VerifyToken,getPurchseExpenceList);
+router.get('/exp-pur/pdf',VerifyToken,generatePurchseExpencePDF)
 
 
 

@@ -641,7 +641,7 @@ export const generateDailySalesPDF = async(req,res,next)=>{
     const user = await USER.findById(userId).lean();
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const restaurnat = await RESTAURANT.find();
+    const restaurnat = await RESTAURANT.findOne();
     const currency = restaurnat.currency || 'AED'
 
         const matchStage = { "order.status": "Completed" };
@@ -781,7 +781,7 @@ export const generateCategorySalesPDF = async(req,res,next)=>{
     if (!user) return res.status(400).json({ message: 'User not found' });
 
     
-    const restaurant = await RESTAURANT.find()
+    const restaurant = await RESTAURANT.findOne()
     const currency = restaurant?.currency || 'AED';
 
 

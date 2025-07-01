@@ -89,16 +89,11 @@ export const createAccounts = async (req, res,next) => {
     }
 
     // Fetch all accounts with parentAccountId populated
-    const accounts = await ACCOUNTS.find({ restaurantId })
+    const accounts = await ACCOUNTS.find({  })
       .populate({ path: 'parentAccountId', select: 'accountName' });
 
     // Get all transaction totals grouped by accountId
     const transactions = await TRANSACTION.aggregate([
-      {
-        $match: {
-          restaurantId: new mongoose.Types.ObjectId(restaurantId)
-        }
-      },
       {
         $group: {
           _id: '$accountId',
@@ -127,16 +122,22 @@ export const createAccounts = async (req, res,next) => {
 
     // Step 2: Build account map with base currentBalance
     const accountMap = {};
-    accounts.forEach(acc => {
-      const bal = balanceMap[acc._id.toString()] || { credit: 0, debit: 0 };
-      const currentBalance = (acc.openingBalance || 0) + bal.credit - bal.debit;
+   accounts.forEach(acc => {
+  const bal = balanceMap[acc._id.toString()] || { credit: 0, debit: 0 };
+  let currentBalance;
 
-      accountMap[acc._id.toString()] = {
-        ...acc._doc,
-        currentBalance,
-        children: []
-      };
-    });
+  if (["Expense", "Purchase"].includes(acc.accountType)) {
+    currentBalance = bal.debit || 0;
+  } else {
+    currentBalance = (acc.openingBalance || 0) + bal.credit - bal.debit;
+  }
+
+  accountMap[acc._id.toString()] = {
+    ...acc._doc,
+    currentBalance,
+    children: []
+  };
+});
 
     // Step 3: Build parent-child relationships
     Object.values(accountMap).forEach(acc => {
@@ -354,6 +355,16 @@ export const getTransactionList = async (req, res, next) => {
               }
             },
             { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+            //  New lookup for paymentType
+        {
+          $lookup: {
+            from: "accounts",
+            localField: "paymentType",
+            foreignField: "_id",
+            as: "paymentTypeInfo"
+          }
+        },
+        { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
             {
               $project: {
                 _id: 1,
@@ -370,6 +381,9 @@ export const getTransactionList = async (req, res, next) => {
                 parentAccount: {
                   name: "$parentInfo.accountName",
                   type: "$parentInfo.accountType"
+                }, 
+                paymentType: {
+                  $ifNull: ["$paymentTypeInfo.accountName", null]
                 }
               }
             },
@@ -506,7 +520,7 @@ export const createTransactionModule= async(req,res,next)=>{
   try {
     console.log(req.body)
 
-    const  { date,accountId,note,amount,accountType} = req.body;
+    const  { date,accountId,note,amount,accountType,paymentAccountId} = req.body;
 
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: 'User not found!' });
@@ -519,6 +533,9 @@ export const createTransactionModule= async(req,res,next)=>{
     }
     if(!accountType){
       return res.status(400).json({ message:'Account Type is required!'})
+    }
+    if(!paymentAccountId){
+      return res.status(400).json({ message:"Payment Type is required!"})
     }
 
     if(!amount){
@@ -535,9 +552,10 @@ export const createTransactionModule= async(req,res,next)=>{
 
     const refId = await generateUniqueRefId();
 
-    await TRANSACTION.create({
+     const debitTXn = {
       restaurantId: account.restaurantId || null,
       accountId: accountId,
+      paymentType:paymentAccountId || null,
       amount,
       type:"Debit", // it's an outgoing expense/purchase
       referenceId: refId,
@@ -546,7 +564,23 @@ export const createTransactionModule= async(req,res,next)=>{
       createdById: user._id,
       createdBy: user.name,
       createdAt: new Date(date),
-    });
+    };
+
+        // Create CREDIT transaction in Payment (Cash/Bank/Card) account
+    const creditTxn = {
+      restaurantId: account.restaurantId || null,
+      accountId: paymentAccountId,
+      amount,
+      type: "Credit",
+      referenceId: refId,
+      referenceType: accountType,
+      description: note || `Payment for ${accountType}`,
+      createdById: user._id,
+      createdBy: user.name,
+      createdAt: new Date(date),
+    };
+
+    await TRANSACTION.insertMany([debitTXn,creditTxn])
 
     return res.status(200).json({ message: "Transaction created successfully!" });
     
@@ -616,6 +650,16 @@ export const getPurchseExpenceList = async (req, res, next) => {
         }
       },
       { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+          {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo"
+        }
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+
       {
         $project: {
           _id: 1,
@@ -625,6 +669,9 @@ export const getPurchseExpenceList = async (req, res, next) => {
           amount: 1,
           narration: 1,
           createdAt: 1,
+               paymentType: {
+            $ifNull: ["$paymentTypeInfo.accountName", null]
+          },
           account: {
             name: "$accountInfo.accountName",
             type: "$accountInfo.accountType"
@@ -681,4 +728,85 @@ export const getPurchseExpenceList = async (req, res, next) => {
 
 
 
+export const generatePurchseExpencePDF = async (req, res, next) => {
+  try {
+    const { fromDate, toDate, search = '' } = req.query;
+
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const restaurant = await RESTAURANT.findOne().lean();
+    const currency = restaurant?.currency || 'AED';
+
+    const matchStage = {};
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const searchStage = search
+      ? {
+          $or: [
+            { referenceId: { $regex: search, $options: 'i' } },
+            { referenceType: { $regex: search, $options: 'i' } },
+            { narration: { $regex: search, $options: 'i' } },
+          ]
+        }
+      : null;
+
+    const pipeline = [
+      { $match: matchStage },
+      ...(searchStage ? [{ $match: searchStage }] : []),
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+      {
+        $match: {
+          "accountInfo.accountType": { $in: ["Expense", "Purchase"] }
+        }
+      },
+      {
+        $project: {
+          date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          referenceId: 1,
+          referenceType: 1,
+          accountType: "$accountInfo.accountType",
+          accountName: "$accountInfo.accountName",
+          amount: 1
+        }
+      },
+      { $sort: { date: -1 } }
+    ];
+
+    const data = await TRANSACTION.aggregate(pipeline);
+
+    const totalAmount = data.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const pdfBuffer = await generatePDF("purchaseExpenceTemp", {
+      data,
+      currency,
+      totalAmount,
+      filters: { fromDate, toDate, search }
+    });
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="purchase-expense-${Date.now()}.pdf"`
+    });
+
+    return res.send(pdfBuffer);
+
+  } catch (err) {
+    next(err);
+  }
+};
 

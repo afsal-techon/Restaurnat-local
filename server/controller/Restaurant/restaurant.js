@@ -2,6 +2,7 @@ import USER from '../../model/userModel.js';
 import RESTAURANT from '../../model/restaurant.js'
 import validatePhoneNumbers from '../../middleware/phoneValidator.js';
 import CUSTOMER_TYPE from '../../model/customerTypes.js'
+import mongoose from 'mongoose';
 
 
 
@@ -366,14 +367,15 @@ export const addCustomerType = async (req, res, next) => {
   export const updateCustomerTypes = async (req, res, next) => {
     try {
       const { restaurantId, customerTypeId, type, subMethods } = req.body;
+      console.log(req.body,'boady')
       const userId = req.user;
 
       // Validate input
-      if (!restaurantId || !mongoose.Types.ObjectId.isValid(restaurantId)) {
+      if (!restaurantId) {
           return res.status(400).json({ message: "Valid restaurantId is required!" });
       }
 
-      if (!customerTypeId || !mongoose.Types.ObjectId.isValid(customerTypeId)) {
+      if (!customerTypeId ) {
           return res.status(400).json({ message: "Valid customerTypeId is required!" });
       }
 
@@ -464,8 +466,10 @@ export const addCustomerType = async (req, res, next) => {
     try {
       const { customerTypeId, subMethod } = req.body;
 
+      console.log(customerTypeId,subMethod,'___payment mehtod')
+
       // Validate input
-      if (!customerTypeId || !mongoose.Types.ObjectId.isValid(customerTypeId)) {
+      if (!customerTypeId) {
           return res.status(400).json({ success: false, message: "Valid customerTypeId is required" });
       }
 

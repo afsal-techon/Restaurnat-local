@@ -733,7 +733,7 @@ export const generateCancelledOrdersPDF = async (req, res, next) => {
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const restaurant = await RESTAURANT.findOne({ _id: user.restaurantId });
+    const restaurant = await RESTAURANT.findOne({  });
     const currency = restaurant?.currency || 'AED';
 
     // Build match stage

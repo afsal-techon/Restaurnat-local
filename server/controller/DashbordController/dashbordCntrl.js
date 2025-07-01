@@ -10,6 +10,7 @@ import CUSTOMER from '../../model/customer.js';
 import PAYMENT from '../../model/paymentRecord.js'
 import { getIO  } from "../../config/socket.js";
 import ACCOUNTS from '../../model/account.js'
+import TRANSACTION from '../../model/transaction.js'
 
 
 
@@ -30,6 +31,7 @@ export const getQuickViewDashboard = async(req,res,next)=>{
 
              const start = new Date(fromDate);
             const end = new Date(toDate);
+            end.setHours(23, 59, 59, 999);
     
 
     const completedOrders = await ORDER.find({
@@ -112,11 +114,39 @@ export const getQuickViewDashboard = async(req,res,next)=>{
       }
     });
 
+
+        // 4. Get total expenses (debit only)
+    const debitAgg = await TRANSACTION.aggregate([
+      {
+        $match: {
+          type: "Debit",
+          createdAt: { $gte: start, $lte: end },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalDebit: { $sum: "$amount" },
+        },
+      },
+    ]);
+
+    const totalDebit = debitAgg[0]?.totalDebit || 0;
+    const netProfit = totalSales - totalDebit;
+
+
+
     // Add totals first
     const data = [
+    
       {
         name: "Total Sales",
         sales: parseFloat(totalSales.toFixed(2)),
+        orders: null,
+      },
+      {
+        name: "Net Profit",
+        sales: parseFloat(netProfit.toFixed(2)),
         orders: null,
       },
       {
@@ -124,6 +154,7 @@ export const getQuickViewDashboard = async(req,res,next)=>{
         sales: null,
         orders: totalOrders,
       },
+    
       ...breakdown,
     ]; 
 
@@ -305,7 +336,7 @@ export const getPaymentOverview = async(req,res,next)=>{
             const end = new Date(toDate);
 
     //  Fetch all account names that can appear as payment methods
-    const accounts = await ACCOUNTS.find().select("accountName -_id").lean();
+    const accounts = await ACCOUNTS.find({showInPos:true}).select("accountName -_id").lean();
     const expectedMethods = accounts.map((acc) => acc.accountName);
 
         const payments = await PAYMENT.aggregate([
