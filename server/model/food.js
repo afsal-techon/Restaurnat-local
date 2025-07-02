@@ -77,7 +77,7 @@ const foodSchema =new mongoose.Schema({
     portions: [
         {
           name: { type: String,},
-          conversion: {type:Number},
+          conversion: {type:Number, default:1},
           base:{ type:Boolean, default:false},
           basePrice:{
             type:Number,

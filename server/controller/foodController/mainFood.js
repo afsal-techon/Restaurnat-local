@@ -109,11 +109,10 @@ export const createFood = async (req, res, next) => {
     // Validate portions
     if (Array.isArray(portions)) {
       for (const p of portions) {
-        if (!p.name ||
-          !p.conversion) {
+        if (!p.name) {
           return res
             .status(400)
-            .json({ message: "Each portion must include a name,price and conversion" });
+            .json({ message: "Each portion must include a name,price" });
         }
         if (!Array.isArray(p.prices) || p.prices.length === 0) {
           return res.status(400).json({ message: "Each portion must have prices." });

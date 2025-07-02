@@ -31,7 +31,7 @@ export const getQuickViewDashboard = async(req,res,next)=>{
 
              const start = new Date(fromDate);
             const end = new Date(toDate);
-            end.setHours(23, 59, 59, 999);
+            // end.setHours(23, 59, 59, 999);
     
 
     const completedOrders = await ORDER.find({
