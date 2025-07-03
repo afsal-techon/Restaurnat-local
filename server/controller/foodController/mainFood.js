@@ -190,7 +190,7 @@ export const createFood = async (req, res, next) => {
             name: choiceName,
             restaurantId,
             createdById: user._id,
-            createdBy: `${user.name}`,
+           
           });
          
           choiceIds.push(newChoice._id);
@@ -218,7 +218,7 @@ export const createFood = async (req, res, next) => {
       offer: offer ? offer : null,
       special: special ? special : false,
       createdById: user._id,
-      createdBy: `${user.name}`,
+      
     });
 
     const io = getIO();
@@ -423,7 +423,7 @@ export const updateFood = async (req, res, next) => {
             name: choiceName,
             restaurantId,
             createdById: user._id,
-            createdBy: `${user.name}`,
+           
           });
           choiceIds.push(newChoice._id);
         }

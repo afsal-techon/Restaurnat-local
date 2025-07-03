@@ -129,7 +129,7 @@ export const getALLOrderSummary = async(req,res,next)=>{
             { "customer.name": { $regex: search, $options: "i" } },
             { "customerType.type": { $regex: search, $options: "i" } },
             { "account.accountName": { $regex: search, $options: "i" } },
-            { createdBy: { $regex: search, $options: "i" } }
+           
           ]
         }
       });
@@ -145,7 +145,7 @@ export const getALLOrderSummary = async(req,res,next)=>{
           orderType: { $first: "$orderType" },
           table: { $first: "$table.name" },
           customerType: { $first: "$customerType.type" },
-          createdBy: { $first: "$createdBy" },
+        
           discount: { $first: "$discount" },
           subTotal: { $first: "$subTotal" },
           grandTotal: { $first: "$paymentInfo.grandTotal" },
@@ -310,7 +310,7 @@ export const getSingleOrder = async (req, res, next) => {
           orderType: { $first: "$orderType" },
           table: { $first: "$table.name" },
           customerType: { $first: "$customerType.type" },
-          createdBy: { $first: "$createdBy" },
+          
           discount: { $first: "$discount" },
           subTotal: { $first: "$subTotal" },
           vat: { $first: "$vat" },
@@ -499,7 +499,7 @@ export const getCancelledOrders = async (req, res, next) => {
           orderType: 1,
           customerType: "$customerType.type",
           table: "$table.name",
-          createdBy: 1,
+        
           status: 1,
           subTotal: 1,
           discount: 1,
@@ -521,7 +521,7 @@ export const getCancelledOrders = async (req, res, next) => {
             { ticketNo: { $regex: search, $options: "i" } },
             { customerType: { $regex: search, $options: "i" } },
             { table: { $regex: search, $options: "i" } },
-            { createdBy: { $regex: search, $options: "i" } }
+           
           ]
         }
       });
@@ -651,7 +651,7 @@ export const generateOrderSummaryPDF = async (req, res, next) => {
             { "customer.name": { $regex: search, $options: "i" } },
             { "customerType.type": { $regex: search, $options: "i" } },
             { "account.accountName": { $regex: search, $options: "i" } },
-            { createdBy: { $regex: search, $options: "i" } }
+           
           ]
         }
       });

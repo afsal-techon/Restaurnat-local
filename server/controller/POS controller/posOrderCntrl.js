@@ -288,7 +288,7 @@ const printer = new ThermalPrinter({
           counterId:counterId,
           status: "Placed",
           createdById: user._id,
-          createdBy: user.name,
+          
         }]);
       }
   
@@ -705,7 +705,7 @@ const paymentRecord = {
   paidAmount,
   dueAmount ,
   createdById: userId,
-  createdBy: user.name,
+
 };
       
      await PAYMENT.create([paymentRecord]);
@@ -725,7 +725,7 @@ const paymentRecord = {
         referenceId: refId,
         referenceType: 'Sale',
         createdById: userId,
-        createdBy: user.name,
+       
       });
     }
   

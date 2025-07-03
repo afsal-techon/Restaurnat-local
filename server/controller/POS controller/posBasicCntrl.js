@@ -145,9 +145,9 @@ export const createCustomerForPOS = async (req,res,next)=>{
         name,
         mobileNo,
         address,
-        credit: credit ?? 0,
+         credit: parseFloat((credit ?? 0).toFixed(2)),
         createdById:user._id,
-        createdBy:user.name
+      
       })
 
         return res.status(200).json({ data: customer })
@@ -413,7 +413,6 @@ export const payCustomerDue = async(req,res,next)=>{
           referenceType: "Due Payment",
           description: note || `Customer Due Payment by ${customer.name}`,
           createdById: userId,
-          createdBy: user.name,
           customerId: customer._id,
     });
 

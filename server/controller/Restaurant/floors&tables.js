@@ -70,7 +70,7 @@ export const createFloors = async (req,res,next)=>{
             name: floor.name.trim(),
             restaurantId,
             createdById: user._id,
-            createdBy: user.name,
+           
         }));
 
 
@@ -311,8 +311,8 @@ export const createTables = async (req,res,next)=>{
             capacity,
             restaurantId,
             floorId,
-            createdById:user._id,
-            createdBy: user.name,
+         
+          
         });
 
         return res.status(200).json({ message:'Table added succsfully',table})
@@ -536,7 +536,7 @@ export const addKitchen = async(req,res,next)=>{
             name: kitchen.name.trim(),
             restaurantId,
             createdById: user._id,
-            createdBy: user.name,
+           
         }));
 
 

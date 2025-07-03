@@ -56,7 +56,7 @@ export const createCategory = async(req,res,next)=>{
                     name,
                     restaurantId: restaurant._id,
                     createdById: user._id,
-                    createdBy:user.name
+                   
                 })
     
               const saved = await category.save();

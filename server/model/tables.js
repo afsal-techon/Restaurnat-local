@@ -43,9 +43,7 @@ const tableSchema  =new mongoose.Schema({
         type: Number,
         default:null
       },
-    createdBy:{
-        type:String,
-    },
+  
     status:{
          type:Boolean,default:true
     },

@@ -12,17 +12,24 @@
     th { background-color: #f2f2f2; }
     .nowrap { white-space: nowrap; }
     .summary { margin-top: 20px; font-weight: bold; }
+    .text-red { color: #e74c3c; }
   </style>
 </head>
 <body>
   <h2>Transaction List</h2>
 
   <div class="filters">
+    <% if (filters.accountName) { %>
+      <strong>Account Name:</strong> <%= filters.accountName %><br/>
+    <% } %>
     <% if (filters.fromDate && filters.toDate) { %>
       <strong>Date Range:</strong> <%= filters.fromDate %> – <%= filters.toDate %><br/>
     <% } %>
     <% if (filters.search) { %>
       <strong>Search:</strong> <%= filters.search %><br/>
+    <% } %>
+    <% if (filters.type) { %>
+      <strong>Transaction Type:</strong> <%= filters.type %><br/>
     <% } %>
   </div>
 
@@ -32,9 +39,9 @@
         <th class="nowrap">Date</th>
         <th class="nowrap">Reference No</th>
         <th class="nowrap">Reference Type</th>
-        <th class="nowrap">Account Type</th>
-        <th class="nowrap">Payment Type</th>
-        <th class="nowrap">Amount (<%= currency %>)</th>
+        <th class="nowrap">Credit (<%= currency %>)</th>
+        <th class="nowrap">Debit (<%= currency %>)</th>
+        <th class="nowrap">Total (<%= currency %>)</th>
       </tr>
     </thead>
     <tbody>
@@ -44,20 +51,31 @@
         <% data.forEach(item => { %>
           <tr>
             <td><%= item.date %></td>
-            <td><%= item.referenceId %></td>
-            <td><%= item.referenceType %></td>
-            <td><%= item.accountType %></td>
-            <td><%= item.paymentType %></td>
-            <td><%= item.amount.toFixed(2) %></td>
+            <td><%= item.referenceId || '-' %></td>
+            <td><%= item.referenceType || '-' %></td>
+            <td><%= item.type === 'Credit' ? item.amount.toFixed(2) : '0.00' %></td>
+            <td><%= item.type === 'Debit' ? item.amount.toFixed(2) : '0.00' %></td>
+            <td class="<%= filters.type !== 'Debit' && item.total < 0 ? 'text-red' : '' %>">
+              <%= filters.type === 'Debit' ? Math.abs(item.total).toFixed(2) : item.total.toFixed(2) %>
+            </td>
           </tr>
         <% }) %>
       <% } %>
     </tbody>
   </table>
 
-  <% if (typeof totalAmount !== 'undefined') { %>
+  <% if (typeof totalCredit !== 'undefined' || typeof totalDebit !== 'undefined') { %>
     <div class="summary">
-      Total Amount: <%= totalAmount.toFixed(2) %> <%= currency %>
+      <div>Total Credit: <%= totalCredit.toFixed(2) %> <%= currency %></div>
+      <div>Total Debit: <%= totalDebit.toFixed(2) %> <%= currency %></div>
+    </div>
+  <% } %>
+
+  <% if (typeof totalAmount !== 'undefined') { %>
+    <div class="summary <%= filters.type !== 'Debit' && totalAmount < 0 ? 'text-red' : '' %>">
+      Final Balance: 
+      <%= filters.type === 'Debit' ? Math.abs(totalAmount).toFixed(2) : totalAmount.toFixed(2) %> 
+      <%= currency %>
     </div>
   <% } %>
 </body>

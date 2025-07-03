@@ -122,7 +122,7 @@ export const createUser = async(req,res,next)=>{
                 password : hashedPassword,
                 role:'User',
                 createdById : user._id,
-                createdBy : user.name,
+                
               });
    
 
@@ -206,8 +206,8 @@ export const updateUser = async(req,res,next)=>{
         restaurantId,
         email,
         role:userData.role,
-        createdById: user._id,
-        createdBy: user.name,
+       
+   
       };
   
       // If password is provided, hash and update

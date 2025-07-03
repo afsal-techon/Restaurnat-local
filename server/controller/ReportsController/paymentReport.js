@@ -6,6 +6,7 @@ import TRANSACTION from '../../model/transaction.js'
 import CUSTOMER from '../../model/customer.js';
 import RESTAURANT from '../../model/restaurant.js'
 import {  generatePDF } from '../../config/pdfGeneration.js'
+import ACCOUNT from '../../model/account.js'
 
 
 
@@ -416,3 +417,186 @@ export const generateDailyCollectionPDF = async (req, res, next) => {
     next(err);
   }
 };
+
+
+export const getDailyTransactionReport = async (req, res, next) => {
+  try {
+    const { fromDate, toDate, search = '', type } = req.query;
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const matchStage = {};
+
+    if (type) {
+      matchStage.type = type;
+    }
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const searchStage = search
+      ? {
+          $or: [
+            { referenceId: { $regex: search, $options: 'i' } },
+            { referenceType: { $regex: search, $options: 'i' } },
+            { narration: { $regex: search, $options: 'i' } },
+          ]
+        }
+      : null;
+
+    const pipeline = [
+      { $match: matchStage },
+      ...(searchStage ? [{ $match: searchStage }] : []),
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo"
+        }
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+      { $sort: { createdAt: 1 } }, // oldest first
+      {
+        $addFields: {
+          credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+          debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          transactions: { $push: "$$ROOT" },
+          totalCredit: { $sum: "$credit" },
+          totalDebit: { $sum: "$debit" }
+        }
+      },
+      {
+        $addFields: {
+          transactionsWithRunningTotal: {
+            $reduce: {
+              input: "$transactions",
+              initialValue: {
+                runningTotal: 0,
+                transactions: []
+              },
+              in: {
+                runningTotal: {
+                  $add: [
+                    "$$value.runningTotal",
+                    {
+                      $cond: [
+                        { $eq: ["$$this.type", "Credit"] },
+                        "$$this.amount",
+                        { $multiply: ["$$this.amount", -1] }
+                      ]
+                    }
+                  ]
+                },
+                transactions: {
+                  $concatArrays: [
+                    "$$value.transactions",
+                    [
+                      {
+                        $mergeObjects: [
+                          "$$this",
+                          {
+                            total: {
+                              $add: [
+                                "$$value.runningTotal",
+                                {
+                                  $cond: [
+                                    { $eq: ["$$this.type", "Credit"] },
+                                    "$$this.amount",
+                                    { $multiply: ["$$this.amount", -1] }
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          allData: "$transactionsWithRunningTotal.transactions",
+          totalCredit: 1,
+          totalDebit: 1
+        }
+      },
+      {
+        $addFields: {
+          data: {
+            $slice: ["$allData", skip, limit]
+          },
+          totalCount: { $size: "$allData" },
+          totalAmount: {
+            $add: [
+              "$totalCredit",
+              { $multiply: ["$totalDebit", -1] }
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          data: 1,
+          totalCount: 1,
+          totalCredit: 1,
+          totalDebit: 1,
+          totalAmount: 1
+        }
+      }
+    ];
+
+    const result = await TRANSACTION.aggregate(pipeline);
+
+    const finalResult = result[0] || {
+      data: [],
+      totalCount: 0,
+      totalCredit: 0,
+      totalDebit: 0,
+      totalAmount: 0
+    };
+
+    return res.status(200).json({
+      data: finalResult.data,
+      totalCount: finalResult.totalCount,
+      totalCredit: finalResult.totalCredit,
+      totalDebit: finalResult.totalDebit,
+      totalAmount: finalResult.totalAmount,
+      page,
+      limit
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+

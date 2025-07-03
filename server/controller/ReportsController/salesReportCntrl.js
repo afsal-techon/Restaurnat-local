@@ -101,7 +101,7 @@ export const getDailySalesReport = async(req,res,next)=>{
             }
           },
           dueAmount: { $first: "$dueAmount" },
-          createdBy: { $first: "$createdBy" }
+        
         }
       }
     ];
@@ -125,7 +125,7 @@ export const getDailySalesReport = async(req,res,next)=>{
             { customerType: { $regex: search, $options: "i" } },
             { table: { $regex: search, $options: "i" } },
             { "paymentMethods.type": { $regex: search, $options: "i" } },
-            { createdBy: { $regex: search, $options: "i" } }
+           
           ]
         }
       });
@@ -714,7 +714,7 @@ export const generateDailySalesPDF = async(req,res,next)=>{
             }
           },
           dueAmount: { $first: "$dueAmount" },
-          createdBy: { $first: "$createdBy" }
+         
         }
       }
     ];
@@ -738,7 +738,7 @@ export const generateDailySalesPDF = async(req,res,next)=>{
             { customerType: { $regex: search, $options: "i" } },
             { table: { $regex: search, $options: "i" } },
             { "paymentMethods.type": { $regex: search, $options: "i" } },
-            { createdBy: { $regex: search, $options: "i" } }
+           
           ]
         }
       });

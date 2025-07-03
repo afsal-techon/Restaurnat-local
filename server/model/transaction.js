@@ -34,9 +34,7 @@ const transactionSchema = new mongoose.Schema(
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
-  createdBy: {
-    type: String,
-  },
+
 }, { timestamps: true });
 
 transactionSchema.index({ accountId: 1 });

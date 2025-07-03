@@ -12,7 +12,7 @@ const AddonSchema = new mongoose.Schema({
     ],
     restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant' },
     createdById: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    createdBy: String,
+   
     
 },{
     timestamps:true

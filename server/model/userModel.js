@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
         enum: ["User","CompanyAdmin"], 
 
     },
-    createdBy : { type:String},
+    
     status: { type: Boolean, default: true },
 
 }, { timestamps: true });

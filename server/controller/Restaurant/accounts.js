@@ -57,10 +57,10 @@ export const createAccounts = async (req, res,next) => {
         accountName,
         accountType,
         description,
-        openingBalance,
+        openingBalance: parseFloat((openingBalance || 0).toFixed(2)),
         showInPos,
           parentAccountId: parentAccountId || null,
-          createdBy:user.name,
+       
           createdById:user._id
       });
   
@@ -132,6 +132,7 @@ export const createAccounts = async (req, res,next) => {
     currentBalance = (acc.openingBalance || 0) + bal.credit - bal.debit;
   }
 
+
   accountMap[acc._id.toString()] = {
     ...acc._doc,
     currentBalance,
@@ -176,11 +177,11 @@ export const createAccounts = async (req, res,next) => {
       description: acc.description,
       openingBalance: acc.openingBalance,
       showInPos: acc.showInPos,
-      currentBalance: acc.currentBalance,
+      currentBalance: parseFloat((acc.currentBalance || 0).toFixed(2)),
       parentAccountId: acc.parentAccountId?._id || null,
       parentAccountName: acc.parentAccountId?.accountName || null,
       createdAt: acc.createdAt,
-      createdBy: acc.createdBy,
+   
     }));
 
     return res.status(200).json({ data: result });
@@ -288,9 +289,200 @@ export const createAccounts = async (req, res,next) => {
 
 
 
+// export const getTransactionList = async (req, res, next) => {
+//   try {
+//     const { accountId, fromDate, toDate, search = '',type, accountName = '' } = req.query;
+//     const limit = parseInt(req.query.limit) || 20;
+//     const page = parseInt(req.query.page) || 1;
+//     const skip = (page - 1) * limit;
+
+//     const user = await USER.findById(req.user);
+//     if (!user) return res.status(400).json({ message: "User not found!" });
+
+//     const mainAccount = await ACCOUNTS.findById(accountId);
+//     if (!mainAccount) return res.status(400).json({ message: 'Account not found!' });
+
+//     const childAccounts = await ACCOUNTS.find({ parentAccountId: accountId }, { _id: 1 });
+//     const accountIdsToMatch = [mainAccount._id, ...childAccounts.map(acc => acc._id)];
+
+//     const matchStage = {
+//       accountId: { $in: accountIdsToMatch }
+//     };
+
+//     if (type) {
+//   matchStage.type = type;
+// }
+
+//     if (fromDate && toDate) {
+//       const start = new Date(fromDate);
+//       const end = new Date(toDate);
+//       end.setHours(23, 59, 59, 999);
+//       matchStage.createdAt = { $gte: start, $lte: end };
+//     }
+
+//     const searchStage = search
+//       ? {
+//           $or: [
+//             { referenceId: { $regex: search, $options: 'i' } },
+//             { referenceType: { $regex: search, $options: 'i' } },
+//             { narration: { $regex: search, $options: 'i' } },
+//           ]
+//         }
+//       : null;
+
+//     const pipeline = [
+//       { $match: matchStage },
+//       ...(searchStage ? [{ $match: searchStage }] : []),
+//       {
+//         $lookup: {
+//           from: "accounts",
+//           localField: "accountId",
+//           foreignField: "_id",
+//           as: "accountInfo"
+//         }
+//       },
+//       { $unwind: "$accountInfo" },
+//       {
+//         $lookup: {
+//           from: "accounts",
+//           let: { parentId: "$accountInfo.parentAccountId" },
+//           pipeline: [
+//             { $match: { $expr: { $eq: ["$_id", "$$parentId"] } } }
+//           ],
+//           as: "parentInfo"
+//         }
+//       },
+//       { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+//       {
+//         $lookup: {
+//           from: "accounts",
+//           localField: "paymentType",
+//           foreignField: "_id",
+//           as: "paymentTypeInfo"
+//         }
+//       },
+//       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+//     { $sort: { createdAt: 1 } },
+
+//       {
+//         $addFields: {
+//           credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+//           debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: null,
+//           transactions: { $push: "$$ROOT" },
+//           totalCredit: { $sum: "$credit" },
+//           totalDebit: { $sum: "$debit" }
+//         }
+//       },
+//       {
+//         $addFields: {
+//           transactionsWithRunningTotal: {
+//             $reduce: {
+//               input: "$transactions",
+//               initialValue: {
+//                 runningTotal: mainAccount.openingBalance || 0,
+//                 transactions: []
+//               },
+//               in: {
+//                 runningTotal: {
+//                   $cond: [
+//                     { $eq: ["$$this.type", "Credit"] },
+//                     { $add: ["$$value.runningTotal", "$$this.amount"] },
+//                     { $subtract: ["$$value.runningTotal", "$$this.amount"] }
+//                   ]
+//                 },
+//                 transactions: {
+//                   $concatArrays: [
+//                     "$$value.transactions",
+//                     [
+//                       {
+//                         $mergeObjects: [
+//                           "$$this",
+//                           {
+//                             total: {
+//                               $cond: [
+//                                 { $eq: ["$$this.type", "Credit"] },
+//                                 { $add: ["$$value.runningTotal", "$$this.amount"] },
+//                                 { $subtract: ["$$value.runningTotal", "$$this.amount"] }
+//                               ]
+//                             }
+//                           }
+//                         ]
+//                       }
+//                     ]
+//                   ]
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       },
+//       {
+//         $project: {
+//           allData: "$transactionsWithRunningTotal.transactions",
+//           totalCredit: 1,
+//           totalDebit: 1
+//         }
+//       },
+//       {
+//         $addFields: {
+//           data: {
+//             $slice: ["$allData", skip, limit]
+//           },
+//           totalCount: { $size: "$allData" },
+//           totalAmount: {
+//             $add: [
+//               mainAccount.openingBalance || 0,
+//               "$totalCredit",
+//               { $multiply: ["$totalDebit", -1] }
+//             ]
+//           }
+//         }
+//       },
+//       {
+//         $project: {
+//           data: 1,
+//           totalCount: 1,
+//           totalCredit: 1,
+//           totalDebit: 1,
+//           totalAmount: 1
+//         }
+//       }
+//     ];
+
+//     const result = await TRANSACTION.aggregate(pipeline);
+//     console.log("All Transactions with Running Total:", result[0]);
+
+//     const finalResult = result[0] || {
+//       data: [],
+//       totalCount: 0,
+//       totalCredit: 0,
+//       totalDebit: 0,
+//       totalAmount: mainAccount.openingBalance || 0
+//     };
+
+//     return res.status(200).json({
+//       data: finalResult.data,
+//       totalCount: finalResult.totalCount,
+//       totalCredit: finalResult.totalCredit,
+//       totalDebit: finalResult.totalDebit,
+//       totalAmount: finalResult.totalAmount,
+//       page,
+//       limit
+//     });
+
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
 export const getTransactionList = async (req, res, next) => {
   try {
-    const { accountId, fromDate, toDate, search = '' } = req.query;
+    const { accountId, fromDate, toDate, search = '', type } = req.query;
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
@@ -301,15 +493,16 @@ export const getTransactionList = async (req, res, next) => {
     const mainAccount = await ACCOUNTS.findById(accountId);
     if (!mainAccount) return res.status(400).json({ message: 'Account not found!' });
 
-    // Get all child accounts if any
     const childAccounts = await ACCOUNTS.find({ parentAccountId: accountId }, { _id: 1 });
-
-    // Prepare accountId list to match in transactions
     const accountIdsToMatch = [mainAccount._id, ...childAccounts.map(acc => acc._id)];
 
     const matchStage = {
       accountId: { $in: accountIdsToMatch }
     };
+
+    if (type) {
+      matchStage.type = type;
+    }
 
     if (fromDate && toDate) {
       const start = new Date(fromDate);
@@ -332,88 +525,151 @@ export const getTransactionList = async (req, res, next) => {
       { $match: matchStage },
       ...(searchStage ? [{ $match: searchStage }] : []),
       {
-        $facet: {
-          data: [
-            { $sort: { createdAt: -1 } },
-            {
-              $lookup: {
-                from: "accounts",
-                localField: "accountId",
-                foreignField: "_id",
-                as: "accountInfo"
-              }
-            },
-            { $unwind: "$accountInfo" },
-            {
-              $lookup: {
-                from: "accounts",
-                let: { parentId: "$accountInfo.parentAccountId" },
-                pipeline: [
-                  { $match: { $expr: { $eq: ["$_id", "$$parentId"] } } }
-                ],
-                as: "parentInfo"
-              }
-            },
-            { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
-            //  New lookup for paymentType
-        {
-          $lookup: {
-            from: "accounts",
-            localField: "paymentType",
-            foreignField: "_id",
-            as: "paymentTypeInfo"
-          }
-        },
-        { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
-            {
-              $project: {
-                _id: 1,
-                referenceType: 1,
-                referenceId: 1,
-                type: 1,
-                amount: 1,
-                narration: 1,
-                createdAt: 1,
-                account: {
-                  name: "$accountInfo.accountName",
-                  type: "$accountInfo.accountType"
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+      {
+        $lookup: {
+          from: "accounts",
+          let: { parentId: "$accountInfo.parentAccountId" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$parentId"] } } }
+          ],
+          as: "parentInfo"
+        }
+      },
+      { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo"
+        }
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+      { $sort: { createdAt: 1 } },
+      {
+        $addFields: {
+          credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+          debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          transactions: { $push: "$$ROOT" },
+          totalCredit: { $sum: "$credit" },
+          totalDebit: { $sum: "$debit" }
+        }
+      },
+      {
+        $addFields: {
+          transactionsWithRunningTotal: {
+            $reduce: {
+              input: "$transactions",
+              initialValue: {
+                runningTotal: mainAccount.openingBalance || 0,
+                transactions: []
+              },
+              in: {
+             runningTotal: {
+                  $add: [
+                    "$$value.runningTotal",
+                    {
+                      $cond: [
+                        { $eq: ["$$this.type", "Credit"] },
+                        "$$this.amount",
+                        { $multiply: ["$$this.amount", -1] }
+                      ]
+                    }
+                  ]
                 },
-                parentAccount: {
-                  name: "$parentInfo.accountName",
-                  type: "$parentInfo.accountType"
-                }, 
-                paymentType: {
-                  $ifNull: ["$paymentTypeInfo.accountName", null]
+                transactions: {
+                  $concatArrays: [
+                    "$$value.transactions",
+                    [
+                      {
+                        $mergeObjects: [
+                          "$$this",
+                          {
+                            total: {
+                              $add: [
+                                "$$value.runningTotal",
+                                {
+                                  $cond: [
+                                    { $eq: ["$$this.type", "Credit"] },
+                                    "$$this.amount",
+                                    { $multiply: ["$$this.amount", -1] }
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  ]
                 }
               }
-            },
-            { $skip: skip },
-            { $limit: limit }
-          ],
-          totalCount: [{ $count: "count" }],
-          totalAmount: [{
-            $group: {
-              _id: null,
-              sum: { $sum: "$amount" }
             }
-          }]
+          }
+        }
+      },
+      {
+        $project: {
+          allData: "$transactionsWithRunningTotal.transactions",
+          totalCredit: 1,
+          totalDebit: 1
+        }
+      },
+      {
+        $addFields: {
+          data: {
+            $slice: ["$allData", skip, limit]
+          },
+          totalCount: { $size: "$allData" },
+          totalAmount: {
+            $add: [
+              mainAccount.openingBalance || 0,
+              "$totalCredit",
+              { $multiply: ["$totalDebit", -1] }
+            ]
+          }
         }
       },
       {
         $project: {
           data: 1,
-          totalCount: { $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0] },
-          totalAmount: { $ifNull: [{ $arrayElemAt: ["$totalAmount.sum", 0] }, 0] }
+          totalCount: 1,
+          totalCredit: 1,
+          totalDebit: 1,
+          totalAmount: 1
         }
       }
     ];
 
     const result = await TRANSACTION.aggregate(pipeline);
 
+    const finalResult = result[0] || {
+      data: [],
+      totalCount: 0,
+      totalCredit: 0,
+      totalDebit: 0,
+      totalAmount: mainAccount.openingBalance || 0
+    };
+
     return res.status(200).json({
-      data: result[0]?.data || [],
-      totalCount: result[0]?.totalCount || 0,
-      totalAmount: result[0]?.totalAmount || 0,
+      data: finalResult.data,
+      totalCount: finalResult.totalCount,
+      totalCredit: finalResult.totalCredit,
+      totalDebit: finalResult.totalDebit,
+      totalAmount: finalResult.totalAmount,
       page,
       limit
     });
@@ -425,9 +681,10 @@ export const getTransactionList = async (req, res, next) => {
 
 
 
+
 export const generateTransactionListPDF = async (req, res, next) => {
   try {
-    const { accountId, fromDate, toDate, search = '' } = req.query;
+    const { accountId, fromDate, toDate, search = '', type } = req.query;
 
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: 'User not found!' });
@@ -435,11 +692,9 @@ export const generateTransactionListPDF = async (req, res, next) => {
     const mainAccount = await ACCOUNTS.findById(accountId).lean();
     if (!mainAccount) return res.status(400).json({ message: 'Account not found!' });
 
-    // Fetch currency from restaurant
     const restaurant = await RESTAURANT.findOne().lean();
     const currency = restaurant?.currency || 'AED';
 
-    // Get child accounts under the selected parent
     const childAccounts = await ACCOUNTS.find({ parentAccountId: accountId }).lean();
     const accountIdsToMatch = [mainAccount._id, ...childAccounts.map(a => a._id)];
 
@@ -447,12 +702,25 @@ export const generateTransactionListPDF = async (req, res, next) => {
       accountId: { $in: accountIdsToMatch }
     };
 
+    if (type) {
+      matchStage.type = type;
+    }
+
     if (fromDate && toDate) {
       const start = new Date(fromDate);
       const end = new Date(toDate);
       end.setHours(23, 59, 59, 999);
       matchStage.createdAt = { $gte: start, $lte: end };
     }
+
+        console.log('Applied Filters:', {
+      accountId,
+      fromDate,
+      toDate,
+      search,
+      type,
+      accountName: mainAccount.accountName
+    });
 
     const searchStage = search
       ? {
@@ -467,39 +735,120 @@ export const generateTransactionListPDF = async (req, res, next) => {
     const pipeline = [
       { $match: matchStage },
       ...(searchStage ? [{ $match: searchStage }] : []),
-      { $sort: { createdAt: -1 } },
       {
         $lookup: {
-          from: 'accounts',
-          localField: 'accountId',
-          foreignField: '_id',
-          as: 'acct'
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
         }
       },
-      { $unwind: '$acct' },
+      { $unwind: "$accountInfo" },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo"
+        }
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+      { $sort: { createdAt: 1 } },
+      {
+        $addFields: {
+          credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+          debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          transactions: { $push: "$$ROOT" },
+          totalCredit: { $sum: "$credit" },
+          totalDebit: { $sum: "$debit" }
+        }
+      },
+      {
+        $addFields: {
+          transactionsWithRunningTotal: {
+            $reduce: {
+              input: "$transactions",
+              initialValue: {
+                runningTotal: mainAccount.openingBalance || 0,
+                transactions: []
+              },
+              in: {
+                runningTotal: {
+                  $add: [
+                    "$$value.runningTotal",
+                    {
+                      $cond: [
+                        { $eq: ["$$this.type", "Credit"] },
+                        "$$this.amount",
+                        { $multiply: ["$$this.amount", -1] }
+                      ]
+                    }
+                  ]
+                },
+                transactions: {
+                  $concatArrays: [
+                    "$$value.transactions",
+                    [
+                      {
+                        $mergeObjects: [
+                          "$$this",
+                          {
+                            total: {
+                              $add: [
+                                "$$value.runningTotal",
+                                {
+                                  $cond: [
+                                    { $eq: ["$$this.type", "Credit"] },
+                                    "$$this.amount",
+                                    { $multiply: ["$$this.amount", -1] }
+                                  ]
+                                }
+                              ]
+                            },
+                            date: {
+                              $dateToString: { format: "%Y-%m-%d", date: "$$this.createdAt" }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
       {
         $project: {
-          date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-          referenceId: 1,
-          referenceType: 1,
-          accountType: '$acct.accountType',
-          paymentType: '$acct.accountName',
-          amount: 1
+          transactions: "$transactionsWithRunningTotal.transactions",
+          totalCredit: 1,
+          totalDebit: 1
         }
       }
     ];
 
-    const data = await TRANSACTION.aggregate(pipeline);
-    const totalAmount = data.reduce((sum, tx) => sum + tx.amount, 0);
+    const result = await TRANSACTION.aggregate(pipeline);
+    const finalResult = result[0] || { transactions: [], totalCredit: 0, totalDebit: 0 };
+    const totalAmount = (mainAccount.openingBalance || 0) + finalResult.totalCredit - finalResult.totalDebit;
 
     const pdfBuffer = await generatePDF('transactionListTemp', {
-      data,
+      data: finalResult.transactions,
       currency,
       totalAmount,
+      totalCredit: finalResult.totalCredit,
+      totalDebit: finalResult.totalDebit,
       filters: {
         fromDate,
         toDate,
-        search
+        search,
+        type,
+        accountName: mainAccount.accountName
       }
     });
 
@@ -513,6 +862,8 @@ export const generateTransactionListPDF = async (req, res, next) => {
     next(err);
   }
 };
+
+
 
   
 
@@ -562,22 +913,18 @@ export const createTransactionModule= async(req,res,next)=>{
       referenceType: accountType, // Use account type as reference
       description: note || `Manual ${account.accountType} entry`,
       createdById: user._id,
-      createdBy: user.name,
-      createdAt: new Date(date),
     };
 
-        // Create CREDIT transaction in Payment (Cash/Bank/Card) account
+    // Create CREDIT transaction in Payment (Cash/Bank/Card) account
     const creditTxn = {
       restaurantId: account.restaurantId || null,
       accountId: paymentAccountId,
       amount,
-      type: "Credit",
+      type: "Debit",
       referenceId: refId,
       referenceType: accountType,
       description: note || `Payment for ${accountType}`,
       createdById: user._id,
-      createdBy: user.name,
-      createdAt: new Date(date),
     };
 
     await TRANSACTION.insertMany([debitTXn,creditTxn])
