@@ -495,19 +495,28 @@ export const getTopSellingItems = async(req,res,next)=>{
           }
 
           //  Count nested food items inside combo (only for count, not price)
-          if (item.items && Array.isArray(item.items)) {
-            for (const nestedItem of item.items) {
-              if (nestedItem.foodId) {
-                const foodId = nestedItem.foodId.toString();
-                const nestedQty = (nestedItem.qty || 1) * comboQty;
+                    if (item.items && Array.isArray(item.items)) {
+              for (const nestedItem of item.items) {
+                if (nestedItem.foodId) {
+                  const foodId = nestedItem.foodId.toString();
+                  const nestedQty = (nestedItem.qty || 1) * comboQty;
+                  const nestedTotal = (nestedItem.total || 0) * comboQty;
 
-                foodCountMap.set(
-                  foodId,
-                  (foodCountMap.get(foodId) || 0) + nestedQty
-                );
+                  // Count
+                  foodCountMap.set(
+                    foodId,
+                    (foodCountMap.get(foodId) || 0) + nestedQty
+                  );
+
+                  // Sales
+                  foodSalesMap.set(
+                    foodId,
+                    (foodSalesMap.get(foodId) || 0) + nestedTotal
+                  );
+                }
               }
             }
-          }
+
         } else {
           //  Direct food item
           const foodId = item.foodId?.toString();
