@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Expense Report</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      color: #333;
+      margin: 20px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .filters {
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+    .total-row {
+      font-weight: bold;
+      background-color: #f9f9f9;
+    }
+  </style>
+</head>
+<body>
+  <h2>Expense Report</h2>
+
+  <div class="filters">
+    <% if (filters?.fromDate || filters?.toDate || filters?.accountName || filters?.search) { %>
+      <% if (filters?.fromDate) { %>
+        <strong>From:</strong> <%= filters.fromDate %><br />
+      <% } %>
+      <% if (filters?.toDate) { %>
+        <strong>To:</strong> <%= filters.toDate %><br />
+      <% } %>
+      <% if (filters?.accountName) { %>
+        <strong>Account:</strong> <%= filters.accountName %><br />
+      <% } %>
+      <% if (filters?.search) { %>
+        <strong>Search:</strong> <%= filters.search %><br />
+      <% } %>
+    <% } %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="nowrap">Date</th>
+        <th class="nowrap">Reference No</th>
+        <th class="nowrap">Account Type</th>
+        <th class="nowrap">Account Name</th>
+        <th class="nowrap">Payment Method</th>
+        <th class="nowrap">Amount (<%= currency %>)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (data.length === 0) { %>
+        <tr>
+          <td colspan="6" style="text-align: center;">No data available.</td>
+        </tr>
+      <% } else { %>
+        <% data.forEach(item => { %>
+          <tr>
+            <td class="nowrap"><%= new Date(item.createdAt).toLocaleDateString() %></td>
+            <td><%= item.referenceId || '-' %></td>
+            <td><%= item.accountType || '-' %></td>
+            <td><%= item.accountName || '-' %></td>
+            <td><%= item.paymentType || '-' %></td>
+            <td class="nowrap"><%= item.amount?.toFixed(2) || '0.00' %></td>
+          </tr>
+        <% }) %>
+        <tr class="total-row">
+          <td colspan="5" class="nowrap">Total</td>
+          <td class="nowrap"><%= totalAmount?.toFixed(2) || '0.00' %></td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</body>
+</html>

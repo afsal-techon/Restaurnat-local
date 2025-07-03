@@ -22,7 +22,7 @@ import upload from '../middleware/multer.js'
 import { generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
 import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
 import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
-import { getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
+import { generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
 const router = express.Router();
 
 
@@ -217,7 +217,8 @@ router.get('/reports/daily-transaction',VerifyToken,getDailyTransactionReport)
 
 //purchse Expence Report
 router.get('/reports/purchase',VerifyToken,getPurchaseReport);
-router.get('/reports/expense',VerifyToken,getExpenseReport)
+router.get('/reports/expanse',VerifyToken,getExpenseReport);
+router.get('/purchase/pdf',VerifyToken,generatePurchaseReportPDF)
 
 
 

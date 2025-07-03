@@ -6,9 +6,15 @@ const userSchema = new mongoose.Schema({
             ref: 'Restaurant',
             default:null,
         },
-    name: { type: String, },
-    email: { type: String, unique: true, required: true },
-    password: { type: String, required: true },
+        name:{
+            type:String,
+            default:'User'
+        },
+        pin: {
+      type: String, // hashed version will be stored
+      minlength: 4,
+      maxlength: 4,
+    },
         createdById: {
               type: mongoose.Schema.Types.ObjectId,
               ref: 'User',
@@ -24,7 +30,7 @@ const userSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-userSchema.index({ email: 1, restaurantId: 1 });
+userSchema.index({  restaurantId: 1 });
 
 const User = mongoose.model("User", userSchema);
 export default User;

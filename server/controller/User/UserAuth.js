@@ -5,84 +5,145 @@ import jwt from 'jsonwebtoken'
 
 
 
-export const createCompanyhAdmin = async (req,res,next)=>{
-    try{
-        const { name, email, password, role  } = req.body;
+// export const createCompanyhAdmin = async (req,res,next)=>{
+//     try{
+//         const { name, email, password, role  } = req.body;
 
-        const userId = req.user;
+//         const userId = req.user;
 
-        if(!name){
-            return res.status(400).json({ message:'Name is required!'})
-        } 
-        if(!email){
-            return res.status(400).json({ message:'Email is required!'})
-        }
-        if(!password){
-            return res.status(400).json({ message:'Password is required!'})
-        }
-        if(!role){
-            return res.status(400).json({ message:'role is required!'})
-        }
+//         if(!name){
+//             return res.status(400).json({ message:'Name is required!'})
+//         } 
+//         if(!email){
+//             return res.status(400).json({ message:'Email is required!'})
+//         }
+//         if(!password){
+//             return res.status(400).json({ message:'Password is required!'})
+//         }
+//         if(!role){
+//             return res.status(400).json({ message:'role is required!'})
+//         }
 
-        if (!["CompanyAdmin"].includes(role)) {
-            return res.status(400).json({ message: "Invalid role!" });
-        }
+//         if (!["CompanyAdmin"].includes(role)) {
+//             return res.status(400).json({ message: "Invalid role!" });
+//         }
 
-        const existingUser = await USER.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: "User with this email already exists!" });
-        }
+//         const existingUser = await USER.findOne({ email });
+//         if (existingUser) {
+//             return res.status(400).json({ message: "User with this email already exists!" });
+//         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+//         const hashedPassword = await bcrypt.hash(password, 10);
 
 
-       const user =  await USER.create({
-            name,
-            email,
-            password: hashedPassword,
-            role,
-        });
+//        const user =  await USER.create({
+//             name,
+//             email,
+//             password: hashedPassword,
+//             role,
+//         });
 
-        return res.status(200).json({ message:'Account created succsffully',user})
+//         return res.status(200).json({ message:'Account created succsffully',user})
 
-    }catch(err){
-        next(err)
+//     }catch(err){
+//         next(err)
+//     }
+// }
+
+
+
+export const createCompanyhAdmin = async (req, res, next) => {
+  try {
+    const { pin, role } = req.body;
+
+    if (!pin || typeof pin !== 'string' || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ message: 'A valid 4-digit PIN is required!' });
     }
-}
+
+    if (!role || role !== 'CompanyAdmin') {
+      return res.status(400).json({ message: 'Role must be CompanyAdmin!' });
+    }
+
+    const user = await USER.create({
+      pin,
+      role,
+    });
+
+    return res.status(200).json({ message: 'Company Admin created successfully', user });
+  } catch (err) {
+    next(err);
+  }
+};
 
 
-export const LoginUser = async (req,res,next)=>{
-    try{
 
-        const {  email, password } = req.body;
+// export const LoginUser = async (req,res,next)=>{
+//     try{
 
-        if(!email){
-            return res.status(404).json({ message:'Email is required!'})
-        }
-        if(!password){
-            return res.status(404).json({ message:'Password is required!'})
-        }
+//         const {  email, password } = req.body;
+
+//         if(!email){
+//             return res.status(404).json({ message:'Email is required!'})
+//         }
+//         if(!password){
+//             return res.status(404).json({ message:'Password is required!'})
+//         }
         
-        const user = await USER.findOne({ email });
-        if(!user){
-            return res.status(400).json({ message:'User not found!'})
-        };
+//         const user = await USER.findOne({ email });
+//         if(!user){
+//             return res.status(400).json({ message:'User not found!'})
+//         };
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ message: "Invalid password!" });
-        }
+//         const isMatch = await bcrypt.compare(password, user.password);
+//         if (!isMatch) {
+//             return res.status(400).json({ message: "Invalid password!" });
+//         }
 
-        const token = jwt.sign({id:user._id,role:user.role,email:user.email}
-            ,process.env.JWT_SECRET_KEY , {expiresIn:'30d' }
-        )
+//         const token = jwt.sign({id:user._id,role:user.role,email:user.email}
+//             ,process.env.JWT_SECRET_KEY , {expiresIn:'30d' }
+//         )
 
-        return res.status(200).json({ message:'Login successful',token,user})
+//         return res.status(200).json({ message:'Login successful',token,user})
 
-    }catch(err){
-        next(err)
+//     }catch(err){
+//         next(err)
+//     }
+// }
+
+export const LoginUser = async (req, res, next) => {
+  try {
+    const { pin } = req.body;
+
+    if (!pin || typeof pin !== 'string' || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ message: 'A valid 4-digit PIN is required!' });
     }
-}
+
+    const user = await USER.findOne({ pin });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid PIN!' });
+    }
+
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+      },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: '30d' }
+    );
+
+    return res.status(200).json({
+      message: 'Login successful',
+      token,
+      user,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
 
 
 export const createUser = async(req,res,next)=>{
