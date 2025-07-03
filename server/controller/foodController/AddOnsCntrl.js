@@ -80,6 +80,7 @@ export const createAddOns = async (req,res,next)=>{
             portion: addOns.portion || [],
             restaurantId: restaurant._id,
             createdById: user._id,
+            createdBy:user.name,
            
         }));
 

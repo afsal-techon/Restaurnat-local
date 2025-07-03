@@ -17,6 +17,9 @@ const courseSchema =new mongoose.Schema({
         ref: 'User',
         required: true, // CompanyAdmin or BranchAdmin who created it
     },
+      createdBy: {
+          type:String,
+      },
 },{
     timestamps:true
 })

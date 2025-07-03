@@ -75,6 +75,7 @@ export const CreateMenuType = async(req,res,next)=>{
                    name:menu.name,
                    restaurantId :restaurant._id,
                    createdById : user._id,
+                   createdBy:user.name,
                 
                })
             }

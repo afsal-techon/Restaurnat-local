@@ -34,6 +34,9 @@ const tableSchema  =new mongoose.Schema({
         ref: 'User',
         required: true, // CompanyAdmin or BranchAdmin who created it
     },
+      createdBy: {
+          type:String,
+      },
     currentOrderId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Order', 

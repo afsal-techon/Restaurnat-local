@@ -132,6 +132,7 @@ export const createCompo = async (req,res,next)=>{
                       foodItems : processedItems,
                       restaurantId,
                       createdById: user._id,
+                      createdBy:user.name,
                  
                })
 
@@ -304,6 +305,7 @@ export const createCompo = async (req,res,next)=>{
           foodItems: processedItems,
           restaurantId,
           createdById: user._id,
+          createdBy:user.name,
         
         });
   
@@ -321,6 +323,8 @@ export const createCompo = async (req,res,next)=>{
       existingCombo.addOns = addOns;
       existingCombo.comboPrice = comboPrice;
       existingCombo.createdById = user._id;
+      existingCombo.createdBy = user.name;
+    
  
       await existingCombo.save();
 

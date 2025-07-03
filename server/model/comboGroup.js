@@ -27,6 +27,9 @@ const comboGroupSchema = new mongoose.Schema({
         ref: 'User',
         required: true, // CompanyAdmin or BranchAdmin who created it
     },
+      createdBy: {
+          type:String,
+      },
  
   
 },{

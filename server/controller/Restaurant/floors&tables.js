@@ -70,6 +70,7 @@ export const createFloors = async (req,res,next)=>{
             name: floor.name.trim(),
             restaurantId,
             createdById: user._id,
+            createdBy:user.name,
            
         }));
 
@@ -536,6 +537,7 @@ export const addKitchen = async(req,res,next)=>{
             name: kitchen.name.trim(),
             restaurantId,
             createdById: user._id,
+            createdBy:user.name,
            
         }));
 

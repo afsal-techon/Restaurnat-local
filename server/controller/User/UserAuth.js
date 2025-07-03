@@ -149,7 +149,7 @@ export const LoginUser = async (req, res, next) => {
 export const createUser = async(req,res,next)=>{
     try {
 
-        const { restaurantId,name, email, password  } = req.body
+        const { restaurantId,name, email, password    } = req.body
    
     
         const userId = req.user;
@@ -157,9 +157,7 @@ export const createUser = async(req,res,next)=>{
         if (!user) return res.status(400).json({ message: "User not found!" });
        
 
-        if(!restaurantId) {
-          return res.status(400).json({ message:'Branch Id not found!'})
-        }
+    
           if(!email) {
             return res.status(400).json({ message:'Email  not found!'})
           }
@@ -183,6 +181,7 @@ export const createUser = async(req,res,next)=>{
                 password : hashedPassword,
                 role:'User',
                 createdById : user._id,
+                createdBy:user.name,
                 
               });
    

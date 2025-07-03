@@ -33,6 +33,9 @@ const customerSchema = new mongoose.Schema({
         ref: 'User',
          // CompanyAdmin or BranchAdmin who created it
     },
+      createdBy: {
+          type:String,
+      },
    
 }, { timestamps: true });
 

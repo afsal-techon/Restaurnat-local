@@ -61,7 +61,8 @@ export const createAccounts = async (req, res,next) => {
         showInPos,
           parentAccountId: parentAccountId || null,
        
-          createdById:user._id
+          createdById:user._id,
+          createdBy:user.name,
       });
   
       await newAccount.save();
@@ -913,6 +914,7 @@ export const createTransactionModule= async(req,res,next)=>{
       referenceType: accountType, // Use account type as reference
       description: note || `Manual ${account.accountType} entry`,
       createdById: user._id,
+      createdBy:user.name,
     };
 
     // Create CREDIT transaction in Payment (Cash/Bank/Card) account
@@ -925,6 +927,7 @@ export const createTransactionModule= async(req,res,next)=>{
       referenceType: accountType,
       description: note || `Payment for ${accountType}`,
       createdById: user._id,
+      createdBy:user.name,
     };
 
     await TRANSACTION.insertMany([debitTXn,creditTxn])

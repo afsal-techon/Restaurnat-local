@@ -224,24 +224,4 @@ router.get('/purchase/pdf',VerifyToken,generatePurchaseReportPDF)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 export default router;

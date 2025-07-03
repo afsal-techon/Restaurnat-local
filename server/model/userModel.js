@@ -20,11 +20,16 @@ const userSchema = new mongoose.Schema({
               ref: 'User',
                
           },
+            createdBy: {
+          type:String,
+      },
     role: { 
         type: String, 
         enum: ["User","CompanyAdmin"], 
 
     },
+
+    access:[String],
     
     status: { type: Boolean, default: true },
 
