@@ -54,7 +54,7 @@ import jwt from 'jsonwebtoken'
 
 export const createCompanyhAdmin = async (req, res, next) => {
   try {
-    const { pin, role } = req.body;
+    const { pin, role,name,phone } = req.body;
 
     if (!pin || typeof pin !== 'string' || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
       return res.status(400).json({ message: 'A valid 4-digit PIN is required!' });
@@ -65,6 +65,8 @@ export const createCompanyhAdmin = async (req, res, next) => {
     }
 
     const user = await USER.create({
+      name,
+      phone,
       pin,
       role,
     });
@@ -148,7 +150,7 @@ export const LoginUser = async (req, res, next) => {
 
 export const createUser = async (req, res, next) => {
   try {
-    const { restaurantId, name, phone, pin, access } = req.body;
+    const { restaurantId, name, phone, pin, access ,accessName } = req.body;
 
     const userId = req.user;
     const user = await USER.findOne({ _id: userId });
@@ -173,8 +175,9 @@ export const createUser = async (req, res, next) => {
       restaurantId,
       phone,
       pin,
-      access, // ['Admin', 'Reports', 'Sales']
+      access, 
       role: 'User',
+      accessName,
       createdById: user._id,
       createdBy: user.name,
     });
@@ -199,7 +202,7 @@ export const getAllUsers = async(req,res,next)=>{
         if (!user) return res.status(400).json({ message: "User not found!" });
 
 
-        const users = await USER.find({ restaurantId })
+        const users = await USER.find({  })
 
         // await redisClient.setEx(cacheKey, 3600, JSON.stringify(users));
 
@@ -215,7 +218,7 @@ export const getAllUsers = async(req,res,next)=>{
 
 export const updateUser = async (req, res, next) => {
   try {
-    const { userId, name, phone, pin, access } = req.body;
+    const { userId, name, phone, pin, access,accessName } = req.body;
 
     const requestingUserId = req.user;
     const requestingUser = await USER.findOne({ _id: requestingUserId });
@@ -225,7 +228,6 @@ export const updateUser = async (req, res, next) => {
     if (!userId) return res.status(400).json({ message: "User ID is required!" });
     if (!name) return res.status(400).json({ message: "Name is required!" });
     if (!phone) return res.status(400).json({ message: "Mobile number is required!" });
-    if (!pin) return res.status(400).json({ message: "Pin is required!" });
     if (!Array.isArray(access) || access.length === 0) {
       return res.status(400).json({ message: "Access must be a non-empty array!" });
     }
@@ -240,7 +242,8 @@ export const updateUser = async (req, res, next) => {
     const updateData = {
       name,
       phone,
-      pin,
+      accessName,
+      pin: pin ?? userToUpdate.pin,
       access
     };
 
@@ -270,9 +273,6 @@ export const updateUser = async (req, res, next) => {
               return res.status(400).json({ message: "User not found!" });
           }
   
-          if (!restaurantId) {
-              return res.status(400).json({ message: "Restaurant ID is required!" });
-          }
   
           if (!userId) {
               return res.status(400).json({ message: "userId not found!" });

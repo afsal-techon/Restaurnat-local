@@ -312,6 +312,8 @@ export const createTables = async (req,res,next)=>{
             capacity,
             restaurantId,
             floorId,
+            createdById:user._id,
+            createdBy:user.name
          
           
         });

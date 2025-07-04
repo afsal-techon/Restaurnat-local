@@ -23,6 +23,7 @@ import { generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySal
 import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
 import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
 import { generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
+import checkOfflinePermission from '../middleware/permission.js'
 const router = express.Router();
 
 
@@ -32,58 +33,58 @@ router.post('/create-admin', createCompanyhAdmin);
 router.post('/login',LoginUser);
 
 //
-router.post('/create-restaurant',VerifyToken,upload.single('logo'),createRestuarantBranch);
-router.get('/get-restaurants',VerifyToken, getAllRestaurant);
-router.put('/update-restaurant',VerifyToken,upload.single('logo'),updateRestaurantBranch);
-router.delete('/delete-restaurant/:restaurantId',VerifyToken, deleteRestaurant);
+router.post('/create-restaurant',VerifyToken,checkOfflinePermission('Admin'),upload.single('logo'),createRestuarantBranch);
+router.get('/get-restaurants',VerifyToken,checkOfflinePermission('Admin'), getAllRestaurant);
+router.put('/update-restaurant',VerifyToken,checkOfflinePermission('Admin'),upload.single('logo'),updateRestaurantBranch);
+router.delete('/delete-restaurant/:restaurantId',VerifyToken,checkOfflinePermission('Admin'), deleteRestaurant);
 
 
 //customer types
-router.post('/customer-type',VerifyToken,addCustomerType);
-router.put('/customer-type',VerifyToken,updateCustomerTypes);
-router.delete('/customer-type',VerifyToken,deleteCustomerTypes);
-router.get('/customer-type/:restaurantId',VerifyToken , getAllCustomerTypes)
+router.post('/customer-type',VerifyToken,checkOfflinePermission('Admin'),addCustomerType);
+router.put('/customer-type',VerifyToken,checkOfflinePermission('Admin'),updateCustomerTypes);
+router.delete('/customer-type',VerifyToken,checkOfflinePermission('Admin'),deleteCustomerTypes);
+router.get('/customer-type/:restaurantId',VerifyToken,checkOfflinePermission('Admin'), getAllCustomerTypes)
 
 
 //floors
-router.post('/floors',VerifyToken,createFloors);
-router.get('/floors/:restaurantId',VerifyToken,getAllFloorsbyRest);
-router.put('/floors',VerifyToken,updateFloorName);
-router.delete('/floors/:floorId',VerifyToken,deleteFloor)
+router.post('/floors',VerifyToken,checkOfflinePermission('Admin'),createFloors);
+router.get('/floors/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getAllFloorsbyRest);
+router.put('/floors',VerifyToken,checkOfflinePermission('Admin'),updateFloorName);
+router.delete('/floors/:floorId',VerifyToken,checkOfflinePermission('Admin'),deleteFloor)
 
 
 //tables
-router.post('/tables',VerifyToken,createTables);
-router.get('/tables/:restaurantId',VerifyToken,getAllTablesbyRest);
-router.put('/tables',VerifyToken,updateTable);
-router.delete('/tables/:tableId',VerifyToken,deleteTable);
+router.post('/tables',VerifyToken,checkOfflinePermission('Admin'),createTables);
+router.get('/tables/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getAllTablesbyRest);
+router.put('/tables',VerifyToken,checkOfflinePermission('Admin'),updateTable);
+router.delete('/tables/:tableId',VerifyToken,checkOfflinePermission('Admin'),deleteTable);
 
 //kitchen 
-router.post('/kitchen',VerifyToken,addKitchen);
-router.get('/kitchen/:restaurantId',VerifyToken,getAllKitchen);
-router.put('/kitchen',VerifyToken,updateKitchen);
-router.delete('/kitchen/:kitchenId',VerifyToken,deleteKitchen);
+router.post('/kitchen',VerifyToken,checkOfflinePermission('Admin'),addKitchen);
+router.get('/kitchen/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getAllKitchen);
+router.put('/kitchen',VerifyToken,checkOfflinePermission('Admin'),updateKitchen);
+router.delete('/kitchen/:kitchenId',VerifyToken,checkOfflinePermission('Admin'),deleteKitchen);
 
 
 //user creation
-router.post('/user',VerifyToken,createUser);
-router.get('/user/:restaurantId',VerifyToken,getAllUsers);
-router.put('/user-update',VerifyToken, updateUser);
-router.delete('/user',VerifyToken, deleteUser);
+router.post('/user',VerifyToken,checkOfflinePermission('Admin'),createUser);
+router.get('/user/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getAllUsers);
+router.put('/user-update',VerifyToken, checkOfflinePermission('Admin'),updateUser);
+router.delete('/user',VerifyToken,checkOfflinePermission('Admin'), deleteUser);
 
 
 //category
-router.post('/category',VerifyToken,createCategory);
-router.get('/category/:restaurantId' ,VerifyToken,getAllCategories)
-router.put('/category',VerifyToken,updateCategory );
-router.delete('/category/:categoryId',VerifyToken,deleteCategory);
+router.post('/category',VerifyToken,checkOfflinePermission('MenuManagement'),createCategory);
+router.get('/category/:restaurantId',checkOfflinePermission('MenuManagement'),VerifyToken,getAllCategories)
+router.put('/category',VerifyToken,checkOfflinePermission('MenuManagement'),updateCategory );
+router.delete('/category/:categoryId',checkOfflinePermission('MenuManagement'),VerifyToken,deleteCategory);
 
 
 //menu type 
-router.post('/menu-type',VerifyToken,CreateMenuType)
-router.get('/menu-type/:restaurantId',VerifyToken,getAllMenuTypes)
-router.put('/menu-type',VerifyToken,updateMenuTypes)
-router.delete('/menu-type',VerifyToken,deleteMenuTypes);
+router.post('/menu-type',VerifyToken,checkOfflinePermission('MenuManagement'),CreateMenuType)
+router.get('/menu-type/:restaurantId',VerifyToken,checkOfflinePermission('MenuManagement'),getAllMenuTypes)
+router.put('/menu-type',VerifyToken,checkOfflinePermission('MenuManagement'),updateMenuTypes)
+router.delete('/menu-type',VerifyToken,checkOfflinePermission('MenuManagement'),deleteMenuTypes);
 
 
 //course sections
@@ -94,131 +95,131 @@ router.delete('/menu-type',VerifyToken,deleteMenuTypes);
 
 
 //add-ons 
-router.post('/add-ons',VerifyToken,createAddOns);
-router.get('/add-ons/:restaurantId',VerifyToken,getAllAddOns )
-router.put('/add-ons',VerifyToken,updateAddOns )
-router.delete('/add-ons',VerifyToken,deleteAddOn);
+router.post('/add-ons',VerifyToken,checkOfflinePermission('MenuManagement'),createAddOns);
+router.get('/add-ons/:restaurantId',VerifyToken,checkOfflinePermission('MenuManagement'),getAllAddOns )
+router.put('/add-ons',VerifyToken,checkOfflinePermission('MenuManagement'),updateAddOns )
+router.delete('/add-ons',VerifyToken,checkOfflinePermission('MenuManagement'),deleteAddOn);
 
 
 //food
-router.post('/food',VerifyToken,upload.single('foodImg'),createFood);
-router.get('/food/:restaurantId',VerifyToken,getAllFoodbyRestaurat);
-router.put('/food',VerifyToken,upload.single('foodImg'), updateFood)
-router.get('/food-id/:foodId',VerifyToken, getOneFood);
-router.delete('/food/:foodId',VerifyToken,deleteFood);
+router.post('/food',VerifyToken,checkOfflinePermission('MenuManagement'),upload.single('foodImg'),createFood);
+router.get('/food/:restaurantId',VerifyToken,checkOfflinePermission('MenuManagement'),getAllFoodbyRestaurat);
+router.put('/food',VerifyToken,checkOfflinePermission('MenuManagement'),upload.single('foodImg'), updateFood)
+router.get('/food-id/:foodId',VerifyToken,checkOfflinePermission('MenuManagement'), getOneFood);
+router.delete('/food/:foodId',VerifyToken,checkOfflinePermission('MenuManagement'),deleteFood);
 
 
 //compo section 
-router.post('/combo',VerifyToken,upload.single('comboImg'),createCompo);
-router.put('/combo',VerifyToken,upload.single('comboImg'),updateCombo);
-router.get('/combo/:restaurantId',VerifyToken,getAllCombo);
-router.get('/combo/:restaurantId/:comboId',VerifyToken,getOneCombo);
-router.delete('/combo/:comboId',VerifyToken,deleteCombo );
+router.post('/combo',VerifyToken,checkOfflinePermission('MenuManagement'),upload.single('comboImg'),createCompo);
+router.put('/combo',VerifyToken,checkOfflinePermission('MenuManagement'),upload.single('comboImg'),updateCombo);
+router.get('/combo/:restaurantId',VerifyToken,checkOfflinePermission('MenuManagement'),getAllCombo);
+router.get('/combo/:restaurantId/:comboId',VerifyToken,checkOfflinePermission('MenuManagement'),getOneCombo);
+router.delete('/combo/:comboId',VerifyToken,checkOfflinePermission('MenuManagement'),deleteCombo );
 
 
 
 
 //pos-category-food
-router.get("/pos-foods/:restaurantId",VerifyToken,getAllFoodForPOS)
-router.get('/pos-category/:restaurantId',VerifyToken,getAllByCategoryForPOS);
-router.get('/pos-menuitems/:restaurantId',VerifyToken,getMenusItemsForPOS)
-router.get('/pos-course/:restaurantId',VerifyToken,getCourseForPOS);
-router.get('/pos-combo/:restaurantId',VerifyToken,getComboForPOS)
+router.get("/pos-foods/:restaurantId",VerifyToken,checkOfflinePermission('Sales'),getAllFoodForPOS)
+router.get('/pos-category/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getAllByCategoryForPOS);
+router.get('/pos-menuitems/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getMenusItemsForPOS)
+router.get('/pos-course/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getCourseForPOS);
+router.get('/pos-combo/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getComboForPOS)
 
 //pos-combo
 // router.get('/pos-combo/:restaurantId',VerifyToken,getAllComboForPOS);
-router.get('/pos-combo/:restaurantId/:comboId',VerifyToken,getOneComboForPOS)
+router.get('/pos-combo/:restaurantId/:comboId',VerifyToken,checkOfflinePermission('Sales'),getOneComboForPOS)
 
 
 //pos-tables and floors
-router.get('/pos-floors/:restaurantId',VerifyToken,getFloorsForPOS);
-router.get('/pos-tables/:restaurantId',VerifyToken,getTablesForPOS);
+router.get('/pos-floors/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getFloorsForPOS);
+router.get('/pos-tables/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getTablesForPOS);
 
 
 //pos-customer
-router.post('/pos-customer',VerifyToken,createCustomerForPOS);
-router.get('/pos-customer/:restaurantId',VerifyToken,getCustomersForPOS);
-router.put('/pos-customer',VerifyToken,updateCustomerforPOS);
-router.get('/pos-customerTypes/:restaurantId',VerifyToken,getCustomerTypesForPOS)
-router.get('/pos-customer/history/:customerId',VerifyToken,getCustomerCreditHistory)
-router.post('/pos-customer/due',VerifyToken,payCustomerDue);
-router.get('/customer/history',VerifyToken,getCustomerOrderHistory)
+router.post('/pos-customer',VerifyToken,checkOfflinePermission('Sales'),createCustomerForPOS);
+router.get('/pos-customer/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getCustomersForPOS);
+router.put('/pos-customer',VerifyToken,checkOfflinePermission('Sales'),updateCustomerforPOS);
+router.get('/pos-customerTypes/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getCustomerTypesForPOS)
+router.get('/pos-customer/history/:customerId',VerifyToken,checkOfflinePermission('Sales'),getCustomerCreditHistory)
+router.post('/pos-customer/due',VerifyToken,checkOfflinePermission('Admin'),payCustomerDue);
+router.get('/customer/history',VerifyToken,checkOfflinePermission('Admin'),getCustomerOrderHistory)
 
 
 
 //pos-order-listing
-router.get('/pos/order/list/:restaurantId',VerifyToken,getTodayOrdersForPOS);
-router.get('/pos/order/:orderId',VerifyToken,getOneOrderDetails)
+router.get('/pos/order/list/:restaurantId',VerifyToken,checkOfflinePermission('Sales'),getTodayOrdersForPOS);
+router.get('/pos/order/:orderId',VerifyToken,checkOfflinePermission('Sales'),getOneOrderDetails)
 
 
 //pos-order
-router.post('/pos/order',VerifyToken,createOrder);
+router.post('/pos/order',VerifyToken,checkOfflinePermission('Sales'),createOrder);
 // router.post('/pos/cancel-order',VerifyToken,cancelOrder)
 
 //pos-order
-router.post('/pos/cancel-order',VerifyToken,cancelOrder)
+router.post('/pos/cancel-order',VerifyToken,checkOfflinePermission('Sales'),cancelOrder)
 
 //pos-billing
-router.post('/pos/order/billing',VerifyToken,posOrderBilling);
+router.post('/pos/order/billing',VerifyToken,checkOfflinePermission('Sales'),posOrderBilling);
 
 
 //accounts
-router.post('/accounts',VerifyToken,createAccounts);
-router.get('/accounts/:restaurantId',VerifyToken,getAccounts);
-router.put('/accounts',VerifyToken,updateAccount);
-router.delete('/accounts/:accountId',VerifyToken,deleteAccount);
-router.get('/accounts/transaction/data',VerifyToken,getTransactionList);
-router.get('/transaction/pdf',VerifyToken,generateTransactionListPDF);
-router.post('/transaction/exp-pur',VerifyToken,createTransactionModule);
-router.get('/transaction/exp-pur',VerifyToken,getPurchseExpenceList);
-router.get('/exp-pur/pdf',VerifyToken,generatePurchseExpencePDF)
+router.post('/accounts',VerifyToken,checkOfflinePermission('Admin'),createAccounts);
+router.get('/accounts/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getAccounts);
+router.put('/accounts',VerifyToken,checkOfflinePermission('Admin'),updateAccount);
+router.delete('/accounts/:accountId',VerifyToken,checkOfflinePermission('Admin'),deleteAccount);
+router.get('/accounts/transaction/data',VerifyToken,checkOfflinePermission('Admin'),getTransactionList);
+router.get('/transaction/pdf',VerifyToken,checkOfflinePermission('Admin'),generateTransactionListPDF);
+router.post('/transaction/exp-pur',VerifyToken,checkOfflinePermission('Purchase'),createTransactionModule);
+router.get('/transaction/exp-pur',VerifyToken,checkOfflinePermission('Admin'),getPurchseExpenceList);
+router.get('/exp-pur/pdf',VerifyToken,checkOfflinePermission('Admin'),generatePurchseExpencePDF)
 
 
 
 
 //dashboard apis 
-router.get('/dashboard/quick-view/:fromDate/:toDate',VerifyToken,getQuickViewDashboard );
-router.get('/dashboard/sales-overview/:fromDate/:toDate',VerifyToken,getSalesOverview );
-router.get('/dashboard/payment-overview/:fromDate/:toDate',VerifyToken,getPaymentOverview );
-router.get('/dashboard/order-summary',VerifyToken,getOrderSummary );
-router.get('/dashboard/top-selling',VerifyToken,getTopSellingItems );
-router.get('/dashboard/latest-orders',VerifyToken,getLatestCompletedOrders );
+router.get('/dashboard/quick-view/:fromDate/:toDate',VerifyToken,checkOfflinePermission('Admin'),getQuickViewDashboard );
+router.get('/dashboard/sales-overview/:fromDate/:toDate',VerifyToken,checkOfflinePermission('Admin'),getSalesOverview );
+router.get('/dashboard/payment-overview/:fromDate/:toDate',VerifyToken,checkOfflinePermission('Admin'),getPaymentOverview );
+router.get('/dashboard/order-summary',VerifyToken,checkOfflinePermission('Admin'),getOrderSummary );
+router.get('/dashboard/top-selling',VerifyToken,checkOfflinePermission('Admin'),getTopSellingItems );
+router.get('/dashboard/latest-orders',VerifyToken,checkOfflinePermission('Admin'),getLatestCompletedOrders );
 
 //Report          
 
 //sales
-router.get('/reports/daily-sale',VerifyToken,getDailySalesReport);
-router.get('/reports/category-sale',VerifyToken,getCategoryWiseSalesReport);
-router.get('/reports/item-sale',VerifyToken,getItemWiseSalesReport);
-router.get('/reports/customerType-sale',VerifyToken,getCustomerTypeWiseSalesReport);
-router.get('/daily-sale/pdf',VerifyToken,generateDailySalesPDF);
-router.get('/category-sale/pdf',VerifyToken,generateCategorySalesPDF);
-router.get('/item-sale/pdf',VerifyToken,generateItemWiseSalesPDF);
-router.get('/customertype-sale/pdf',VerifyToken,generateCustomerTypeWisePDF)
+router.get('/reports/daily-sale',VerifyToken,checkOfflinePermission('Reports'),getDailySalesReport);
+router.get('/reports/category-sale',VerifyToken,checkOfflinePermission('Reports'),getCategoryWiseSalesReport);
+router.get('/reports/item-sale',VerifyToken,checkOfflinePermission('Reports'),getItemWiseSalesReport);
+router.get('/reports/customerType-sale',VerifyToken,checkOfflinePermission('Reports'),getCustomerTypeWiseSalesReport);
+router.get('/daily-sale/pdf',VerifyToken,checkOfflinePermission('Reports'),generateDailySalesPDF);
+router.get('/category-sale/pdf',VerifyToken,checkOfflinePermission('Reports'),generateCategorySalesPDF);
+router.get('/item-sale/pdf',VerifyToken,checkOfflinePermission('Reports'),generateItemWiseSalesPDF);
+router.get('/customertype-sale/pdf',VerifyToken,checkOfflinePermission('Reports'),generateCustomerTypeWisePDF)
 
 
 
 //order report 
-router.get('/reports/order-summary',VerifyToken,getALLOrderSummary);
-router.get('/reports/one-order/:orderId',VerifyToken,getSingleOrder);
-router.get('/reports/cancelled-order',VerifyToken,getCancelledOrders)
-router.get('/order-summary/pdf',VerifyToken,generateOrderSummaryPDF)
-router.get('/cancel-order/pdf',VerifyToken,generateCancelledOrdersPDF)
+router.get('/reports/order-summary',VerifyToken,checkOfflinePermission('Reports'),getALLOrderSummary);
+router.get('/reports/one-order/:orderId',VerifyToken,checkOfflinePermission('Reports'),getSingleOrder);
+router.get('/reports/cancelled-order',VerifyToken,checkOfflinePermission('Reports'),getCancelledOrders)
+router.get('/order-summary/pdf',VerifyToken,checkOfflinePermission('Reports'),generateOrderSummaryPDF)
+router.get('/cancel-order/pdf',VerifyToken,checkOfflinePermission('Reports'),generateCancelledOrdersPDF)
 
 //Payment  Report 
-router.get('/reports/payment-summary',VerifyToken,getPaymentSummary);
-router.get('/reports/daily-payment',VerifyToken,getDailyCollectionReport);
-router.get('/payment-summary/pdf',VerifyToken,generatePaymentSummaryPDF);
-router.get('/payment-collection/pdf',VerifyToken,generateDailyCollectionPDF)
+router.get('/reports/payment-summary',VerifyToken,checkOfflinePermission('Reports'),getPaymentSummary);
+router.get('/reports/daily-payment',VerifyToken,checkOfflinePermission('Reports'),getDailyCollectionReport);
+router.get('/payment-summary/pdf',VerifyToken,checkOfflinePermission('Reports'),generatePaymentSummaryPDF);
+router.get('/payment-collection/pdf',VerifyToken,checkOfflinePermission('Reports'),generateDailyCollectionPDF)
 
 //daily transaction type 
-router.get('/reports/daily-transaction',VerifyToken,getDailyTransactionReport)
+router.get('/reports/daily-transaction',VerifyToken,checkOfflinePermission('Reports'),getDailyTransactionReport)
 
 
 //purchse Expence Report
-router.get('/reports/purchase',VerifyToken,getPurchaseReport);
-router.get('/reports/expanse',VerifyToken,getExpenseReport);
-router.get('/purchase/pdf',VerifyToken,generatePurchaseReportPDF)
+router.get('/reports/purchase',VerifyToken,checkOfflinePermission('Reports'),getPurchaseReport);
+router.get('/reports/expanse',VerifyToken,checkOfflinePermission('Reports'),getExpenseReport);
+router.get('/purchase/pdf',VerifyToken,checkOfflinePermission('Reports'),generatePurchaseReportPDF)
 
 
 
