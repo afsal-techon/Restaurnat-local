@@ -146,54 +146,46 @@ export const LoginUser = async (req, res, next) => {
 
 
 
-export const createUser = async(req,res,next)=>{
-    try {
+export const createUser = async (req, res, next) => {
+  try {
+    const { restaurantId, name, phone, pin, access } = req.body;
 
-        const { restaurantId,name, email, password    } = req.body
-   
-    
-        const userId = req.user;
-        const user = await USER.findOne({ _id: userId  })
-        if (!user) return res.status(400).json({ message: "User not found!" });
-       
+    const userId = req.user;
+    const user = await USER.findOne({ _id: userId });
+    if (!user) return res.status(400).json({ message: "User not found!" });
 
-    
-          if(!email) {
-            return res.status(400).json({ message:'Email  not found!'})
-          }
-          if(!password) {
-            return res.status(400).json({ message:'Password  not found!'})
-          }
-         
-
-          const existingUser = await USER.findOne({ email });
-          if (existingUser) {
-            return res.status(400).json({ message: "Email already exists!" });
-          }
-
-           // Hash the password
-              const hashedPassword = await bcrypt.hash(password, 10);
-
-              const newUser = new USER({
-                name: name,
-                restaurantId,
-                email,
-                password : hashedPassword,
-                role:'User',
-                createdById : user._id,
-                createdBy:user.name,
-                
-              });
-   
-
-              await newUser.save();
-
-            return  res.status(200).json({ message: "User created successfully", data: newUser });
-        
-    } catch (err) {
-        next(err)
+    // Validations
+    if (!name) return res.status(400).json({ message: 'Name is required!' });
+    if (!phone) return res.status(400).json({ message: 'Mobile number is required!' });
+    if (!pin) return res.status(400).json({ message: 'Pin is required!' });
+    if (!Array.isArray(access) || access.length === 0) {
+      return res.status(400).json({ message: "Access must be a non-empty array!" });
     }
-}
+
+    // Check for duplicate phone
+    const existingUser = await USER.findOne({ phone });
+    if (existingUser) {
+      return res.status(400).json({ message: "Mobile number already exists!" });
+    }
+
+    const newUser = new USER({
+      name,
+      restaurantId,
+      phone,
+      pin,
+      access, // ['Admin', 'Reports', 'Sales']
+      role: 'User',
+      createdById: user._id,
+      createdBy: user.name,
+    });
+
+    await newUser.save();
+
+    return res.status(200).json({ message: "User created successfully", data: newUser });
+  } catch (err) {
+    next(err);
+  }
+};
 
 
 export const getAllUsers = async(req,res,next)=>{
@@ -206,19 +198,6 @@ export const getAllUsers = async(req,res,next)=>{
         console.log(user,'uservan')
         if (!user) return res.status(400).json({ message: "User not found!" });
 
-        let filter = {};
-        if (user.role === "CompanyAdmin") {
-            filter = { _id: restaurantId, companyAdmin: user._id };
-        } else if (user.role === "User") {
-            filter = { _id: restaurantId };
-        } else {
-            return res.status(403).json({ message: "Unauthorized!" });
-        }
-
-        const restaurantData = await RESTAURANT.findOne(filter);
-        if (!restaurantData) {
-            return res.status(404).json({ message: "No matching restaurant found!" });
-        }
 
         const users = await USER.find({ restaurantId })
 
@@ -232,63 +211,51 @@ export const getAllUsers = async(req,res,next)=>{
 }
 
 
-export const updateUser = async(req,res,next)=>{
-    try {
-  
-      const {
-        userId,
-        restaurantId,
-        name,
-        email,
-        password,
-      } = req.body;
-  
-      const userid = req.user;
-      console.log(userid,'userid')
-      const user = await USER.findOne({ _id: userId })
-      if (!user) return res.status(400).json({ message: "User not found!" });
-  
-      const userData = await USER.findById(userId);
-      if (!userData) return res.status(404).json({ message: "No User found!" });
-  
-      if (!restaurantId) {
-        return res.status(400).json({ message: "Branch Id is required!" });
-      }
-  
-  
-      // Check for email uniqueness (excluding current user)
-      const emailTaken = await USER.findOne({ email, _id: { $ne: userId } });
-      if (emailTaken) return res.status(400).json({ message: "Email already in use!" });
 
-  
-      const updateData = {
-        name: name,
-        restaurantId,
-        email,
-        role:userData.role,
-       
-   
-      };
-  
-      // If password is provided, hash and update
-      if (password) {
-        updateData.password = await bcrypt.hash(password, 10);
-      }
-  
-      const updatedUser = await USER.findByIdAndUpdate(userId, updateData, { new: true });
-  
-      // Remove from Redis cache
-      // await redisClient.del(`users:${restaurantId}`);
-  
-      return res.status(200).json({
-        message: "User updated successfully",
-        data: updatedUser
-      });
-  
-    } catch (err) {
-        next(err)
+
+export const updateUser = async (req, res, next) => {
+  try {
+    const { userId, name, phone, pin, access } = req.body;
+
+    const requestingUserId = req.user;
+    const requestingUser = await USER.findOne({ _id: requestingUserId });
+    if (!requestingUser) return res.status(400).json({ message: "User not found!" });
+
+    // Validate input
+    if (!userId) return res.status(400).json({ message: "User ID is required!" });
+    if (!name) return res.status(400).json({ message: "Name is required!" });
+    if (!phone) return res.status(400).json({ message: "Mobile number is required!" });
+    if (!pin) return res.status(400).json({ message: "Pin is required!" });
+    if (!Array.isArray(access) || access.length === 0) {
+      return res.status(400).json({ message: "Access must be a non-empty array!" });
     }
+
+    const userToUpdate = await USER.findById(userId);
+    if (!userToUpdate) return res.status(404).json({ message: "User to update not found!" });
+
+    // Check for phone uniqueness (excluding current user)
+    const phoneTaken = await USER.findOne({ phone, _id: { $ne: userId } });
+    if (phoneTaken) return res.status(400).json({ message: "Mobile number already in use!" });
+
+    const updateData = {
+      name,
+      phone,
+      pin,
+      access
+    };
+
+    const updatedUser = await USER.findByIdAndUpdate(userId, updateData, { new: true });
+
+    return res.status(200).json({
+      message: "User updated successfully",
+      data: updatedUser
+    });
+  } catch (err) {
+    next(err);
   }
+};
+
+
   
   
   export const deleteUser = async(req,res,next)=>{
@@ -310,22 +277,6 @@ export const updateUser = async(req,res,next)=>{
           if (!userId) {
               return res.status(400).json({ message: "userId not found!" });
           }
-  
-          let filter = {};
-  
-          // Access control based on user role
-          if (user.role === "CompanyAdmin") {
-              filter = { _id: restaurantId, companyAdmin: user._id };
-          } else if (user.role === "User") {
-              filter = { _id: restaurantId };
-          } else {
-              return res.status(403).json({ message: "Unauthorized access!" });
-          }
-  
-          const restaurant = await RESTAURANT.findOne(filter);
-          if (!restaurant) {
-              return res.status(404).json({ message: "No matching restaurants found!" });
-          } 
   
           const userData = await USER.findById(userId);
           if (!userData) {

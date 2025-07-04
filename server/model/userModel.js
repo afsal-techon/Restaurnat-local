@@ -29,7 +29,11 @@ const userSchema = new mongoose.Schema({
 
     },
 
-    access:[String],
+   access: {
+    type: [String],
+    enum: ['Admin', 'Reports', 'Sales', 'MenuManagement'],
+    default: []
+  },
     
     status: { type: Boolean, default: true },
 
