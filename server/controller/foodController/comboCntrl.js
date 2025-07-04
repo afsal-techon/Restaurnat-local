@@ -703,6 +703,13 @@ export const createCompo = async (req,res,next)=>{
       if (!combo) {
         return res.status(404).json({ message: "Combo not found!" });
       }
+
+    //  Check: comboId used in orders
+    const usedInOrders = await ORDER.exists({ "items.comboId": comboId });
+    if (usedInOrders) {
+      return res.status(400).json({ message: "Cannot delete this combo. It is used in orders." });
+    }
+
   
       await COMBO.findByIdAndDelete(comboId)
   

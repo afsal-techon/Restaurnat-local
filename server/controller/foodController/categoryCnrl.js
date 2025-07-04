@@ -2,6 +2,7 @@ import CATEGORY from '../../model/category.js'
 import USER from '../../model/userModel.js';
 import RESTAURANT from '../../model/restaurant.js'
 import { getIO  } from "../../config/socket.js";
+import FOOD from '../../model/food.js'
 
 
 
@@ -214,6 +215,14 @@ export const deleteCategory = async (req, res, next) => {
       if (!category) {
         return res.status(404).json({ message: "Category not found!" });
       }
+
+          const categoryInUse = await FOOD.exists({ categoryId });
+    if (categoryInUse) {
+      return res.status(400).json({
+        message:
+          "Cannot delete this category because it is being used in food items.",
+      });
+    }
 
       await CATEGORY.findByIdAndDelete(categoryId)
 

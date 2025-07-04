@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema(
 
     access: {
       type: [String],
-      enum: ["Admin", "Reports","Purchase", "Sales", "MenuManagement"],
+      enum: ["Admin", "Reports","Purchase", "Sale", "Menu Setup"],
       default: [],
     },
 

@@ -11,10 +11,9 @@ import CUSTOMER_TYPE from '../../model/customerTypes.js'
 
 
 
-export const getDailySalesReport = async(req,res,next)=>{
-    try {
-
-      const userId = req.user;
+export const getDailySalesReport = async (req, res, next) => {
+  try {
+    const userId = req.user;
     const user = await USER.findOne({ _id: userId });
     if (!user) return res.status(400).json({ message: "User not found!" });
 
@@ -22,12 +21,14 @@ export const getDailySalesReport = async(req,res,next)=>{
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
-     const {
+    const {
       fromDate,
       toDate,
       customerTypeId,
       paymentMethod,
       search,
+      minPrice,
+      maxPrice
     } = req.query;
 
     const matchStage = { "order.status": "Completed" };
@@ -43,7 +44,7 @@ export const getDailySalesReport = async(req,res,next)=>{
       matchStage["order.customerTypeId"] = new mongoose.Types.ObjectId(customerTypeId);
     }
 
-    // Common initial pipeline
+    // Common pipeline before price filtering
     const basePipeline = [
       {
         $lookup: {
@@ -100,12 +101,24 @@ export const getDailySalesReport = async(req,res,next)=>{
               amount: "$methods.amount"
             }
           },
-          dueAmount: { $first: "$dueAmount" },
-        
+          dueAmount: { $first: "$dueAmount" }
         }
       }
     ];
 
+    // Filter by price range (after grouping, where amount is available)
+    const priceMatch = {};
+    const min = parseFloat(minPrice);
+    const max = parseFloat(maxPrice);
+
+    if (!isNaN(min)) priceMatch.amount = { ...priceMatch.amount, $gte: min };
+    if (!isNaN(max)) priceMatch.amount = { ...priceMatch.amount, $lte: max };
+
+    if (Object.keys(priceMatch).length) {
+      basePipeline.push({ $match: priceMatch });
+    }
+
+    // Filter by payment method
     if (paymentMethod) {
       basePipeline.push({
         $match: {
@@ -116,6 +129,7 @@ export const getDailySalesReport = async(req,res,next)=>{
       });
     }
 
+    // Search filter
     if (search) {
       basePipeline.push({
         $match: {
@@ -124,14 +138,13 @@ export const getDailySalesReport = async(req,res,next)=>{
             { orderId: { $regex: search, $options: "i" } },
             { customerType: { $regex: search, $options: "i" } },
             { table: { $regex: search, $options: "i" } },
-            { "paymentMethods.type": { $regex: search, $options: "i" } },
-           
+            { "paymentMethods.type": { $regex: search, $options: "i" } }
           ]
         }
       });
     }
 
-    // Make full data pipeline
+    // Final pipeline for data and pagination
     const dataPipeline = [...basePipeline,
       { $sort: { date: -1 } },
       { $skip: skip },
@@ -152,11 +165,11 @@ export const getDailySalesReport = async(req,res,next)=>{
       data
     });
 
-        
-    } catch (err) {
-        next(err)
-    }
-}
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 
 

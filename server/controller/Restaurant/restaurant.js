@@ -3,6 +3,7 @@ import RESTAURANT from '../../model/restaurant.js'
 import validatePhoneNumbers from '../../middleware/phoneValidator.js';
 import CUSTOMER_TYPE from '../../model/customerTypes.js'
 import mongoose from 'mongoose';
+import ORDER from '../../model/oreder.js'
 
 
 
@@ -479,30 +480,62 @@ export const addCustomerType = async (req, res, next) => {
           return res.status(404).json({ success: false, message: "Customer type not found" });
       }
 
-      // Handle Online type with subMethod deletion
-      if (customerType.type === "Online" && subMethod) {
-          // Check if subMethod exists
-          const subMethodIndex = customerType.subMethods.indexOf(subMethod);
-          if (subMethodIndex === -1) {
-              return res.status(400).json({ 
-                  success: false, 
-                  message: "SubMethod not found in this Online type" 
-              });
-          }
+          // 1. Check in Food.prices
+    const foodPriceUsed = await FOOD.exists({ 
+      "prices.customerTypeId": customerTypeId 
+    });
 
-          // Remove the subMethod
-          customerType.subMethods.splice(subMethodIndex, 1);
+     if (foodPriceUsed) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete: Customer type is used in Food prices. Please remove related food entries first."
+      });
+    }
 
-          // If no subMethods left, delete the entire entry
-          if (customerType.subMethods.length === 0) {
-              await CUSTOMER_TYPE.findByIdAndDelete(customerTypeId);
-              return res.status(200).json({ 
-                  success: true, 
-                  message: "Online type deleted as no subMethods remain" 
-              });
-          }
+        // 2. Check in Food.portions.prices
+    const portionPriceUsed = await FOOD.exists({ 
+      "portions.prices.customerTypeId": customerTypeId 
+    });
 
-          // Save if subMethods still exist
+    if (portionPriceUsed) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete: Customer type is used in Food portion prices. Please remove related entries first."
+      });
+    }
+
+        // 3. Check in Order.customerTypeId
+    const orderUsed = await ORDER.exists({ customerTypeId });
+    if (orderUsed) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete: Customer type is used in Orders. Please remove related orders first."
+      });
+    }
+
+// If type is "Online" and subMethod is provided
+    if (customerType.type === "Online" && subMethod) {
+      const index = customerType.subMethods.indexOf(subMethod);
+      if (index === -1) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "SubMethod not found in this Online type" 
+        });
+      }
+
+      // Remove subMethod
+      customerType.subMethods.splice(index, 1);
+
+             // If no subMethods left, delete whole document
+      if (customerType.subMethods.length === 0) {
+        await CUSTOMER_TYPE.findByIdAndDelete(customerTypeId);
+        return res.status(200).json({ 
+          success: true, 
+          message: "Online type deleted as no subMethods remain" 
+        });
+      }
+
+         // Save if subMethods still exist
           await customerType.save();
           return res.status(200).json({ 
               success: true, 

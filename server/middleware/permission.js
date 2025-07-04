@@ -13,6 +13,10 @@ const checkOfflinePermission = (requiredAccess) => {
        if (user.role === 'CompanyAdmin') {
         return next();
       }
+     
+      if(user.access.includes('Admin')){
+        return next()
+      }
 
       // Check if required access is included
       if (!user.access.includes(requiredAccess)) {

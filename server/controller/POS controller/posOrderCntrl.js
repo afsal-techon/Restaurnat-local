@@ -317,7 +317,7 @@ const printer = new ThermalPrinter({
             currentStatus: 'Running',
             currentOrderId: order._id,
             totalAmount: order.totalAmount,
-            runningSince: new Date()
+            runningSince: order.createdAt  || new Date(),
           },
           { new: true }
         ).lean();
@@ -962,6 +962,76 @@ export const cancelOrder = async(req,res,next)=>{
       message: "Order cancelled successfully",
     });
 
+  } catch (err) {
+    next(err)
+  }
+}
+
+
+export const changeTable = async(req,res,next)=>{
+  try {
+
+      const { orderId, tableId } = req.body;
+       const userId = req.user;
+
+       if(!orderId){
+        return res.status(400).json({ message:'Order not found!'})
+       }
+
+       if(!tableId){
+        return res.status(400).json({ message:"Table Id not found!"})
+       }
+
+     // 1. Fetch order and validate
+    const order = await ORDER.findOne({_id:orderId, status:'Running'});
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const oldTableId  = order.tableId;
+
+     if (!oldTableId ) {
+      return res.status(400).json({ message: 'This order is not associated with any table' });
+    }
+
+       if (oldTableId.toString() === tableId) {
+      return res.status(400).json({ message: 'New table must be different from current table' });
+    }
+
+       // 2. Check if new table is available
+    const newTable = await TABLES.findOne({
+      _id: tableId,
+      currentStatus: 'Available',
+    });
+
+    if (!newTable) {
+      return res.status(400).json({ message: 'New table is not available' });
+    }
+
+        // 4. Update new table: set to Running
+    const updatedNewTable = await TABLES.findByIdAndUpdate(
+      tableId,
+      {
+        $set: {
+          currentStatus: 'Running',
+          currentOrderId: order._id,
+          totalAmount: order.totalAmount,
+          runningSince: order.createdAt,
+        }
+      },
+      { new: true }
+    );
+
+    order.tableId = tableId;
+    await order.save();
+
+      // 6. Emit real-time updates for both tables
+    const io = getIO();
+    io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedNewTable);
+
+    const oldTable = await TABLES.findById(oldTableId).lean();
+    io.to(`posTable-${order.restaurantId}`).emit('single_table_update', oldTable);
+
+    return res.status(200).json({ message: 'Table changed successfully' });
+    
   } catch (err) {
     next(err)
   }

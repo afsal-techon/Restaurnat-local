@@ -114,13 +114,21 @@ export const createCompanyhAdmin = async (req, res, next) => {
 
 export const LoginUser = async (req, res, next) => {
   try {
-    const { pin } = req.body;
+    const { pin,userId } = req.body;
 
-    if (!pin || typeof pin !== 'string' || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+  
+
+    if (!pin || typeof pin !== 'string') {
       return res.status(400).json({ message: 'A valid 4-digit PIN is required!' });
     }
 
-    const user = await USER.findOne({ pin });
+    if(!userId){
+      return res.status(400).json({ message:'User not found!'})
+    }
+    
+     
+    const user = await USER.findOne({ _id:userId, pin: pin}).select("-pin");
+
 
     if (!user) {
       return res.status(400).json({ message: 'Invalid PIN!' });
@@ -202,7 +210,7 @@ export const getAllUsers = async(req,res,next)=>{
         if (!user) return res.status(400).json({ message: "User not found!" });
 
 
-        const users = await USER.find({  })
+        const users = await USER.find({  }).select("-pin");
 
         // await redisClient.setEx(cacheKey, 3600, JSON.stringify(users));
 
@@ -214,6 +222,18 @@ export const getAllUsers = async(req,res,next)=>{
 }
 
 
+
+export const getAllUsersForLoginPin = async(req,res,next)=>{
+    try {
+
+
+        const users = await USER.find().select("-pin");
+        return res.status(200).json({ data: users })
+        
+    } catch (err) {
+        next(err)
+    }
+}
 
 
 export const updateUser = async (req, res, next) => {

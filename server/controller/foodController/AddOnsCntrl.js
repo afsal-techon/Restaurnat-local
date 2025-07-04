@@ -1,7 +1,7 @@
 import USER from '../../model/userModel.js';
 import RESTAURANT from '../../model/restaurant.js'
 import ADDONS from '../../model/add-on.js'
-
+import FOOD from '../../model/food.js'
 
 
 
@@ -239,6 +239,14 @@ export const deleteAddOn  = async (req, res, next) => {
       if (!addOn) {
         return res.status(404).json({ message: "Add-on not found!" });
       }
+
+               const addONsUse = await FOOD.exists({ addOnsIds: addOnId });
+          if (addONsUse) {
+            return res.status(400).json({
+              message:
+                "Cannot delete this addOn because it is being used in food items.",
+            });
+          }
   
       // Soft delete
      await ADDONS.findByIdAndDelete(addOnId)

@@ -7,6 +7,8 @@ import CATEGORY from '../../model/category.js'
 import CHOICE from "../../model/choice.js";
 import FOOD from '../../model/food.js'
 import { getIO  } from "../../config/socket.js";
+import ORDER from '../../model/oreder.js';
+import COMBOGROUP from '../../model/comboGroup.js'
 
 
 
@@ -524,6 +526,25 @@ export const deleteFood = async (req, res, next) => {
     const food = await FOOD.findById(foodId);
     if (!food) {
       return res.status(404).json({ message: "Food not found!" });
+    }
+
+    
+    //  Check: foodId used in direct order items
+     const usedInOrders = await ORDER.exists({ "items.foodId": foodId });
+    if (usedInOrders) {
+      return res.status(400).json({ message: "Cannot delete this food item. It is used in orders." });
+    }
+
+       //  Check: foodId used in nested combo items inside order
+    const usedInNestedOrderCombos = await ORDER.exists({ "items.items.foodId": foodId });
+    if (usedInNestedOrderCombos) {
+      return res.status(400).json({ message: "Cannot delete this food item. It is used in combo items in orders." });
+    }
+
+       //  Check: foodId used in combo groups
+    const usedInComboGroups = await COMBOGROUP.exists({ "foodItems.foodId": foodId });
+    if (usedInComboGroups) {
+      return res.status(400).json({ message: "Cannot delete this food item. It is used in combos." });
     }
 
     await FOOD.findByIdAndDelete(foodId)
