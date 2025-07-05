@@ -47,6 +47,10 @@
     <% if (filters?.search) { %>
       <strong>Search:</strong> <%= filters.search %><br />
     <% } %>
+    <% if (filters?.minPrice || filters?.maxPrice) { %>
+      <strong>Amount Range:</strong>
+      <%= filters.minPrice || '0' %> - <%= filters.maxPrice || '∞' %> <%= currency %><br />
+    <% } %>
   </div>
 
   <table>

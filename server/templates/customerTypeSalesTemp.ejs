@@ -43,6 +43,12 @@
     <% if (filters?.search) { %>
       <strong>Search:</strong> <%= filters.search %><br />
     <% } %>
+    <% if (filters?.minPrice != null) { %>
+      <strong>Min Price:</strong> <%= filters.minPrice %> <%= currency %><br />
+    <% } %>
+    <% if (filters?.maxPrice != null) { %>
+      <strong>Max Price:</strong> <%= filters.maxPrice %> <%= currency %><br />
+    <% } %>
   </div>
 
   <table>

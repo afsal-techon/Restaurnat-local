@@ -7,28 +7,29 @@ import CUSTOMER_TYPE from '../../model/customerTypes.js'
 import {  generatePDF } from '../../config/pdfGeneration.js'
 
 
-export const getALLOrderSummary = async(req,res,next)=>{
+export const getALLOrderSummary = async (req, res, next) => {
   try {
-
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-   const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
-   const {
+    const {
       fromDate,
       toDate,
       customerTypeId,
       paymentMethod,
       status,
-      search
+      search,
+      minPrice,
+      maxPrice,
     } = req.query;
 
     const matchStage = {};
 
-    // Date filter
+    // Date range
     if (fromDate && toDate) {
       const start = new Date(fromDate);
       const end = new Date(toDate);
@@ -36,12 +37,12 @@ export const getALLOrderSummary = async(req,res,next)=>{
       matchStage.createdAt = { $gte: start, $lte: end };
     }
 
-    // Customer Type filter
+    // Customer Type
     if (customerTypeId) {
       matchStage.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
     }
 
-    // Status filter
+    // Status
     if (status) {
       matchStage.status = status;
     }
@@ -54,8 +55,8 @@ export const getALLOrderSummary = async(req,res,next)=>{
           from: "paymentrecords",
           localField: "_id",
           foreignField: "orderId",
-          as: "paymentInfo"
-        }
+          as: "paymentInfo",
+        },
       },
       { $unwind: { path: "$paymentInfo", preserveNullAndEmptyArrays: true } },
       { $unwind: { path: "$paymentInfo.methods", preserveNullAndEmptyArrays: true } },
@@ -65,8 +66,8 @@ export const getALLOrderSummary = async(req,res,next)=>{
           from: "accounts",
           localField: "paymentInfo.methods.accountId",
           foreignField: "_id",
-          as: "account"
-        }
+          as: "account",
+        },
       },
       { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
 
@@ -75,8 +76,8 @@ export const getALLOrderSummary = async(req,res,next)=>{
           from: "tables",
           localField: "tableId",
           foreignField: "_id",
-          as: "table"
-        }
+          as: "table",
+        },
       },
       { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
 
@@ -85,8 +86,8 @@ export const getALLOrderSummary = async(req,res,next)=>{
           from: "customertypes",
           localField: "customerTypeId",
           foreignField: "_id",
-          as: "customerType"
-        }
+          as: "customerType",
+        },
       },
       { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
 
@@ -95,25 +96,24 @@ export const getALLOrderSummary = async(req,res,next)=>{
           from: "customers",
           localField: "customerId",
           foreignField: "_id",
-          as: "customer"
-        }
+          as: "customer",
+        },
       },
       { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
 
-      // Convert order_id to string for regex search
       {
         $addFields: {
-          order_id_str: { $toString: "$order_id" }
-        }
-      }
+          order_id_str: { $toString: "$order_id" },
+        },
+      },
     ];
 
     // Payment Method filter
     if (paymentMethod) {
       pipeline.push({
         $match: {
-          "account.accountName": paymentMethod
-        }
+          "account.accountName": paymentMethod,
+        },
       });
     }
 
@@ -129,9 +129,8 @@ export const getALLOrderSummary = async(req,res,next)=>{
             { "customer.name": { $regex: search, $options: "i" } },
             { "customerType.type": { $regex: search, $options: "i" } },
             { "account.accountName": { $regex: search, $options: "i" } },
-           
-          ]
-        }
+          ],
+        },
       });
     }
 
@@ -145,7 +144,6 @@ export const getALLOrderSummary = async(req,res,next)=>{
           orderType: { $first: "$orderType" },
           table: { $first: "$table.name" },
           customerType: { $first: "$customerType.type" },
-        
           discount: { $first: "$discount" },
           subTotal: { $first: "$subTotal" },
           grandTotal: { $first: "$paymentInfo.grandTotal" },
@@ -159,44 +157,58 @@ export const getALLOrderSummary = async(req,res,next)=>{
                 {
                   $and: [
                     { $ne: ["$paymentInfo.methods.amount", null] },
-                    { $ne: ["$account.accountName", null] }
-                  ]
+                    { $ne: ["$account.accountName", null] },
+                  ],
                 },
                 {
                   type: "$account.accountName",
-                  amount: "$paymentInfo.methods.amount"
+                  amount: "$paymentInfo.methods.amount",
                 },
-                "$$REMOVE"
-              ]
-            }
-          }
-        }
+                "$$REMOVE",
+              ],
+            },
+          },
+        },
       },
       {
         $addFields: {
           grandTotal: { $ifNull: ["$grandTotal", 0] },
-          paidAmount: { $ifNull: ["$paidAmount", 0] }
-        }
-      },
+          paidAmount: { $ifNull: ["$paidAmount", 0] },
+        },
+      }
+    );
+
+    // 💰 Apply grandTotal price filtering
+    const priceFilter = {};
+    const min = parseFloat(minPrice);
+    const max = parseFloat(maxPrice);
+    if (!isNaN(min)) priceFilter.$gte = min;
+    if (!isNaN(max)) priceFilter.$lte = max;
+    if (Object.keys(priceFilter).length > 0) {
+      pipeline.push({
+        $match: {
+          grandTotal: priceFilter,
+        },
+      });
+    }
+
+    pipeline.push(
       {
-        $sort: { createdAt: -1 }
+        $sort: { createdAt: -1 },
       },
       {
         $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: limit }
-          ],
-          totalCount: [
-            { $count: "count" }
-          ]
-        }
+          data: [{ $skip: skip }, { $limit: limit }],
+          totalCount: [{ $count: "count" }],
+        },
       },
       {
         $project: {
           data: 1,
-          totalCount: { $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0] }
-        }
+          totalCount: {
+            $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0],
+          },
+        },
       }
     );
 
@@ -206,13 +218,13 @@ export const getALLOrderSummary = async(req,res,next)=>{
       page,
       limit,
       totalCount: result[0]?.totalCount || 0,
-      data: result[0]?.data || []
+      data: result[0]?.data || [],
     });
-    
   } catch (err) {
-    next(err)
+    next(err);
   }
-}
+};
+
 
 
 export const getSingleOrder = async (req, res, next) => {
@@ -435,23 +447,22 @@ export const getCancelledOrders = async (req, res, next) => {
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-        const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
-
 
     const {
       fromDate,
       toDate,
       customerTypeId,
-      search
+      search,
+      minPrice,
+      maxPrice
     } = req.query;
 
-
-
-    // Build match stage
     const matchStage = { status: "Cancelled" };
 
+    // 🗓️ Date filter
     if (fromDate && toDate) {
       const start = new Date(fromDate);
       const end = new Date(toDate);
@@ -459,8 +470,19 @@ export const getCancelledOrders = async (req, res, next) => {
       matchStage.createdAt = { $gte: start, $lte: end };
     }
 
+    // 👤 Customer Type filter
     if (customerTypeId) {
       matchStage.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
+    }
+
+    // 💰 Min/Max price filter
+    const priceFilter = {};
+    const min = parseFloat(minPrice);
+    const max = parseFloat(maxPrice);
+    if (!isNaN(min)) priceFilter.$gte = min;
+    if (!isNaN(max)) priceFilter.$lte = max;
+    if (Object.keys(priceFilter).length > 0) {
+      matchStage.totalAmount = priceFilter;
     }
 
     const pipeline = [
@@ -499,7 +521,6 @@ export const getCancelledOrders = async (req, res, next) => {
           orderType: 1,
           customerType: "$customerType.type",
           table: "$table.name",
-        
           status: 1,
           subTotal: 1,
           discount: 1,
@@ -511,7 +532,7 @@ export const getCancelledOrders = async (req, res, next) => {
       }
     ];
 
-    // Add search stage
+    // 🔍 Search stage
     if (search) {
       pipeline.push({
         $match: {
@@ -520,8 +541,7 @@ export const getCancelledOrders = async (req, res, next) => {
             { orderNo: { $regex: search, $options: "i" } },
             { ticketNo: { $regex: search, $options: "i" } },
             { customerType: { $regex: search, $options: "i" } },
-            { table: { $regex: search, $options: "i" } },
-           
+            { table: { $regex: search, $options: "i" } }
           ]
         }
       });
@@ -529,7 +549,7 @@ export const getCancelledOrders = async (req, res, next) => {
 
     const result = await ORDER.aggregate(pipeline);
 
-    // Count based on match stage (filtered)
+    // 📊 Count for pagination
     const countPipeline = [{ $match: matchStage }, { $count: "total" }];
     const countResult = await ORDER.aggregate(countPipeline);
     const totalCount = countResult[0]?.total || 0;
@@ -548,6 +568,7 @@ export const getCancelledOrders = async (req, res, next) => {
 
 
 
+
 //pdf
 
 export const generateOrderSummaryPDF = async (req, res, next) => {
@@ -558,7 +579,9 @@ export const generateOrderSummaryPDF = async (req, res, next) => {
       customerTypeId,
       paymentMethod,
       status,
-      search
+      search,
+      minPrice,
+      maxPrice
     } = req.query;
 
     const user = await USER.findById(req.user);
@@ -650,8 +673,7 @@ export const generateOrderSummaryPDF = async (req, res, next) => {
             { "table.name": { $regex: search, $options: "i" } },
             { "customer.name": { $regex: search, $options: "i" } },
             { "customerType.type": { $regex: search, $options: "i" } },
-            { "account.accountName": { $regex: search, $options: "i" } },
-           
+            { "account.accountName": { $regex: search, $options: "i" } }
           ]
         }
       });
@@ -694,9 +716,20 @@ export const generateOrderSummaryPDF = async (req, res, next) => {
         $addFields: {
           amount: { $ifNull: ["$amount", 0] }
         }
-      },
-      { $sort: { createdAt: -1 } }
+      }
     );
+
+    // 💰 minPrice/maxPrice filter
+    const priceFilter = {};
+    const min = parseFloat(minPrice);
+    const max = parseFloat(maxPrice);
+    if (!isNaN(min)) priceFilter.$gte = min;
+    if (!isNaN(max)) priceFilter.$lte = max;
+    if (Object.keys(priceFilter).length > 0) {
+      pipeline.push({ $match: { amount: priceFilter } });
+    }
+
+    pipeline.push({ $sort: { createdAt: -1 } });
 
     const result = await ORDER.aggregate(pipeline);
 
@@ -707,7 +740,16 @@ export const generateOrderSummaryPDF = async (req, res, next) => {
     const pdfBuffer = await generatePDF("orderSummaryTemp", {
       data: result,
       currency,
-      filters: { fromDate, toDate, paymentMethod, customerType, status, search }
+      filters: {
+        fromDate,
+        toDate,
+        paymentMethod,
+        customerType,
+        status,
+        search,
+        minPrice,
+        maxPrice
+      }
     });
 
     res.set({
@@ -721,6 +763,7 @@ export const generateOrderSummaryPDF = async (req, res, next) => {
   }
 };
 
+
 export const generateCancelledOrdersPDF = async (req, res, next) => {
   try {
     const {
@@ -728,17 +771,19 @@ export const generateCancelledOrdersPDF = async (req, res, next) => {
       toDate,
       customerTypeId,
       search = '',
+      minPrice,
+      maxPrice
     } = req.query;
 
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const restaurant = await RESTAURANT.findOne({  });
+    const restaurant = await RESTAURANT.findOne({});
     const currency = restaurant?.currency || 'AED';
 
-    // Build match stage
     const matchStage = { status: "Cancelled" };
 
+    // 📅 Date Range Filter
     if (fromDate && toDate) {
       const start = new Date(fromDate);
       const end = new Date(toDate);
@@ -746,8 +791,19 @@ export const generateCancelledOrdersPDF = async (req, res, next) => {
       matchStage.createdAt = { $gte: start, $lte: end };
     }
 
+    // 👤 Customer Type Filter
     if (customerTypeId) {
       matchStage.customerTypeId = new mongoose.Types.ObjectId(customerTypeId);
+    }
+
+    // 💰 Min/Max Price Filter
+    const priceFilter = {};
+    const min = parseFloat(minPrice);
+    const max = parseFloat(maxPrice);
+    if (!isNaN(min)) priceFilter.$gte = min;
+    if (!isNaN(max)) priceFilter.$lte = max;
+    if (Object.keys(priceFilter).length > 0) {
+      matchStage.totalAmount = priceFilter;
     }
 
     const pipeline = [
@@ -788,7 +844,7 @@ export const generateCancelledOrdersPDF = async (req, res, next) => {
           ]
         }
       },
-      { $sort: { createdAt: -1 } },
+      { $sort: { createdAt: -1 } }
     ];
 
     const result = await ORDER.aggregate(pipeline);
@@ -800,12 +856,14 @@ export const generateCancelledOrdersPDF = async (req, res, next) => {
         fromDate: fromDate ? new Date(fromDate).toLocaleDateString() : null,
         toDate: toDate ? new Date(toDate).toLocaleDateString() : null,
         search,
+        minPrice,
+        maxPrice
       },
     });
 
     res.set({
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="Cancelled-orders-report-${Date.now()}.pdf"`,
+      "Content-Disposition": `attachment; filename="Cancelled-orders-report-${Date.now()}.pdf"`
     });
 
     return res.send(pdfBuffer);
@@ -813,4 +871,5 @@ export const generateCancelledOrdersPDF = async (req, res, next) => {
     next(err);
   }
 };
+
 

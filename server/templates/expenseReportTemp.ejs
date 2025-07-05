@@ -45,7 +45,7 @@
   <h2>Expense Report</h2>
 
   <div class="filters">
-    <% if (filters?.fromDate || filters?.toDate || filters?.accountName || filters?.search) { %>
+    <% if (filters?.fromDate || filters?.toDate || filters?.accountName || filters?.search || filters?.minPrice || filters?.maxPrice) { %>
       <% if (filters?.fromDate) { %>
         <strong>From:</strong> <%= filters.fromDate %><br />
       <% } %>
@@ -57,6 +57,12 @@
       <% } %>
       <% if (filters?.search) { %>
         <strong>Search:</strong> <%= filters.search %><br />
+      <% } %>
+      <% if (filters?.minPrice) { %>
+        <strong>Min Price:</strong> <%= filters.minPrice %><br />
+      <% } %>
+      <% if (filters?.maxPrice) { %>
+        <strong>Max Price:</strong> <%= filters.maxPrice %><br />
       <% } %>
     <% } %>
   </div>

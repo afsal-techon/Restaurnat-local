@@ -22,7 +22,7 @@ import upload from '../middleware/multer.js'
 import { generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
 import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
 import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
-import { generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
+import { generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
 import checkOfflinePermission from '../middleware/permission.js'
 const router = express.Router();
 
@@ -218,7 +218,8 @@ router.get('/reports/daily-transaction',VerifyToken,checkOfflinePermission('Repo
 //purchse Expence Report
 router.get('/reports/purchase',VerifyToken,checkOfflinePermission('Reports'),getPurchaseReport);
 router.get('/reports/expanse',VerifyToken,checkOfflinePermission('Reports'),getExpenseReport);
-router.get('/purchase/pdf',VerifyToken,checkOfflinePermission('Reports'),generatePurchaseReportPDF)
+router.get('/purchase/pdf',VerifyToken,checkOfflinePermission('Reports'),generatePurchaseReportPDF);
+router.get('/expense/pdf',VerifyToken,checkOfflinePermission('Reports'),generateExpenseReportPDF)
 
 
 

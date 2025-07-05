@@ -47,9 +47,15 @@
     <% if (filters.paymentMethod) { %>
       <strong>Payment Method:</strong> <%= filters.paymentMethod %><br/>
     <% } %>
-   <% if (filters.customerType) { %>
-  <p><strong>Customer Type:</strong> <%= filters.customerType %></p>
-<% } %>
+    <% if (filters.customerType) { %>
+      <strong>Customer Type:</strong> <%= filters.customerType %><br/>
+    <% } %>
+    <% if (filters.minPrice) { %>
+      <strong>Min Price:</strong> <%= filters.minPrice %><br/>
+    <% } %>
+    <% if (filters.maxPrice) { %>
+      <strong>Max Price:</strong> <%= filters.maxPrice %><br/>
+    <% } %>
     <% if (filters.search) { %>
       <strong>Search:</strong> <%= filters.search %><br/>
     <% } %>

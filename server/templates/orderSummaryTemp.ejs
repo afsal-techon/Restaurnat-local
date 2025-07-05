@@ -40,23 +40,29 @@
 <body>
   <h2>Order Summary Report</h2>
 
-  <div class="filters">
-    <% if (filters.fromDate && filters.toDate) { %>
-      <strong>Date Range:</strong> <%= filters.fromDate %> to <%= filters.toDate %><br/>
-    <% } %>
-    <% if (filters.paymentMethod) { %>
-      <strong>Payment Method:</strong> <%= filters.paymentMethod %><br/>
-    <% } %>
-    <% if (filters.customerType) { %>
-      <strong>Customer Type:</strong> <%= filters.customerType %><br/>
-    <% } %>
-    <% if (filters.status) { %>
-      <strong>Status:</strong> <%= filters.status %><br/>
-    <% } %>
-    <% if (filters.search) { %>
-      <strong>Search:</strong> <%= filters.search %><br/>
-    <% } %>
-  </div>
+<div class="filters">
+  <% if (filters.fromDate && filters.toDate) { %>
+    <strong>Date Range:</strong> <%= filters.fromDate %> to <%= filters.toDate %><br/>
+  <% } %>
+  <% if (filters.paymentMethod) { %>
+    <strong>Payment Method:</strong> <%= filters.paymentMethod %><br/>
+  <% } %>
+  <% if (filters.customerType) { %>
+    <strong>Customer Type:</strong> <%= filters.customerType %><br/>
+  <% } %>
+  <% if (filters.status) { %>
+    <strong>Status:</strong> <%= filters.status %><br/>
+  <% } %>
+  <% if (filters.search) { %>
+    <strong>Search:</strong> <%= filters.search %><br/>
+  <% } %>
+  <% if (filters.minPrice) { %>
+    <strong>Min Amount:</strong> <%= filters.minPrice %> <br/>
+  <% } %>
+  <% if (filters.maxPrice) { %>
+    <strong>Max Amount:</strong> <%= filters.maxPrice %> <br/>
+  <% } %>
+</div>
 
   <table>
     <thead>
