@@ -231,33 +231,6 @@ export const getCustomersForPOS = async (req, res, next) => {
 };
 
 
-  
-
-  
-
-  export const getCustomerCreditHistory = async (req, res, next) => {
-    try {
-      const { customerId } = req.params;
-  
-      // if (!customerId) {
-      //   return res.status(400).json({ message: "Customer ID is required!" });
-      // }
-  
-  
-      // const creditHistory = await CUSTOMER_CREDIT_HISTORY.find({ customerId })
-      //   .sort({ createdAt: -1 }) 
-      //   .populate("orderId order_id") 
-      //   .lean();
-
-      // return res.status(200).json({
-      //   data: creditHistory,
-      // });
-  
-    } catch (err) {
-      next(err);
-    }
-  };
-  
 
   export const updateCustomerforPOS = async (req, res, next) => {
     try {
@@ -610,6 +583,413 @@ export const getCustomerOrderHistory = async (req, res, next) => {
     next(err);
   }
 };
+
+
+export const getCustomerDueHistory = async (req, res, next) => {
+  try {
+    const { customerId, fromDate, toDate, search = '' } = req.query;
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    const customer = await CUSTOMER.findById(customerId);
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    const matchStage = {
+      customerId: new mongoose.Types.ObjectId(customerId)
+    };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (search) {
+      matchStage.$or = [
+        { referenceId: { $regex: search, $options: 'i' } },
+        { referenceType: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      { $sort: { createdAt: 1 } },
+
+      // Account Info
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+
+      // FILTER ONLY Due Payment or Sale with accountType = "Due"
+      {
+        $match: {
+          $or: [
+            { referenceType: "Due Payment" },
+            {
+              referenceType: "Sale",
+              "accountInfo.accountType": "Due"
+            }
+          ]
+        }
+      },
+
+      // Parent Info
+      {
+        $lookup: {
+          from: "accounts",
+          let: { parentId: "$accountInfo.parentAccountId" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$parentId"] } } }
+          ],
+          as: "parentInfo"
+        }
+      },
+      { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+
+      // Payment Method
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo"
+        }
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+
+      // Reverse logic (for view)
+      {
+        $addFields: {
+          credit: {
+            $cond: [
+              { $eq: ["$referenceType", "Due Payment"] },
+              "$amount",
+              0
+            ]
+          },
+          debit: {
+            $cond: [
+              { $eq: ["$referenceType", "Sale"] },
+              "$amount",
+              0
+            ]
+          }
+        }
+      },
+
+      // Grouping for running total
+      {
+        $group: {
+          _id: null,
+          transactions: { $push: "$$ROOT" },
+          totalCredit: { $sum: "$credit" },
+          totalDebit: { $sum: "$debit" }
+        }
+      },
+
+      // Add running due
+      {
+        $addFields: {
+          transactionsWithRunningBalance: {
+            $reduce: {
+              input: "$transactions",
+              initialValue: {
+                runningDue: 0,
+                transactions: []
+              },
+              in: {
+                runningDue: {
+                  $add: [
+                    "$$value.runningDue",
+                    {
+                      $cond: [
+                        { $eq: ["$$this.referenceType", "Sale"] },
+                        "$$this.amount",
+                        { $multiply: ["$$this.amount", -1] }
+                      ]
+                    }
+                  ]
+                },
+                transactions: {
+                  $concatArrays: [
+                    "$$value.transactions",
+                    [
+                      {
+                        $mergeObjects: [
+                          "$$this",
+                          {
+                            dueBalance: {
+                              $add: [
+                                "$$value.runningDue",
+                                {
+                                  $cond: [
+                                    { $eq: ["$$this.referenceType", "Sale"] },
+                                    "$$this.amount",
+                                    { $multiply: ["$$this.amount", -1] }
+                                  ]
+                                }
+                              ]
+                            },
+                            account: {
+                              name: "$$this.accountInfo.accountName",
+                              type: "$$this.accountInfo.accountType"
+                            },
+                            parentAccount: {
+                              name: "$$this.parentInfo.accountName",
+                              type: "$$this.parentInfo.accountType"
+                            },
+                            paymentMethod: {
+                              $ifNull: ["$$this.paymentTypeInfo.accountName", null]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+
+      {
+        $project: {
+          allData: "$transactionsWithRunningBalance.transactions",
+          totalCredit: 1,
+          totalDebit: 1
+        }
+      },
+
+      {
+        $addFields: {
+          data: { $slice: ["$allData", skip, limit] },
+          totalCount: { $size: "$allData" },
+          totalDue: {
+            $subtract: ["$totalDebit", "$totalCredit"]
+          }
+        }
+      },
+
+      {
+        $project: {
+          data: 1,
+          totalCount: 1,
+          totalCredit: 1,
+          totalDebit: 1,
+          totalDue: 1
+        }
+      }
+    ];
+
+    const result = await TRANSACTION.aggregate(pipeline);
+
+    const final = result[0] || {
+      data: [],
+      totalCount: 0,
+      totalCredit: 0,
+      totalDebit: 0,
+      totalDue: 0
+    };
+
+    return res.status(200).json({
+      data: final.data,
+      totalCount: final.totalCount,
+      totalCredit: final.totalCredit,
+      totalDebit: final.totalDebit,
+      totalDue: final.totalDue,
+      page,
+      limit
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+export const generateCustomerDueHistoryPDF = async (req, res, next) => {
+  try {
+    const { customerId, fromDate, toDate, search = '' } = req.query;
+
+    const customer = await CUSTOMER.findById(customerId).lean();
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+
+    const restaurant = await RESTAURANT.findOne().lean();
+    const currency = restaurant?.currency || 'AED';
+
+    const matchStage = { customerId: new mongoose.Types.ObjectId(customerId) };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (search) {
+      matchStage.$or = [
+        { referenceId: { $regex: search, $options: 'i' } },
+        { referenceType: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      { $sort: { createdAt: 1 } },
+      { $lookup: { from: 'accounts', localField: 'accountId', foreignField: '_id', as: 'accountInfo' } },
+      { $unwind: '$accountInfo' },
+      {
+        $match: {
+          $or: [
+            { referenceType: 'Due Payment' },
+            { referenceType: 'Sale', 'accountInfo.accountType': 'Due' }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: 'accounts',
+          let: { parentId: '$accountInfo.parentAccountId' },
+          pipeline: [{ $match: { $expr: { $eq: ['$_id', '$$parentId'] } } }],
+          as: 'parentInfo'
+        }
+      },
+      { $unwind: { path: '$parentInfo', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'accounts', localField: 'paymentType', foreignField: '_id', as: 'paymentTypeInfo' } },
+      { $unwind: { path: '$paymentTypeInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          credit: { $cond: [{ $eq: ['$referenceType', 'Due Payment'] }, '$amount', 0] },
+          debit: { $cond: [{ $eq: ['$referenceType', 'Sale'] }, '$amount', 0] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          transactions: { $push: '$$ROOT' },
+          totalCredit: { $sum: '$credit' },
+          totalDebit: { $sum: '$debit' }
+        }
+      },
+      {
+        $addFields: {
+          transactionsWithRunningBalance: {
+            $reduce: {
+              input: '$transactions',
+              initialValue: { runningDue: 0, transactions: [] },
+              in: {
+                runningDue: {
+                  $add: [
+                    '$$value.runningDue',
+                    {
+                      $cond: [
+                        { $eq: ['$$this.referenceType', 'Sale'] },
+                        '$$this.amount',
+                        { $multiply: ['$$this.amount', -1] }
+                      ]
+                    }
+                  ]
+                },
+                transactions: {
+                  $concatArrays: [
+                    '$$value.transactions',
+                    [
+                      {
+                        $mergeObjects: [
+                          '$$this',
+                          {
+                            dueBalance: {
+                              $add: [
+                                '$$value.runningDue',
+                                {
+                                  $cond: [
+                                    { $eq: ['$$this.referenceType', 'Sale'] },
+                                    '$$this.amount',
+                                    { $multiply: ['$$this.amount', -1] }
+                                  ]
+                                }
+                              ]
+                            },
+                            account: {
+                              name: '$$this.accountInfo.accountName',
+                              type: '$$this.accountInfo.accountType'
+                            },
+                            parentAccount: {
+                              name: '$$this.parentInfo.accountName',
+                              type: '$$this.parentInfo.accountType'
+                            },
+                            paymentMethod: {
+                              $ifNull: ['$$this.paymentTypeInfo.accountName', null]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          data: '$transactionsWithRunningBalance.transactions',
+          totalCredit: 1,
+          totalDebit: 1,
+          totalDue: { $subtract: ['$totalDebit', '$totalCredit'] }
+        }
+      }
+    ];
+
+    const result = await TRANSACTION.aggregate(pipeline);
+    const final = result[0] || {
+      data: [],
+      totalCredit: 0,
+      totalDebit: 0,
+      totalDue: 0
+    };
+
+    // 🧾 Call your shared PDF generator
+    const pdfBuffer = await generatePDF('customerDueHistoryTemp', {
+      data: final.data,
+      currency,
+      totalCredit: final.totalCredit,
+      totalDebit: final.totalDebit,
+      totalDue: final.totalDue,
+      filters: {
+        fromDate,
+        toDate,
+        search,
+        customerName: customer.name
+      },
+      customer
+    });
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="customer-due-${Date.now()}.pdf"`
+    });
+
+    return res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
 
 
 

@@ -726,8 +726,10 @@ const paymentRecord = {
         description: `POS Sale for Order ${order.order_id}`,
         referenceId: refId,
         referenceType: 'Sale',
+        customerId: customerId || null,
         createdById: userId,
         createdBy:user.name,
+
        
       });
     }

@@ -12,6 +12,11 @@ const transactionSchema = new mongoose.Schema(
     ref: "Account",
     required: true,
   },
+   customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      default:null,
+    },
   amount: {
     type: Number,
     required: true,

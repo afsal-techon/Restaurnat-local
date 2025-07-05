@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Customer Due History</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 30px; font-size: 12px; color: #333; }
+    h2 { text-align: center; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; font-size: 11px; }
+    th { background-color: #f2f2f2; }
+    .footer { margin-top: 30px; font-size: 12px; }
+    .right { text-align: right; }
+    .summary { margin-top: 20px; width: 100%; border: 1px solid #ccc; padding: 10px; }
+  </style>
+</head>
+<body>
+
+  <h2>Customer Due History</h2>
+
+  <div>
+    <strong>Customer Name:</strong> <%= customer?.name || '' %><br/>
+    <% if (filters?.fromDate && filters?.toDate) { %>
+      <strong>Date Range:</strong> <%= filters.fromDate %> to <%= filters.toDate %><br/>
+    <% } %>
+    <% if (filters?.search) { %>
+      <strong>Search:</strong> <%= filters.search %><br/>
+    <% } %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Reference Type</th>
+        <th>Reference ID</th>
+        <th>Account</th>
+        <th>Parent Account</th>
+        <th>Payment Method</th>
+        <th class="right">Debit (<%= currency %>)</th>
+        <th class="right">Credit (<%= currency %>)</th>
+        <th class="right">Running Due (<%= currency %>)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach((txn, index) => { %>
+        <tr>
+          <td><%= index + 1 %></td>
+          <td><%= new Date(txn.createdAt).toLocaleDateString() %></td>
+          <td><%= txn.referenceType %></td>
+          <td><%= txn.referenceId || '-' %></td>
+          <td><%= txn.account?.name || '-' %></td>
+          <td><%= txn.parentAccount?.name || '-' %></td>
+          <td><%= txn.paymentMethod || '-' %></td>
+          <td class="right"><%= txn.debit ? txn.debit.toFixed(2) : '-' %></td>
+          <td class="right"><%= txn.credit ? txn.credit.toFixed(2) : '-' %></td>
+          <td class="right"><%= txn.dueBalance.toFixed(2) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="summary">
+    <strong>Total Debit:</strong> <%= totalDebit.toFixed(2) %> <%= currency %><br/>
+    <strong>Total Credit:</strong> <%= totalCredit.toFixed(2) %> <%= currency %><br/>
+    <strong>Total Due:</strong> <%= totalDue.toFixed(2) %> <%= currency %>
+  </div>
+
+</body>
+</html>
