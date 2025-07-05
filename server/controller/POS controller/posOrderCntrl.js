@@ -1032,7 +1032,7 @@ export const changeTable = async(req,res,next)=>{
 
     order.tableId = tableId;
     await order.save();
-
+  
         // 5. Set old table to Available
     const updatedOldTable = await TABLES.findByIdAndUpdate(
       oldTableId,
@@ -1054,8 +1054,12 @@ export const changeTable = async(req,res,next)=>{
     io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedNewTable);
     io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedOldTable);
 
-    // const oldTable = await TABLES.findById(oldTableId).lean();
-    // io.to(`posTable-${order.restaurantId}`).emit('single_table_update', oldTable);
+const populatedOrder = await ORDER.findById(order._id)
+  .populate("tableId", "name")
+  .populate("customerId", "name mobileNo")
+  .lean();
+
+io.to(`posOrder-${order.restaurantId}`).emit('table_change', { order: populatedOrder });
 
     return res.status(200).json({ message: 'Table changed successfully' });
     

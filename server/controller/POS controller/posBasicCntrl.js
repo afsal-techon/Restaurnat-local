@@ -9,7 +9,7 @@ import { generateUniqueRefId } from '../../controller/POS controller/posOrderCnt
 import ORDER from '../../model/oreder.js';
 import PAYMENT from '../../model/paymentRecord.js'
 import TRANSACTION from '../../model/transaction.js'
-
+import { generatePDF } from '../../config/pdfGeneration.js'
 
 
 

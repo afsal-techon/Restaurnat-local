@@ -33,14 +33,13 @@
       <tr>
         <th>#</th>
         <th>Date</th>
+        <th>Reference No</th>
         <th>Reference Type</th>
-        <th>Reference ID</th>
-        <th>Account</th>
-        <th>Parent Account</th>
-        <th>Payment Method</th>
-        <th class="right">Debit (<%= currency %>)</th>
+        <th>Account Type</th>
+        <th>Account Name</th>
         <th class="right">Credit (<%= currency %>)</th>
-        <th class="right">Running Due (<%= currency %>)</th>
+        <th class="right">Debit (<%= currency %>)</th>
+        <th class="right">Total (<%= currency %>)</th>
       </tr>
     </thead>
     <tbody>
@@ -48,22 +47,21 @@
         <tr>
           <td><%= index + 1 %></td>
           <td><%= new Date(txn.createdAt).toLocaleDateString() %></td>
-          <td><%= txn.referenceType %></td>
           <td><%= txn.referenceId || '-' %></td>
+          <td><%= txn.referenceType || '-' %></td>
+          <td><%= txn.account?.type || '-' %></td>
           <td><%= txn.account?.name || '-' %></td>
-          <td><%= txn.parentAccount?.name || '-' %></td>
-          <td><%= txn.paymentMethod || '-' %></td>
-          <td class="right"><%= txn.debit ? txn.debit.toFixed(2) : '-' %></td>
           <td class="right"><%= txn.credit ? txn.credit.toFixed(2) : '-' %></td>
-          <td class="right"><%= txn.dueBalance.toFixed(2) %></td>
+          <td class="right"><%= txn.debit ? txn.debit.toFixed(2) : '-' %></td>
+          <td class="right"><%= txn.dueBalance?.toFixed(2) %></td>
         </tr>
       <% }) %>
     </tbody>
   </table>
 
   <div class="summary">
-    <strong>Total Debit:</strong> <%= totalDebit.toFixed(2) %> <%= currency %><br/>
     <strong>Total Credit:</strong> <%= totalCredit.toFixed(2) %> <%= currency %><br/>
+    <strong>Total Debit:</strong> <%= totalDebit.toFixed(2) %> <%= currency %><br/>
     <strong>Total Due:</strong> <%= totalDue.toFixed(2) %> <%= currency %>
   </div>
 
