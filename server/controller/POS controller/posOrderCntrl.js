@@ -976,6 +976,12 @@ export const changeTable = async(req,res,next)=>{
       const { orderId, tableId } = req.body;
        const userId = req.user;
 
+       console.log(orderId,tableId,'andi');
+       
+
+          const user = await USER.findOne({ _id: userId }).lean();
+      if (!user) return res.status(400).json({ message: "User not found" });
+
        if(!orderId){
         return res.status(400).json({ message:'Order not found!'})
        }
@@ -985,7 +991,7 @@ export const changeTable = async(req,res,next)=>{
        }
 
      // 1. Fetch order and validate
-    const order = await ORDER.findOne({_id:orderId, status:'Running'});
+    const order = await ORDER.findOne({_id:orderId});
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     const oldTableId  = order.tableId;
@@ -1022,15 +1028,34 @@ export const changeTable = async(req,res,next)=>{
       { new: true }
     );
 
+    console.log(updatedNewTable,'updated')
+
     order.tableId = tableId;
     await order.save();
+
+        // 5. Set old table to Available
+    const updatedOldTable = await TABLES.findByIdAndUpdate(
+      oldTableId,
+      {
+        $set: {
+          currentStatus: 'Available',
+          currentOrderId: null,
+          totalAmount: 0,
+          runningSince: null
+        }
+      },
+      { new: true }
+    );
+
+    console.log(updatedOldTable,'old')
 
       // 6. Emit real-time updates for both tables
     const io = getIO();
     io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedNewTable);
+    io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedOldTable);
 
-    const oldTable = await TABLES.findById(oldTableId).lean();
-    io.to(`posTable-${order.restaurantId}`).emit('single_table_update', oldTable);
+    // const oldTable = await TABLES.findById(oldTableId).lean();
+    // io.to(`posTable-${order.restaurantId}`).emit('single_table_update', oldTable);
 
     return res.status(200).json({ message: 'Table changed successfully' });
     

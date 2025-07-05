@@ -224,6 +224,6 @@ router.get('/expense/pdf',VerifyToken,checkOfflinePermission('Reports'),generate
 
 
 //change table
-router.post('/order/change-table',VerifyToken,changeTable)
+router.post('/order/change-table',VerifyToken,checkOfflinePermission('Admin'),changeTable)
 
 export default router;

@@ -234,7 +234,7 @@ export const getCustomersForPOS = async (req, res, next) => {
 
   export const updateCustomerforPOS = async (req, res, next) => {
     try {
-      const { customerId, restaurantId, name, mobileNo, address } = req.body;
+      const { customerId, restaurantId, name, mobileNo, address,credit  } = req.body;
       const userId = req.user;
   
       if (!customerId) {
@@ -297,6 +297,7 @@ export const getCustomersForPOS = async (req, res, next) => {
       customer.name = name.trim();
       customer.mobileNo = mobileNo.trim();
       customer.address = address?.trim() || "";
+      customer.credit = credit;
   
       await customer.save();
   
