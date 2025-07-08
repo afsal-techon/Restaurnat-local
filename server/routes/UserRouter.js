@@ -24,6 +24,7 @@ import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary
 import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
 import { generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
 import checkOfflinePermission from '../middleware/permission.js'
+import { getPritnerConfigs, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
 const router = express.Router();
 
 
@@ -224,6 +225,10 @@ router.get('/expense/pdf',VerifyToken,checkOfflinePermission('Reports'),generate
 
 
 //change table
-router.post('/order/change-table',VerifyToken,checkOfflinePermission('Admin'),changeTable)
+router.post('/order/change-table',VerifyToken,checkOfflinePermission('Admin'),changeTable);
+
+//printer config
+router.post('/printer/upsert',VerifyToken,checkOfflinePermission('Admin'),upsertPrinterConfig);
+router.get('/printer/get',VerifyToken,checkOfflinePermission('Admin'),getPritnerConfigs)
 
 export default router;

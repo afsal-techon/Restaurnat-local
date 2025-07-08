@@ -15,7 +15,11 @@ import CUSTOMER from '../../model/customer.js';
 import PAYMENT from '../../model/paymentRecord.js'
 import { getIO  } from "../../config/socket.js";
 import TRANSACTION from '../../model/transaction.js'
-import { printer as ThermalPrinter, types as PrinterTypes } from "node-thermal-printer";
+import PRINTER_CONFIG from '../../model/printConfig.js'
+import printer from '@thiagoelg/node-printer';
+import { TokenCounter }  from '../../model/tokenCounter.js'
+import moment from 'moment'
+
 
 
 
@@ -50,130 +54,435 @@ const generateOrderId = async () => {
     }
   };
   
-  const getNextOrderNo = async () => {
-    const lastOrder = await ORDER.findOne({ orderNo: { $regex: /^\d{2}$/ } })
-    .sort({ createdAt: -1 })
-    .select("orderNo");
-  
-    const lastNumber = parseInt(lastOrder?.orderNo) || 0;
-    return (lastNumber + 1).toString().padStart(2, '0');
-  };
+
+const getNextOrderNo = async () => {
+  const today = moment().format('YYYY-MM-DD');
+
+  const counter = await TokenCounter.findOneAndUpdate(
+    { date: today },
+    { $inc: { tokenNo: 1 } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
+
+ 
+  return counter.tokenNo.toString().padStart(2, '0'); // '01', '02', etc.
+};
 
 
-const printer = new ThermalPrinter({
-  type: PrinterTypes.EPSON,
-  interface: 'usb', // Or 'tcp://192.168.x.x' if network printer
-  width: 48,
-  characterSet: 'SLOVENIA',
-  removeSpecialCharacters: false,
-  lineCharacter: "-",
-});
+// const printer = new ThermalPrinter({
+//   type: PrinterTypes.EPSON,
+//   interface: `printer:${printerName}`, // replace with actual printer name from DB
+//   options: { timeout: 5000 },
+//   width: 48, // For 80mm paper (~48 characters)
+//   characterSet: 'SLOVENIA',
+//   removeSpecialCharacters: false,
+//   lineCharacter: "="
+// });
 
 
 
 
 
-
-  export const createOrder = async(req,res,next)=>{
-    try { 
-       console.log(req.body,'body')
-      // 1. Extract and Validate Request Parameters
-      const {
-        tableId,
-        customerTypeId,
-        subMethod,
-        items,
-        vat,
-        restaurantId,
-        total,
-        subTotal,
-        orderId, // For additional orders
-        counterId,
-        discount,
-        action = 'create', // 'create', 'kot', 'save', 'kot_print'
-        printConfig = {} // Printer settings for KOT print
-      } = req.body;
+//   export const createOrder = async(req,res,next)=>{
+//     try { 
+//        console.log(req.body,'body')
+//       // 1. Extract and Validate Request Parameters
+//       const {
+//         tableId,
+//         customerTypeId,
+//         subMethod,
+//         items,
+//         vat,
+//         restaurantId,
+//         total,
+//         subTotal,
+//         orderId, // For additional orders
+//         counterId,
+//         discount,
+//         action = 'create', // 'create', 'kot', 'save', 'kot_print'
+//         printConfig = {} // Printer settings for KOT print
+//       } = req.body;
   
     
   
-      const userId = req.user;
-      let isAdditionalOrder = Boolean(orderId);
-      console.log(isAdditionalOrder,'additional roder')
+//       const userId = req.user;
+//       let isAdditionalOrder = Boolean(orderId);
+//       console.log(isAdditionalOrder,'additional roder')
   
-      // 2. Validate User and Basic Parameters
-      const user = await USER.findOne({ _id: userId }).lean();
-      if (!user) {
-        return res.status(400).json({ message: "User not found" });
-      }
+//       // 2. Validate User and Basic Parameters
+//       const user = await USER.findOne({ _id: userId }).lean();
+//       if (!user) {
+//         return res.status(400).json({ message: "User not found" });
+//       }
   
-      if (!Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ message: 'No items in order' });
-      }
+//       if (!Array.isArray(items) || items.length === 0) {
+//         return res.status(400).json({ message: 'No items in order' });
+//       }
   
-      // 3. Process Order Items for validation (updated for combos)
-           const foodIds = [];
-          const comboIds = [];
-           // 1. Collect all necessary IDs
-           items.forEach(item => {
-            if (item.isCombo) {
-              // Add combo ID to comboIds array
-              comboIds.push(new mongoose.Types.ObjectId(item.comboId));
+//       // 3. Process Order Items for validation (updated for combos)
+//            const foodIds = [];
+//           const comboIds = [];
+//            // 1. Collect all necessary IDs
+//            items.forEach(item => {
+//             if (item.isCombo) {
+//               // Add combo ID to comboIds array
+//               comboIds.push(new mongoose.Types.ObjectId(item.comboId));
               
-              // Add all food IDs from combo items
-              item.items.forEach(comboItem => {
-                foodIds.push(new mongoose.Types.ObjectId(comboItem.foodId));
-              });
-            } else {
-              foodIds.push(new mongoose.Types.ObjectId(item.foodId));
-            }
-          });
-            const uniqueFoodIds = [...new Set(foodIds)];
+//               // Add all food IDs from combo items
+//               item.items.forEach(comboItem => {
+//                 foodIds.push(new mongoose.Types.ObjectId(comboItem.foodId));
+//               });
+//             } else {
+//               foodIds.push(new mongoose.Types.ObjectId(item.foodId));
+//             }
+//           });
+//             const uniqueFoodIds = [...new Set(foodIds)];
   
-      // 2. Fetch all required data
-          const [foodDocs, comboDocs] = await Promise.all([
-            FOOD.find({ 
-              _id: { $in: uniqueFoodIds }, 
-              restaurantId: restaurantId 
-            }).lean(),
-            COMBO.find({
-              _id: { $in: comboIds },
-              restaurantId: restaurantId
-            }).populate({
-              path: 'groups',
-              populate: {
-                path: 'foodItems.foodId',
-                model: 'Food'
-              }
-            }).populate('addOns.addOnId').lean()
-          ]);
+//       // 2. Fetch all required data
+//           const [foodDocs, comboDocs] = await Promise.all([
+//             FOOD.find({ 
+//               _id: { $in: uniqueFoodIds }, 
+//               restaurantId: restaurantId 
+//             }).lean(),
+//             COMBO.find({
+//               _id: { $in: comboIds },
+//               restaurantId: restaurantId
+//             }).populate({
+//               path: 'groups',
+//               populate: {
+//                 path: 'foodItems.foodId',
+//                 model: 'Food'
+//               }
+//             }).populate('addOns.addOnId').lean()
+//           ]);
                         
-            // 3. Create lookup maps
-          const foodMap = {};
-          foodDocs.forEach(food => foodMap[food._id.toString()] = food);
+//             // 3. Create lookup maps
+//           const foodMap = {};
+//           foodDocs.forEach(food => foodMap[food._id.toString()] = food);
   
-          const comboMap = {};
-          comboDocs.forEach(combo => comboMap[combo._id.toString()] = combo);
-        const processedItems = await Promise.all(items.map(async (item) => {
-          if (item.isCombo) {
-            // Handle combo item
-            const combo = comboMap[item.comboId];
-            if (!combo) throw new Error(`Invalid combo item: ${item.comboId}`);
+//           const comboMap = {};
+//           comboDocs.forEach(combo => comboMap[combo._id.toString()] = combo);
+//         const processedItems = await Promise.all(items.map(async (item) => {
+//           if (item.isCombo) {
+//             // Handle combo item
+//             const combo = comboMap[item.comboId];
+//             if (!combo) throw new Error(`Invalid combo item: ${item.comboId}`);
 
 
-                      // Get the first food item's name to use as the foodName
-            const firstFoodItemId = item.items[0]?.foodId;
-            const firstFoodItem = foodMap[firstFoodItemId];
-            if (!firstFoodItem) throw new Error(`Invalid food item in combo: ${firstFoodItemId}`);
+//                       // Get the first food item's name to use as the foodName
+//             const firstFoodItemId = item.items[0]?.foodId;
+//             const firstFoodItem = foodMap[firstFoodItemId];
+//             if (!firstFoodItem) throw new Error(`Invalid food item in combo: ${firstFoodItemId}`);
 
 
-            const comboItems = await Promise.all(item.items.map(async (comboItem) => {
+//             const comboItems = await Promise.all(item.items.map(async (comboItem) => {
+//               const food = foodMap[comboItem.foodId];
+//               if (!food) throw new Error(`Invalid food item in combo: ${comboItem.foodId}`);
+    
+//               const portion = comboItem.portion ? 
+//                 food.portions?.find(p => p.name === comboItem.portion) : null;
+//               const conversion = portion?.conversion || 1;
+    
+//               return {
+//                 foodId: food._id,
+//                 foodName: food.foodName,
+//                 portion: comboItem.portion || null,
+//                 price: comboItem.price || 0,
+//                 qty: comboItem.qty,
+//                 total: comboItem.total,
+//                 discount:comboItem.discountAmount || 0,
+//                 choices: [],
+//                 isAdditional: isAdditionalOrder,
+//                 conversionFactor: conversion,
+//                 isComboItem: true,
+//                 comboId: combo._id,
+//                 comboName: combo.comboName
+//               };
+//             }));
+    
+//                    return {
+//                   foodId: combo._id, // Using combo ID as foodId for schema validation
+//                   foodName: firstFoodItem.foodName, // Using combo name as foodName
+//                   price: item.comboPrice || combo.comboPrice, // Ensure price is set
+//                   comboPrice: item.comboPrice || combo.comboPrice,
+//                   qty: item.qty ?? 1,
+//                   total: item.total,
+//                   discount: item.discountAmount || 0,
+//                   addOns: item.addOns || [],
+//                   choices: [],
+//                   isAdditional: isAdditionalOrder,
+//                   conversionFactor: 1, // Default for combo
+//                   isCombo: true,
+//                   comboId: combo._id,
+//                   comboName: combo.comboName,
+//                   items: comboItems // Nested combo items
+//                  };
+//           }else{
+      
+//         const food = foodMap[item.foodId];
+//        if (!food) throw new Error(`Invalid food item: ${item.foodId}`);
+  
+//         const selectedPortion = item.portion || null;
+//         const portionData = food.portions?.find(p => p.name === item.portion);
+//         const conversion = portionData?.conversion || 1;
+  
+//         return {
+//           foodId: item.foodId,
+//           foodName: food.foodName,
+//           portion: selectedPortion,
+//           price: item.price,
+//           qty: item.qty ?? 1,
+//           total: item.total,
+//           discount: item.discountAmount || 0,
+//           addOns: item.addOns || [],
+//           choices: item.choices || [],
+//           isAdditional: isAdditionalOrder,
+//           conversionFactor: conversion
+//         };
+  
+//       }
+//       }));
+
+//       let order;
+//       let ticketNo = null;
+//       let orderNo = null;
+//       let ctypeName;
+  
+//       if (isAdditionalOrder) {
+//         // Additional Items Flow
+//         order = await ORDER.findOne({
+//           _id: orderId,
+//           status: { $nin: ['Completed', 'Cancelled'] }
+//         })
+  
+//         if (!order) {
+//           return res.status(404).json({ message: "Order not found or cannot be modified" });
+//         }
+  
+//         ctypeName = order.orderType;
+//       } else {
+//         // New Order Flow
+//         const custType = await CUSTOMER_TYPE.findById(customerTypeId).lean();
+//         if (!custType) {
+//           return res.status(400).json({ message: 'Invalid customer type' });
+//         }
+  
+//         ctypeName = custType.type;
+//         const generatedOrderId = await generateOrderId();
+//          ticketNo = await getNextTicketNo();
+//          orderNo = await getNextOrderNo();
+  
+//         // Generate Ticket/Order No based on order type
+//         // if (ctypeName.includes("Dine-In")) {
+//         //   ticketNo = await getNextTicketNo();
+//         // } else if (ctypeName.includes("Take Away")) {
+//         //   ticketNo = await getNextTicketNo();
+//         //   orderNo = await getNextOrderNo();
+//         // }
+  
+//         [order] = await ORDER.create([{
+//           restaurantId,
+//           tableId,
+//           customerTypeId,
+//           subMethod,
+//           items: [], // Will be populated after validation
+//           discount: discount || 0,
+//           vat,
+//           subTotal,
+//           totalAmount: total,
+//           orderType: ctypeName,
+//           order_id: generatedOrderId,
+//           ticketNo: ticketNo || null,
+//           orderNo: orderNo || null,
+//           counterId:counterId,
+//           status: "Placed",
+//           createdById: user._id,
+//           createdBy:user.name,
+          
+//         }]);
+//       }
+  
+  
+//       // 6. Update Order with Items
+//       if (isAdditionalOrder) {
+//         order.items.push(...processedItems);
+//         order.totalAmount += processedItems.reduce((sum, item) => sum + item.total, 0);
+//       } else {
+//         order.items = processedItems;
+//       }
+//       await order.save();
+
+  
+//       // 7. Handle Table Status for Dine-In
+//       if (ctypeName.includes("Dine-In") && tableId) {
+//         const table = await TABLES.findById(tableId)
+//         if (!table) {
+//           return res.status(400).json({ message: 'Table not found' });
+//         }
+  
+//         const updatedTable = await TABLES.findOneAndUpdate(
+//           { _id: tableId },
+//           {
+//             currentStatus: 'Running',
+//             currentOrderId: order._id,
+//             totalAmount: order.totalAmount,
+//             runningSince: order.createdAt  || new Date(),
+//           },
+//           { new: true }
+//         ).lean();
+  
+//         const io = getIO();
+//         io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
+//       }
+  
+//       const shouldPrint = action === 'print';
+  
+//       // 7. Handle Printing
+//    // 7. Handle Printing
+// if (shouldPrint) {
+//   try {
+//     // 1. Fetch all configured KOT printers for the restaurant
+//     const printerConfigs = await PRINTER_CONFIG.find({
+//       printerType: "KOT"
+//     }).lean();
+
+//     // 2. Loop through each printer config (kitchen-wise)
+//     for (const config of printerConfigs) {
+//       const { kitchenId, printerName } = config;
+
+//       // 3. Collect only the items for that kitchen
+//       const kitchenItems = [];
+//       for (const item of order.items) {
+//         const food = await FOOD.findById(item.foodId).lean();
+//         if (food?.kitchenId?.toString() === kitchenId?.toString()) {
+//           kitchenItems.push(item);
+//         }
+//       }
+
+//       // 4. If kitchen has items to print
+//       if (kitchenItems.length > 0) {
+//         const printer = new ThermalPrinter({
+//           type: PrinterTypes.EPSON,
+//           interface: `printer:${printerName}`,
+//           width: 48,
+//         });
+
+//         await printKOTReceipt(order, printer, kitchenItems); // Pass only relevant items
+//       }
+//     }
+
+//     // 5. Customer Receipt printing
+//     if (ctypeName.includes("Take Away")) {
+//       await printTakeawayCustomerReceipt(order, printConfig);
+//     }
+
+//   } catch (printError) {
+//     console.error(" Printing failed:", printError);
+//     // Fail silently — continue processing order
+//   }
+// }
+
+
+  
+//       // 9. Prepare Response
+//       const populatedOrder = await ORDER.findById(order._id)
+//         .populate("tableId", "name")
+//         .populate("customerId", "name mobileNo")
+//         .lean();
+  
+//       // Emit real-time updates
+//       const io = getIO();
+//       const responseData = {
+//         order: populatedOrder,  // Always nest under 'order' for consistency
+//       };
+      
+//       io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
+  
+//       return res.status(200).json(responseData);
+
+  
+//     } catch (err) {
+//       return next(err);
+//     }
+//   }
+
+export const createOrder = async (req, res, next) => {
+  try {
+    console.log(req.body, 'body');
+
+    const {
+      tableId,
+      customerTypeId,
+      subMethod,
+      items,
+      vat,
+      restaurantId,
+      total,
+      subTotal,
+      orderId, // For additional orders
+      counterId,
+      discount,
+      action = 'create',
+      printConfig = {},
+    } = req.body;
+
+    const userId = req.user;
+    const isAdditionalOrder = Boolean(orderId);
+    console.log(isAdditionalOrder, 'additional order');
+
+    const user = await USER.findOne({ _id: userId }).lean();
+    if (!user) return res.status(400).json({ message: 'User not found' });
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'No items in order' });
+    }
+
+    const foodIds = [];
+    const comboIds = [];
+
+    items.forEach(item => {
+      if (item.isCombo) {
+        comboIds.push(new mongoose.Types.ObjectId(item.comboId));
+        item.items.forEach(comboItem => {
+          foodIds.push(new mongoose.Types.ObjectId(comboItem.foodId));
+        });
+      } else {
+        foodIds.push(new mongoose.Types.ObjectId(item.foodId));
+      }
+    });
+
+    const uniqueFoodIds = [...new Set(foodIds)];
+
+    const [foodDocs, comboDocs] = await Promise.all([
+      FOOD.find({ _id: { $in: uniqueFoodIds }, restaurantId }).lean(),
+      COMBO.find({ _id: { $in: comboIds }, restaurantId })
+        .populate({ path: 'groups', populate: { path: 'foodItems.foodId', model: 'Food' } })
+        .populate('addOns.addOnId')
+        .lean(),
+    ]);
+
+    const foodMap = {};
+    foodDocs.forEach(food => (foodMap[food._id.toString()] = food));
+
+    const comboMap = {};
+    comboDocs.forEach(combo => (comboMap[combo._id.toString()] = combo));
+
+    const processedItems = await Promise.all(
+      items.map(async item => {
+        if (item.isCombo) {
+          const combo = comboMap[item.comboId];
+          if (!combo) throw new Error(`Invalid combo item: ${item.comboId}`);
+
+          const firstFoodItemId = item.items[0]?.foodId;
+          const firstFoodItem = foodMap[firstFoodItemId];
+          if (!firstFoodItem) throw new Error(`Invalid food item in combo: ${firstFoodItemId}`);
+
+          const comboItems = await Promise.all(
+            item.items.map(async comboItem => {
               const food = foodMap[comboItem.foodId];
               if (!food) throw new Error(`Invalid food item in combo: ${comboItem.foodId}`);
-    
-              const portion = comboItem.portion ? 
-                food.portions?.find(p => p.name === comboItem.portion) : null;
+              const portion = comboItem.portion ? food.portions?.find(p => p.name === comboItem.portion) : null;
               const conversion = portion?.conversion || 1;
-    
               return {
                 foodId: food._id,
                 foodName: food.foodName,
@@ -181,102 +490,83 @@ const printer = new ThermalPrinter({
                 price: comboItem.price || 0,
                 qty: comboItem.qty,
                 total: comboItem.total,
-                discount:comboItem.discountAmount || 0,
+                discount: comboItem.discountAmount || 0,
                 choices: [],
                 isAdditional: isAdditionalOrder,
                 conversionFactor: conversion,
                 isComboItem: true,
                 comboId: combo._id,
-                comboName: combo.comboName
+                comboName: combo.comboName,
               };
-            }));
-    
-                   return {
-                  foodId: combo._id, // Using combo ID as foodId for schema validation
-                  foodName: firstFoodItem.foodName, // Using combo name as foodName
-                  price: item.comboPrice || combo.comboPrice, // Ensure price is set
-                  comboPrice: item.comboPrice || combo.comboPrice,
-                  qty: item.qty ?? 1,
-                  total: item.total,
-                  discount: item.discountAmount || 0,
-                  addOns: item.addOns || [],
-                  choices: [],
-                  isAdditional: isAdditionalOrder,
-                  conversionFactor: 1, // Default for combo
-                  isCombo: true,
-                  comboId: combo._id,
-                  comboName: combo.comboName,
-                  items: comboItems // Nested combo items
-                 };
-          }else{
-      
-        const food = foodMap[item.foodId];
-       if (!food) throw new Error(`Invalid food item: ${item.foodId}`);
-  
-        const selectedPortion = item.portion || null;
-        const portionData = food.portions?.find(p => p.name === item.portion);
-        const conversion = portionData?.conversion || 1;
-  
-        return {
-          foodId: item.foodId,
-          foodName: food.foodName,
-          portion: selectedPortion,
-          price: item.price,
-          qty: item.qty ?? 1,
-          total: item.total,
-          discount: item.discountAmount || 0,
-          addOns: item.addOns || [],
-          choices: item.choices || [],
-          isAdditional: isAdditionalOrder,
-          conversionFactor: conversion
-        };
-  
-      }
-      }));
+            })
+          );
 
-      let order;
-      let ticketNo = null;
-      let orderNo = null;
-      let ctypeName;
-  
-      if (isAdditionalOrder) {
-        // Additional Items Flow
-        order = await ORDER.findOne({
-          _id: orderId,
-          status: { $nin: ['Completed', 'Cancelled'] }
-        })
-  
-        if (!order) {
-          return res.status(404).json({ message: "Order not found or cannot be modified" });
+          return {
+            foodId: combo._id,
+            foodName: firstFoodItem.foodName,
+            price: item.comboPrice || combo.comboPrice,
+            comboPrice: item.comboPrice || combo.comboPrice,
+            qty: item.qty ?? 1,
+            total: item.total,
+            discount: item.discountAmount || 0,
+            addOns: item.addOns || [],
+            choices: [],
+            isAdditional: isAdditionalOrder,
+            conversionFactor: 1,
+            isCombo: true,
+            comboId: combo._id,
+            comboName: combo.comboName,
+            items: comboItems,
+          };
+        } else {
+          const food = foodMap[item.foodId];
+          if (!food) throw new Error(`Invalid food item: ${item.foodId}`);
+
+          const portionData = food.portions?.find(p => p.name === item.portion);
+          const conversion = portionData?.conversion || 1;
+
+          return {
+            foodId: item.foodId,
+            foodName: food.foodName,
+            portion: item.portion || null,
+            price: item.price,
+            qty: item.qty ?? 1,
+            total: item.total,
+            discount: item.discountAmount || 0,
+            addOns: item.addOns || [],
+            choices: item.choices || [],
+            isAdditional: isAdditionalOrder,
+            conversionFactor: conversion,
+          };
         }
-  
-        ctypeName = order.orderType;
-      } else {
-        // New Order Flow
-        const custType = await CUSTOMER_TYPE.findById(customerTypeId).lean();
-        if (!custType) {
-          return res.status(400).json({ message: 'Invalid customer type' });
-        }
-  
-        ctypeName = custType.type;
-        const generatedOrderId = await generateOrderId();
-         ticketNo = await getNextTicketNo();
-         orderNo = await getNextOrderNo();
-  
-        // Generate Ticket/Order No based on order type
-        // if (ctypeName.includes("Dine-In")) {
-        //   ticketNo = await getNextTicketNo();
-        // } else if (ctypeName.includes("Take Away")) {
-        //   ticketNo = await getNextTicketNo();
-        //   orderNo = await getNextOrderNo();
-        // }
-  
-        [order] = await ORDER.create([{
+      })
+    );
+
+    let order;
+    let ticketNo = null;
+    let orderNo = null;
+    let ctypeName;
+
+    if (isAdditionalOrder) {
+      order = await ORDER.findOne({ _id: orderId, status: { $nin: ['Completed', 'Cancelled'] } });
+      if (!order) return res.status(404).json({ message: 'Order not found or cannot be modified' });
+      ctypeName = order.orderType;
+    } else {
+      const custType = await CUSTOMER_TYPE.findById(customerTypeId).lean();
+      if (!custType) return res.status(400).json({ message: 'Invalid customer type' });
+      ctypeName = custType.type;
+      const generatedOrderId = await generateOrderId();
+      ticketNo = await getNextTicketNo();
+      orderNo = await getNextOrderNo();
+      console.log('Generated Token No:', orderNo);
+
+      [order] = await ORDER.create([
+        {
           restaurantId,
           tableId,
           customerTypeId,
           subMethod,
-          items: [], // Will be populated after validation
+          items: [],
           discount: discount || 0,
           vat,
           subTotal,
@@ -285,94 +575,204 @@ const printer = new ThermalPrinter({
           order_id: generatedOrderId,
           ticketNo: ticketNo || null,
           orderNo: orderNo || null,
-          counterId:counterId,
-          status: "Placed",
+          counterId,
+          status: 'Placed',
           createdById: user._id,
-          createdBy:user.name,
-          
-        }]);
-      }
-  
-  
-      // 6. Update Order with Items
-      if (isAdditionalOrder) {
-        order.items.push(...processedItems);
-        order.totalAmount += processedItems.reduce((sum, item) => sum + item.total, 0);
-      } else {
-        order.items = processedItems;
-      }
-      await order.save();
-
-  
-      // 7. Handle Table Status for Dine-In
-      if (ctypeName.includes("Dine-In") && tableId) {
-        const table = await TABLES.findById(tableId)
-        if (!table) {
-          return res.status(400).json({ message: 'Table not found' });
-        }
-  
-        const updatedTable = await TABLES.findOneAndUpdate(
-          { _id: tableId },
-          {
-            currentStatus: 'Running',
-            currentOrderId: order._id,
-            totalAmount: order.totalAmount,
-            runningSince: order.createdAt  || new Date(),
-          },
-          { new: true }
-        ).lean();
-  
-        const io = getIO();
-        io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
-      }
-  
-      const shouldPrint = action === 'print';
-  
-      // 7. Handle Printing
-      if (shouldPrint) {
-        try {
-          if (ctypeName.includes("Take Away")) {
-            // Takeaway printing - KOT and Customer Receipt
-            await printTakeawayKOT(order, printConfig); // Kitchen copy
-            await printTakeawayCustomerReceipt(order, printConfig); // Customer copy
-          } else {
-            // Dine-In printing
-            // await printKOTReceipt(order, printConfig); // Only KOT
-          }
-        } catch (printError) {
-          console.error('Printing failed:', printError);
-          // Continue even if printing fails
-        }
-      }
-
-  
-      // 9. Prepare Response
-      const populatedOrder = await ORDER.findById(order._id)
-        .populate("tableId", "name")
-        .populate("customerId", "name mobileNo")
-        .lean();
-  
-      // Emit real-time updates
-      const io = getIO();
-      const responseData = {
-        order: populatedOrder,  // Always nest under 'order' for consistency
-      };
-      
-      io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
-  
-      return res.status(200).json(responseData);
-
-  
-    } catch (err) {
-      return next(err);
+          createdBy: user.name,
+        },
+      ]);
     }
+
+    if (isAdditionalOrder) {
+      order.items.push(...processedItems);
+      order.totalAmount += processedItems.reduce((sum, item) => sum + item.total, 0);
+    } else {
+      order.items = processedItems;
+    }
+    await order.save();
+
+    if (ctypeName.includes('Dine-In') && tableId) {
+      const table = await TABLES.findById(tableId);
+      if (!table) return res.status(400).json({ message: 'Table not found' });
+
+      const updatedTable = await TABLES.findOneAndUpdate(
+        { _id: tableId },
+        {
+          currentStatus: 'Running',
+          currentOrderId: order._id,
+          totalAmount: order.totalAmount,
+          runningSince: order.createdAt || new Date(),
+        },
+        { new: true }
+      ).lean();
+
+      const io = getIO();
+      io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
+    }
+
+      const populatedOrder = await ORDER.findById(order._id)
+      .populate('tableId', 'name')
+      .populate('customerId', 'name mobileNo')
+      //  .populate('restaurantId', 'name logo',)
+      //  .populate('customerTypeId', 'type')
+      .lean();
+
+    const io = getIO();
+    const responseData = {
+      order: populatedOrder,
+    };
+
+    io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
+
+    const shouldPrint = action === 'print';
+
+if (shouldPrint) {
+  try {
+    const printerConfigs = await PRINTER_CONFIG.find({ printerType: 'KOT' }).lean();
+    
+    for (const config of printerConfigs) {
+      const { kitchenId, printerName } = config;
+      // For additional orders, only filter the newly added items
+      const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
+      
+      const kitchenItems = itemsToCheck.filter(item => {
+        const foodId = item.isCombo ? item.items[0]?.foodId : item.foodId;
+        const food = foodDocs.find(f => f._id.toString() === foodId.toString());
+        return food?.kitchenId?.toString() === kitchenId?.toString();
+      });
+
+      if (kitchenItems.length > 0) {
+        await printKOTReceipt(order, kitchenItems, printerName, isAdditionalOrder);
+      }
+    }
+
+    if (ctypeName.includes('Take Away')) {
+      await printTakeawayCustomerReceipt(order, printConfig);
+    }
+  } catch (printError) {
+    console.error('Printing failed:', printError);
   }
+}
 
 
-  async function printTakeawayCustomerReceipt(order, config) {
-    // Implement thermal printer logic for kitchen KOT
-    console.log(`Printing Takeaway KOT for Order #${order.orderNo}`);
+  
+    return res.status(200).json(responseData);
+  } catch (err) {
+    return next(err);
   }
+};
+
+
+
+
+
+ export const printTakeawayCustomerReceipt = async (order, printConfig = {}) => {
+  try {
+    const popOrder = await ORDER.findById(order._id)
+      .populate('restaurantId', 'name address phone mobile trn logo')
+      .populate('tableId', 'name')
+      .populate('customerTypeId', 'type')
+      .lean();
+
+    const customerType = popOrder.customerTypeId?.type || "Order";
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-GB");
+    const timeStr = now.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const LINE_WIDTH = 48;
+    let txt = '';
+    const line = '-'.repeat(LINE_WIDTH);
+
+    // === Header ===
+    txt += '\x1B\x61\x01'; // Align center
+    txt += '\x1B\x21\x30'; // Bold + Double height + width
+    txt += (popOrder.restaurantId?.name || 'RESTAURANT').toUpperCase() + '\n';
+    txt += '\x1B\x21\x00';
+
+    if (popOrder.restaurantId?.address) txt += popOrder.restaurantId.address + '\n';
+    if (popOrder.restaurantId?.phone)
+      txt += `TEL: ${popOrder.restaurantId.phone}, `;
+    if (popOrder.restaurantId?.mobile)
+      txt += `MOB: ${popOrder.restaurantId.phone2}\n`;
+    if (popOrder.restaurantId?.trn)
+      txt += `TRN:${popOrder.restaurantId.trn}\n`;
+
+    txt += '\nTAX INVOICE\n';
+    txt += `${line}\n`;
+
+    // === Token No. & Type ===
+    const typeText = customerType;
+    const tokenLine = `Token No. : ${popOrder.orderNo || '-'}`;
+    const typeSpacing = LINE_WIDTH - tokenLine.length - typeText.length;
+    txt += tokenLine + ' '.repeat(typeSpacing > 0 ? typeSpacing : 1) + typeText + '\n';
+
+    // === Date, Time, Bill ===
+    const billDate = `Date : ${dateStr}`;
+    const billTime = `Time:${timeStr}`;
+    const spacing = LINE_WIDTH - billDate.length - billTime.length;
+    txt += billDate + ' '.repeat(spacing > 0 ? spacing : 1) + billTime + '\n';
+
+    const billNo = `Bill No. : ${popOrder.order_id || '-'}`;
+    const waiter = `Waiter : ${popOrder.createdBy || '-'}`;
+    const spacing2 = LINE_WIDTH - billNo.length - waiter.length;
+    txt += billNo + ' '.repeat(spacing2 > 0 ? spacing2 : 1) + waiter + '\n';
+
+    txt += `${line}\n`;
+    txt += `Items              Qty.   Price    Amount\n`;
+    txt += `${line}\n`;
+
+    let totalQty = 0;
+    let total = 0;
+
+    for (const item of popOrder.items) {
+      const list = item.isCombo ? item.items : [item];
+      for (const it of list) {
+        const name = item.isCombo && item.comboName
+          ? `${item.comboName}`
+          : it.foodName;
+
+        const qty = it.qty?.toString().padStart(2, ' ');
+        const price = it.price?.toFixed(2).padStart(6, ' ');
+        const amount = it.total?.toFixed(2).padStart(7, ' ');
+
+        txt += name.padEnd(18, ' ') + qty + '   ' + price + '   ' + amount + '\n';
+        totalQty += it.qty || 0;
+        total += it.total || 0;
+      }
+    }
+
+    txt += `${line}\n`;
+    txt += `Total Before VAT:`.padEnd(34, ' ') + `${(popOrder.subTotal || 0).toFixed(2)}\n`;
+    txt += `VAT Incl:`.padEnd(34, ' ') + `${(popOrder.vat || 0).toFixed(2)}\n`;
+    txt += `${'-'.repeat(LINE_WIDTH)}\n`;
+    txt += `Total :`.padEnd(34, ' ') + `${(popOrder.totalAmount || total).toFixed(2)}\n`;
+    txt += `${line}\n`;
+
+    txt += `\nUser: ${popOrder.createdBy || '-'}\n`;
+    txt += `Items: ${totalQty.toString().padStart(2, '0')}\n`;
+    txt += `\nThank You Visit Again\n\n`;
+
+    txt += '\x1D\x6B\x04'; // Barcode type CODE39
+    txt += `${popOrder.order_id || ''}\x00\n`;
+
+    txt += '\n\n\n\x1B\x69'; // Cut paper
+
+    const targetPrinter = printConfig.printerName || printer.getDefaultPrinterName();
+    printer.printDirect({
+      data: txt,
+      printer: targetPrinter,
+      type: 'RAW',
+      success: jobID => console.log(`Printed Customer Receipt (job ${jobID})`),
+      error: err => console.error('Receipt Print failed:', err),
+    });
+  } catch (err) {
+    console.error('Takeaway Receipt Print Error:', err);
+  }
+};  
+
   
   async function printCustomerReceipt(order, config) {
     // Implement customer receipt printing
@@ -380,137 +780,132 @@ const printer = new ThermalPrinter({
   }
   
 
-async function printKOTReceipt(order, restaurant) {
-  const customerTypeDoc = await CUSTOMER_TYPE.findById(order.customerTypeId).lean();
-  const customerType = customerTypeDoc?.type || "Order";
 
-  const kitchenWiseItems = {}; // { kitchenId: { name, items[] } }
+export const printKOTReceipt = async (order, kitchenItems = [], printerName = null,isAdditionalOrder = false) => {
+  try {
 
-  for (const item of order.items) {
-    let food;
+    const popOrder = await ORDER.findById(order._id)
+      .populate('restaurantId', 'name logo')
+      .populate('tableId', 'name')
+      .populate('customerTypeId', 'type')
+      .lean();
 
-    if (item.isCombo) {
-      for (const comboItem of item.items) {
-        food = await FOOD.findById(comboItem.foodId).lean();
-        if (!food) continue;
+    const customerType = popOrder.customerTypeId?.type || "Order";
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-GB");
+    const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-        const kitchenId = food.kitchenId?.toString() || "default";
-
-        if (!kitchenWiseItems[kitchenId]) {
-          const kitchen = await KITCHEN.findById(kitchenId).lean();
-          kitchenWiseItems[kitchenId] = {
-            name: kitchen?.name || "Main",
-            items: [],
-          };
-        }
-
-        kitchenWiseItems[kitchenId].items.push({
-          foodName: food.foodName,
-          portion: comboItem.portion || "_",
-          qty: comboItem.qty || 1,
-          isCombo: true,
-          comboName: item.comboName,
-        });
+    let kitchenName = "Main";
+    if (kitchenItems.length) {
+      const firstFoodId = kitchenItems[0].isCombo
+        ? kitchenItems[0].items[0]?.foodId
+        : kitchenItems[0].foodId;
+      const food = await FOOD.findById(firstFoodId).lean();
+      if (food?.kitchenId) {
+        const kitchen = await KITCHEN.findById(food.kitchenId).lean();
+        kitchenName = kitchen?.name || "Main";
       }
-    } else {
-      food = await FOOD.findById(item.foodId).lean();
-      if (!food) continue;
-
-      const kitchenId = food.kitchenId?.toString() || "default";
-
-      if (!kitchenWiseItems[kitchenId]) {
-        const kitchen = await KITCHEN.findById(kitchenId).lean();
-        kitchenWiseItems[kitchenId] = {
-          name: kitchen?.name || "Main",
-          items: [],
-        };
-      }
-
-      kitchenWiseItems[kitchenId].items.push({
-        foodName: food.foodName,
-        portion: item.portion || "_",
-        qty: item.qty || 1,
-        isCombo: false,
-      });
-    }
-  }
-
-  const now = new Date();
-  const dateStr = now.toLocaleDateString();
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  for (const [kitchenId, { name: kitchenName, items }] of Object.entries(kitchenWiseItems)) {
-    printer.clear();
-    printer.alignCenter();
-    printer.setTextDoubleHeight();
-    printer.println(restaurant.name.toUpperCase());
-    printer.setTextNormal();
-    printer.println(`Kitchen Order Ticket (${customerType})`);
-    printer.drawLine();
-
-    printer.setTextBold();
-    printer.println(kitchenName || "Main");
-    printer.setTextNormal();
-
-    printer.alignLeft();
-    printer.println(`Ticket No. : KOT-${order.ticketNo || "N/A"}`);
-
-    // Conditionally show table or order number
-    if (customerType.toLowerCase() === "dine-in") {
-        const table = await TABLES.findById(order.tableId).lean();
-     const tableName = table?.name || "-";
-  printer.println(`Table No. : ${tableName}`);
-    } else if (customerType.toLowerCase() === "takeaway") {
-      printer.println(`Order No. : ${order.orderNo || "-"}`);
     }
 
-    printer.println(`Date&Time : ${dateStr}     ${timeStr}`);
-    printer.println(`Operator Id. : ${order.createdBy || "Admin"}`);
-    printer.newLine();
+    const LINE_WIDTH = 40;
+    let txt = '';
+    const line = '-'.repeat(LINE_WIDTH);
 
-    printer.tableCustom([
-      { text: "Item", align: "LEFT", width: 0.5 },
-      { text: "Portion", align: "CENTER", width: 0.25 },
-      { text: "Qty.", align: "RIGHT", width: 0.25 },
-    ]);
-    printer.drawLine();
+    // === Header ===
+txt += '\x1B\x61\x01';    // Align center
+txt += '\x1B\x21\x38';   // Bold + double height
+txt += (popOrder.restaurantId?.name || 'RESTAURANT').toUpperCase() + '\n';
+txt += '\x1B\x21\x00';    // Reset to normal
 
+    if (isAdditionalOrder) {
+      txt += '\x1B\x21\x30'; // Bold + Double Height
+      txt += 'Additional Order\n';
+      txt += '\x1B\x21\x00'; // Reset font
+    }
+
+txt += 'Kitchen Order Ticket\n';
+txt += `${line}\n`;
+txt += `${kitchenName}\n\n`;
+
+// === Token No. (center + bold)
+txt += '\x1B\x21\x30'; // Bold + Double Height
+txt += `Token No. : ${order.orderNo || '-'}\n`;
+txt += '\x1B\x21\x00'; // Reset font
+txt += '\n';
+
+
+
+    // === KOT + Type (with table if dine-in)
+    const kotNo = `KOT No. : ${order.ticketNo || '-'}`;
+    const typeText = customerType === "Dine-In"
+      ? `${customerType}(${popOrder.tableId?.name || '-'})`
+      : customerType;
+    const kotSpacing = LINE_WIDTH - kotNo.length - typeText.length;
+    txt += kotNo + ' '.repeat(kotSpacing > 0 ? kotSpacing : 1) + typeText + '\n\n';
+
+    // === Date + Time
+    const dateLabel = `Date : ${dateStr}`;
+    const timeLabel = `Time: ${timeStr}`;
+    const dateSpacing = LINE_WIDTH - dateLabel.length - timeLabel.length;
+    txt += dateLabel + ' '.repeat(dateSpacing > 0 ? dateSpacing : 1) + timeLabel + '\n\n';
+
+    // === Bill No + Waiter
+    const billNo = `Bill No. : ${order.order_id || '-'}`;
+    const waiter = `Waiter: ${order.createdBy || '-'}`;
+    const billSpacing = LINE_WIDTH - billNo.length - waiter.length;
+    txt += billNo + ' '.repeat(billSpacing > 0 ? billSpacing : 1) + waiter + '\n\n';
+
+    txt += `${line}\n`;
+
+    // === Table Headers ===
+    txt += `Item${' '.repeat(20 - 4)}Portion     Qty\n`;
+    txt += `${line}\n\n`;
+
+    // === Items ===
     let totalQty = 0;
+    let totalItems = 0;
 
-    items.forEach(({ foodName, portion, qty, isCombo, comboName }) => {
-      const itemName = isCombo && comboName ? `${comboName} > ${foodName}` : foodName;
+    for (const item of kitchenItems) {
+      const list = item.isCombo ? item.items : [item];
+      for (const it of list) {
+        const name = item.isCombo && item.comboName
+          ? `${item.comboName}`
+          : it.foodName;
 
-      printer.tableCustom([
-        { text: itemName, align: "LEFT", width: 0.5 },
-        { text: portion, align: "CENTER", width: 0.25 },
-        { text: `x${qty}`, align: "RIGHT", width: 0.25 },
-      ]);
+        const itemName = name.length > 20 ? name.slice(0, 20) : name.padEnd(20, ' ');
+        const portion = (it.portion || '-').padEnd(10, ' ');
+        const qty = `x${it.qty}`.padStart(3, ' ');
 
-      totalQty += qty;
-    });
-
-    printer.drawLine();
-    printer.tableCustom([
-      { text: `Item : ${items.length}`, align: "LEFT", width: 0.5 },
-      { text: `Qty. : ${totalQty}`, align: "RIGHT", width: 0.5 },
-    ]);
-
-    printer.newLine();
-    printer.alignCenter();
-    printer.println(`Served By  ${order.counterId ? `POS ${order.counterId}` : "POS 1"}`);
-
-    printer.cut();
-
-    const isConnected = await printer.isPrinterConnected();
-    if (isConnected) {
-      await printer.execute();
-      console.log(`✅ Printed KOT for Kitchen: ${kitchenName}`);
-    } else {
-      console.error("❌ Printer not connected.");
+        txt += `${itemName}${portion}${qty}\n`;
+        totalQty += it.qty || 1;
+        totalItems++;
+      }
     }
-  }
-}
 
+    txt += `\n${line}\n`;
+    txt += `Item : ${totalItems}`.padEnd(28, ' ') + `Qty. : ${totalQty}\n`;
+    txt += `${line}\n`;
+
+    // === Paper feed & cut ===
+    txt += '\n'.repeat(5);
+    txt += '\x1B\x69';
+
+    const targetPrinter = printerName || printer.getDefaultPrinterName();
+    printer.printDirect({
+      data: txt,
+      printer: targetPrinter,
+      type: 'RAW',
+      success: jobID => console.log(`Printed KOT (job ${jobID})`),
+      error: err => {
+        console.error('Print failed:', err);
+        throw err;
+      }
+    });
+  } catch (err) {
+    console.error('KOT Print Error:', err);
+    throw err;
+  }
+};
 
 
   export const getTodayOrdersForPOS = async (req, res, next) => {
@@ -629,6 +1024,7 @@ export const generateUniqueRefId = async () => {
 
   return refId;
 };
+
 
   export const posOrderBilling = async (req,res,next)=>{
     try {
@@ -975,9 +1371,6 @@ export const changeTable = async(req,res,next)=>{
 
       const { orderId, tableId } = req.body;
        const userId = req.user;
-
-       console.log(orderId,tableId,'andi');
-       
 
           const user = await USER.findOne({ _id: userId }).lean();
       if (!user) return res.status(400).json({ message: "User not found" });
