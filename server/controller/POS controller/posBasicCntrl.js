@@ -818,6 +818,9 @@ export const getCustomerDueHistory = async (req, res, next) => {
 };
 
 
+
+
+
 export const generateCustomerDueHistoryPDF = async (req, res, next) => {
   try {
     const { customerId, fromDate, toDate, search = '' } = req.query;

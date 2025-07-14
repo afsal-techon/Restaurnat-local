@@ -16,9 +16,11 @@ import PAYMENT from '../../model/paymentRecord.js'
 import { getIO  } from "../../config/socket.js";
 import TRANSACTION from '../../model/transaction.js'
 import PRINTER_CONFIG from '../../model/printConfig.js'
-import printer from '@thiagoelg/node-printer';
+// import printer from '@thiagoelg/node-printer';
 import { TokenCounter }  from '../../model/tokenCounter.js'
 import moment from 'moment'
+
+// "@thiagoelg/node-printer": "^0.6.2",
 
 
 

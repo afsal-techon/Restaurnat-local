@@ -17,6 +17,11 @@ const transactionSchema = new mongoose.Schema(
       ref: "Customer",
       default:null,
     },
+    supplierId:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Supplier",
+      default:null,
+    },
   amount: {
     type: Number,
     required: true,

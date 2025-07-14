@@ -78,6 +78,7 @@ export const createAccounts = async (req, res,next) => {
   };
 
 
+  
 
   export const getAccounts = async(req,res,next)=>{
     try {
@@ -309,9 +310,6 @@ export const createAccounts = async (req, res,next) => {
   };
   
 
-
-
-
 // export const getTransactionList = async (req, res, next) => {
 //   try {
 //     const { accountId, fromDate, toDate, search = '',type, accountName = '' } = req.query;
@@ -502,6 +500,9 @@ export const createAccounts = async (req, res,next) => {
 //     next(err);
 //   }
 // };
+
+
+
 
 export const getTransactionList = async (req, res, next) => {
   try {
@@ -701,7 +702,6 @@ export const getTransactionList = async (req, res, next) => {
     next(err);
   }
 };
-
 
 
 
