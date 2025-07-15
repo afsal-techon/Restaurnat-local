@@ -1,14 +1,12 @@
 import ACCOUNTS from '../../model/account.js'
 import USER from '../../model/userModel.js';
-import RESTAURANT from '../../model/restaurant.js'
 import TRANSACTION from '../../model/transaction.js';
 import { generateUniqueRefId } from '../POS controller/posOrderCntrl.js'
-import PURCHASE from '../../model/purchase.js'
+import EXPENSE from '../../model/expense.js'
 
 
 
-
-export const createPurchase = async (req, res, next) => {
+export const createExpense = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found!" });
@@ -16,97 +14,76 @@ export const createPurchase = async (req, res, next) => {
     const {
       date,
       invoiceNo,
-      supplierId,
-      paymentModeId,
-      items,
-      totalAmount
+      paymentModeId,   // Expense paid through this account
+      accountId,       // Expense account (e.g., Electricity, Rent)
+      supplierId,      // Optional
+      amount,
+      qty
     } = req.body;
 
-        if (!date) {
-        return res.status(400).json({ message: "Purchase date is required!" });
-        }
+    // === Validations ===
+    if (!date) return res.status(400).json({ message: "Expense date is required!" });
+    if (!accountId) return res.status(400).json({ message: "Expense Account ID is required!" });
+    if (!paymentModeId) return res.status(400).json({ message: "Payment mode (Account ID) is required!" });
+    if (!amount || isNaN(amount)) return res.status(400).json({ message: "Valid amount is required!" });
 
-        if (!supplierId) {
-        return res.status(400).json({ message: "Supplier ID is required!" });
-        }
+    const quantity = qty && !isNaN(qty) ? qty : 1;
 
-        if (!paymentModeId) {
-        return res.status(400).json({ message: "Payment mode (Account ID) is required!" });
-        }
-
-        if (!items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ message: "At least one purchase item is required!" });
-        }
-
-    // const totalAmount = items.reduce((sum, item) => {
-    //   return sum + item.price * item.quantity;
-    // }, 0);
-
-    const account = await ACCOUNTS.findOne({ accountType:'Purchase'}).lean();
-
-    
-      if(!account){
-      return res.status(400).json({ message:'Account not found!'})
-    }
+    const account = await ACCOUNTS.findById(accountId).lean();
+    if (!account) return res.status(400).json({ message: "Expense Account not found!" });
 
     const refId = await generateUniqueRefId();
 
-    // 1. Save Purchase
-    const purchase = await PURCHASE.create({
+    // === Save Expense Record ===
+     await EXPENSE.create({
       date,
       invoiceNo,
-      supplierId,
+      supplierId: supplierId || null,
       paymentModeId,
-      accountId : account._id,
-      items: items.map((item) => ({
-        ingredientId: item.ingredientId,
-        price: item.price,
-        quantity: item.quantity,
-        total: item.price * item.quantity,
-      })),
-      totalAmount,
+      accountId,
+      qty: quantity,
+      amount,
       createdById: user._id,
-      createdBy:user.name,
+      createdBy: user.name
     });
 
-    // 2. Create transaction records
-    const debitTxn = {
-      restaurantId : account.restaurantId || null,
-      purchaseId: purchase._id,
-      accountId: account._id, // supplier account
-      paymentType: paymentModeId,
-      supplierId,
-      amount: totalAmount,
+    // === Create Transaction (debit from business, credit to expense account) ===
+    const txn = {
+      restaurantId: account.restaurantId || null,
+      accountId: account._id,           // Expense account
+      paymentType: paymentModeId,       // Source account (cash, bank, etc.)
+      supplierId: supplierId || null,
+      amount: amount,
       type: "Debit",
       referenceId: refId,
-      referenceType: account.accountType ||  "Purchase",
-      description: `Purchase from supplier #${invoiceNo}`,
+      referenceType: account.accountType || "Expense",
+      description: `Expense for #${invoiceNo || "N/A"}`,
       createdById: user._id,
-      createdBy:user.name,
+      createdBy: user.name
     };
 
-    const creditTxn = {
+        const creditTxn = {
       restaurantId : account.restaurantId || null,
-      purchaseId: purchase._id,
       accountId: paymentModeId,
-      amount: totalAmount,
+      amount: amount,
       type: "Debit",
       referenceId: refId,
       referenceType: account.accountType ||  "Purchase",
-      description: `Payment for Purchase #${invoiceNo}`,
+      description: `Payment for Expense #${invoiceNo}`,
       createdById: user._id,
       createdBy:user.name,
     };
 
-    await TRANSACTION.insertMany([debitTxn, creditTxn]);
+        await TRANSACTION.insertMany([txn, creditTxn]);
 
-    return res.status(200).json({ message: "Purchase created successfully!" });
+    return res.status(200).json({ message: "Expense created successfully!" });
   } catch (err) {
     next(err);
   }
 };
 
-export const getPurchaseList = async (req, res, next) => {
+
+export const getExpenseList = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found!" });
@@ -119,6 +96,8 @@ export const getPurchaseList = async (req, res, next) => {
       { $sort: { createdAt: -1 } },
       { $skip: skip },
       { $limit: limit },
+
+      // Supplier lookup
       {
         $lookup: {
           from: "suppliers",
@@ -128,6 +107,8 @@ export const getPurchaseList = async (req, res, next) => {
         }
       },
       { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+
+      // Payment mode lookup
       {
         $lookup: {
           from: "accounts",
@@ -137,33 +118,36 @@ export const getPurchaseList = async (req, res, next) => {
         }
       },
       { $unwind: { path: "$paymentAccount", preserveNullAndEmptyArrays: true } },
+
+      // Expense category lookup
       {
         $lookup: {
           from: "accounts",
           localField: "accountId",
           foreignField: "_id",
-          as: "purchaseAccount"
+          as: "expenseAccount"
         }
       },
-      { $unwind: { path: "$purchaseAccount", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$expenseAccount", preserveNullAndEmptyArrays: true } },
+
+      // Final projection
       {
         $project: {
           _id: 1,
           date: 1,
           invoiceNo: 1,
-          totalAmount: 1,
+          qty: 1,
+          amount: 1,
           createdAt: 1,
           supplier: "$supplier.supplierName",
           paymentMode: "$paymentAccount.accountName",
-          purchaseAccount: "$purchaseAccount.accountName",
-          items:1,
+          expenseAccount: "$expenseAccount.accountName"
         }
       }
     ];
 
-    const data = await PURCHASE.aggregate(pipeline);
-
-    const totalCount = await PURCHASE.countDocuments();
+    const data = await EXPENSE.aggregate(pipeline);
+    const totalCount = await EXPENSE.countDocuments();
 
     return res.json({
       page,
@@ -171,13 +155,14 @@ export const getPurchaseList = async (req, res, next) => {
       totalCount,
       data
     });
+
   } catch (err) {
     next(err);
   }
 };
 
 
-export const getAllPurchasesReport = async (req, res, next) => {
+export const getAllExpensesReport = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found!" });
@@ -188,9 +173,7 @@ export const getAllPurchasesReport = async (req, res, next) => {
 
     const { fromDate, toDate, supplierId, search } = req.query;
 
-    const matchStage = {
-    
-    };
+    const matchStage = {};
 
     //  Date filter
     if (fromDate && toDate) {
@@ -200,7 +183,7 @@ export const getAllPurchasesReport = async (req, res, next) => {
       matchStage.date = { $gte: start, $lte: end };
     }
 
-    //  Supplier filter
+    //  Supplier filter (optional)
     if (supplierId) {
       matchStage.supplierId = new mongoose.Types.ObjectId(supplierId);
     }
@@ -210,6 +193,8 @@ export const getAllPurchasesReport = async (req, res, next) => {
       { $sort: { createdAt: -1 } },
       { $skip: skip },
       { $limit: limit },
+
+      //  Supplier lookup
       {
         $lookup: {
           from: "suppliers",
@@ -221,6 +206,8 @@ export const getAllPurchasesReport = async (req, res, next) => {
       {
         $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true }
       },
+
+      //  Payment Mode lookup
       {
         $lookup: {
           from: "accounts",
@@ -232,50 +219,54 @@ export const getAllPurchasesReport = async (req, res, next) => {
       {
         $unwind: { path: "$paymentAccount", preserveNullAndEmptyArrays: true }
       },
-        //  Account lookup (Expense category)
+
+      //  Account lookup (Expense category)
       {
         $lookup: {
           from: "accounts",
           localField: "accountId",
           foreignField: "_id",
-          as: "purchaseAccount"
+          as: "expenseAccount"
         }
       },
       {
-        $unwind: { path: "$purchaseAccount", preserveNullAndEmptyArrays: true }
+        $unwind: { path: "$expenseAccount", preserveNullAndEmptyArrays: true }
       },
+
+      //  Final projection
       {
         $project: {
           _id: 1,
           date: 1,
           invoiceNo: 1,
-          totalAmount: 1,
+          qty: 1,
+          amount: 1,
           createdAt: 1,
           supplier: "$supplier.name",
           paymentMode: "$paymentAccount.accountName",
-          purchaseAccount: "$purchaseAccount.accountName"
+          expenseAccount: "$expenseAccount.accountName"
         }
       }
     ];
 
-    // 🔍 Search by invoice or supplier name
+    //  Search filter
     if (search) {
       pipeline.push({
         $match: {
           $or: [
             { invoiceNo: { $regex: search, $options: "i" } },
-            { supplier: { $regex: search, $options: "i" } },
-            { "purchaseAccount": { $regex: search, $options: "i" } }
+            { "supplier": { $regex: search, $options: "i" } },
+            { "expenseAccount": { $regex: search, $options: "i" } }
           ]
         }
       });
     }
 
-    const data = await PURCHASE.aggregate(pipeline);
+    const data = await EXPENSE.aggregate(pipeline);
 
     //  Total count
     const countPipeline = [{ $match: matchStage }, { $count: "total" }];
-    const countResult = await PURCHASE.aggregate(countPipeline);
+    const countResult = await EXPENSE.aggregate(countPipeline);
     const totalCount = countResult[0]?.total || 0;
 
     return res.json({
@@ -284,75 +275,66 @@ export const getAllPurchasesReport = async (req, res, next) => {
       totalCount,
       data
     });
+
   } catch (err) {
     next(err);
   }
 };
 
 
-export const updatePurchase = async (req, res, next) => {
+
+export const updateExpense = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found!" });
 
     const {
-      purchaseId,
+      expenseId,
       date,
       invoiceNo,
       supplierId,
-      items,
-      totalAmount
+      amount,
+      qty
     } = req.body;
 
-    if (!purchaseId) return res.status(400).json({ message: "Purchase ID is required!" });
-    if (!date) return res.status(400).json({ message: "Purchase date is required!" });
-    if (!supplierId) return res.status(400).json({ message: "Supplier ID is required!" });
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "At least one purchase item is required!" });
-    }
+    if (!expenseId) return res.status(400).json({ message: "Expense ID is required!" });
+    if (!date) return res.status(400).json({ message: "Expense date is required!" });
+    if (!amount || isNaN(amount)) return res.status(400).json({ message: "Valid amount is required!" });
 
-    // 1. Recalculate item totals
-    const updatedItems = items.map(item => ({
-      ingredientId: item.ingredientId,
-      price: item.price,
-      quantity: item.quantity,
-      total: item.price * item.quantity
-    }));
+    const quantity = qty && !isNaN(qty) ? qty : 1;
 
-
-    // 2. Update Purchase
-    const updatedPurchase = await PURCHASE.findByIdAndUpdate(
-      purchaseId,
+    // 1. Update Expense record
+    const updatedExpense = await EXPENSE.findByIdAndUpdate(
+      expenseId,
       {
         date,
         invoiceNo,
-        supplierId,
-        items: updatedItems,
-        totalAmount,
-        updatedById: user._id,
+        supplierId: supplierId || null,
+        amount,
+        qty: quantity,
         createdBy: user.name,
         createdById: user._id
       },
       { new: true }
     );
 
-    if (!updatedPurchase) {
-      return res.status(404).json({ message: "Purchase not found!" });
+    if (!updatedExpense) {
+      return res.status(404).json({ message: "Expense not found!" });
     }
 
-    // 3. Update related transactions
+    // 2. Update related Transactions
     await TRANSACTION.updateMany(
-      { purchaseId: purchaseId },
+      { expenseId },
       [
         {
           $set: {
-            amount: totalAmount,
-            supplierId: supplierId,
+            amount,
+            supplierId: supplierId || null,
             description: {
               $cond: [
-                { $eq: ["$type", "Debit"] },
-                `Purchase from supplier #${invoiceNo}`,
-                `Payment for Purchase #${invoiceNo}`
+                { $eq: ["$accountId", updatedExpense.accountId] },
+                `Expense for #${invoiceNo || "N/A"}`,
+                `Payment for Expense #${invoiceNo || "N/A"}`
               ]
             },
             updatedById: user._id,
@@ -363,8 +345,12 @@ export const updatePurchase = async (req, res, next) => {
       ]
     );
 
-    return res.status(200).json({ message: "Purchase updated successfully!" });
+    return res.status(200).json({ message: "Expense updated successfully!" });
   } catch (err) {
     next(err);
   }
 };
+
+
+
+

@@ -15,6 +15,10 @@ const purchaseSchema = new mongoose.Schema(
       ref: "Supplier",
       required: true,
     },
+  accountId: {
+     type: mongoose.Schema.Types.ObjectId,
+     ref: "Account",
+   },
     paymentModeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Account",
@@ -44,6 +48,10 @@ const purchaseSchema = new mongoose.Schema(
     totalAmount: {
       type: Number,
       required: true,
+    },
+     vat:{
+        type:Number,
+        default:5
     },
     createdBy:{
         type:String

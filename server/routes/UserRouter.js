@@ -27,7 +27,8 @@ import checkOfflinePermission from '../middleware/permission.js'
 import { getPritnerConfigs, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
 import { createSupplier, deleteSupplier, getSuppliers, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
 import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient } from '../controller/purchse-Expense/ingredients.js';
-import { createPurchase, getAllPurchases } from '../controller/purchse-Expense/purchase.js';
+import { createPurchase, getAllPurchasesReport, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
+import { createExpense, getAllExpensesReport, getExpenseList } from '../controller/purchse-Expense/Expense.js';
 const router = express.Router();
 
 
@@ -237,9 +238,9 @@ router.get('/printer/get',VerifyToken,checkOfflinePermission('Admin'),getPritner
 
 //supplier
 router.post('/vendor',VerifyToken,checkOfflinePermission('Admin'),createSupplier);
-router.get('/vendor/id',VerifyToken,checkOfflinePermission('Admin'),getSuppliers);
+router.get('/vendor-id',VerifyToken,checkOfflinePermission('Admin'),getSuppliers);
 router.put('/vendor',VerifyToken,checkOfflinePermission('Admin'),updateSupplier);
-router.delete('/vendor/:vendorId',VerifyToken,checkOfflinePermission('Admin'),deleteSupplier);
+router.delete('/vendor/:supplierId',VerifyToken,checkOfflinePermission('Admin'),deleteSupplier);
 
 
 //ingredients
@@ -250,8 +251,20 @@ router.delete('/ingredient/:ingredientId',VerifyToken,checkOfflinePermission('Ad
 
 
 //purchase
-router.post('/purchase',VerifyToken,checkOfflinePermission('Admin'),createPurchase);
-router.get('/purhcase',VerifyToken,checkOfflinePermission('Admin'),getAllPurchases)
+router.post('/purchase',VerifyToken,checkOfflinePermission('Purchase'),createPurchase);
+router.get('/purchase',VerifyToken,checkOfflinePermission('Purchase'),getPurchaseList)
+router.get('/purhcase-report',VerifyToken,checkOfflinePermission('Purchase'),getAllPurchasesReport);
+router.put('/purhcase',VerifyToken,checkOfflinePermission('Purchase'),updatePurchase)
+
+
+//Expense
+router.post('/expense',VerifyToken,checkOfflinePermission('Admin'),createExpense);
+router.get('/expense',VerifyToken,checkOfflinePermission('Admin'),getExpenseList)
+router.get('/expense-report',VerifyToken,checkOfflinePermission('Admin'),getAllExpensesReport);
+
+
+
+
 
 
 export default router;

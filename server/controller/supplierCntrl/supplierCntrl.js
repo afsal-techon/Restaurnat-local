@@ -4,7 +4,7 @@ import SUPPLIER from '../../model/supplier.js'
 
 export const createSupplier = async (req, res, next) => {
   try {
-    const {  supplierName, mobileNo, address,credit,debit } = req.body;
+    const {  supplierName, mobileNo, address,credit } = req.body;
     const userId = req.user;
 
 
@@ -42,7 +42,6 @@ export const createSupplier = async (req, res, next) => {
         createdBy: user.name,
          wallet: {
         credit: credit || 0,
-       debit: debit || 0
   }
       });
 
@@ -64,6 +63,7 @@ export const getSuppliers = async (req, res, next) => {
  
     const userId = req.user;
     const user = await USER.findOne({ _id: userId});
+
     if (!user) {
       return res.status(400).json({ message: "User not found!" });
     }
@@ -94,7 +94,7 @@ export const getSuppliers = async (req, res, next) => {
 export const updateSupplier = async (req, res, next) => {
   try {
     // vendorId will come from URL params
-    const { supplierId, supplierName, mobileNo, address } = req.body;
+    const { supplierId, supplierName, mobileNo, address ,credit  } = req.body;
     const userId = req.user;
 
     if (!supplierId) {
@@ -124,7 +124,6 @@ export const updateSupplier = async (req, res, next) => {
     const duplicateVendor = await SUPPLIER.findOne({
       _id: { $ne: supplierId }, // _id not equal to current vendorId
       supplierName: { $regex: `^${supplierName}$`, $options: "i" },
-      isDeleted: false,
     }).collation({ locale: "en", strength: 2 });
 
     if (duplicateVendor) {
@@ -137,6 +136,7 @@ export const updateSupplier = async (req, res, next) => {
     supplier.supplierName = supplierName.trim();
     supplier.mobileNo = mobileNo.trim();
     supplier.address = address?.trim() || "";
+    supplier.wallet.credit = credit ;
 
     await supplier.save();
 

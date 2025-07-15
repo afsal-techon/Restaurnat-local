@@ -12,6 +12,16 @@ const transactionSchema = new mongoose.Schema(
     ref: "Account",
     required: true,
   },
+    purchaseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Purchase",
+    default:null
+  },
+     expenseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Expense",
+    default:null
+  },
    customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
@@ -50,6 +60,8 @@ const transactionSchema = new mongoose.Schema(
 transactionSchema.index({ accountId: 1 });
 transactionSchema.index({ restaurantId: 1 });
 transactionSchema.index({ createdAt: -1 });
+transactionSchema.index({ purchaseId: 1 });
+transactionSchema.index({ expenseId: 1 });
 
 const transactionModel =  mongoose.model("Transaction", transactionSchema);
 export default transactionModel;
