@@ -370,3 +370,121 @@ export const updatePurchase = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+export const getOnePurchase = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const { purchaseId } = req.params;
+
+    if (!purchaseId) {
+      return res.status(400).json({ message: "Purchase ID is required!" });
+    }
+
+    const objectId = new mongoose.Types.ObjectId(purchaseId);
+
+    const data = await PURCHASE.aggregate([
+      { $match: { _id: objectId } },
+
+      // Supplier
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplier"
+        }
+      },
+      { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+
+      // Payment mode account
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentModeId",
+          foreignField: "_id",
+          as: "paymentAccount"
+        }
+      },
+      { $unwind: { path: "$paymentAccount", preserveNullAndEmptyArrays: true } },
+
+      // Purchase account
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "purchaseAccount"
+        }
+      },
+      { $unwind: { path: "$purchaseAccount", preserveNullAndEmptyArrays: true } },
+
+      // Lookup ingredients for each item
+      {
+        $unwind: "$items"
+      },
+      {
+        $lookup: {
+          from: "ingredients",
+          localField: "items.ingredientId",
+          foreignField: "_id",
+          as: "ingredient"
+        }
+      },
+      {
+        $unwind: { path: "$ingredient", preserveNullAndEmptyArrays: true }
+      },
+      {
+        $addFields: {
+          "items.ingredientName": "$ingredient.ingredient"
+        }
+      },
+      {
+        $group: {
+          _id: "$_id",
+          date: { $first: "$date" },
+          invoiceNo: { $first: "$invoiceNo" },
+          supplier: { $first: "$supplier" },
+          paymentAccount: { $first: "$paymentAccount" },
+          purchaseAccount: { $first: "$purchaseAccount" },
+          totalAmount: { $first: "$totalAmount" },
+          createdAt: { $first: "$createdAt" },
+          items: {
+            $push: {
+              ingredientId: "$items.ingredientId",
+              ingredientName: "$items.ingredientName",
+              price: "$items.price",
+              quantity: "$items.quantity",
+              total: "$items.total"
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          date: 1,
+          invoiceNo: 1,
+          totalAmount: 1,
+          createdAt: 1,
+          supplier: "$supplier.supplierName",
+          paymentMode: "$paymentAccount.accountName",
+          purchaseAccount: "$purchaseAccount.accountName",
+          items: 1
+        }
+      }
+    ]);
+
+    if (!data.length) {
+      return res.status(404).json({ message: "Purchase not found!" });
+    }
+
+    return res.json({ purchase: data[0] });
+
+  } catch (err) {
+    next(err);
+  }
+};
