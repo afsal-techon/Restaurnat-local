@@ -140,6 +140,8 @@ export const getExpenseList = async (req, res, next) => {
           amount: 1,
           createdAt: 1,
           supplier: "$supplier.supplierName",
+          supplierId: "$supplier._id",
+          paymentModeId:"$paymentAccount._id",
           paymentMode: "$paymentAccount.accountName",
           expenseAccount: "$expenseAccount.accountName"
         }

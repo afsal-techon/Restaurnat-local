@@ -254,7 +254,8 @@ router.delete('/ingredient/:ingredientId',VerifyToken,checkOfflinePermission('Ad
 router.post('/purchase',VerifyToken,checkOfflinePermission('Purchase'),createPurchase);
 router.get('/purchase',VerifyToken,checkOfflinePermission('Purchase'),getPurchaseList)
 router.get('/purhcase-report',VerifyToken,checkOfflinePermission('Purchase'),getAllPurchasesReport);
-router.put('/purhcase',VerifyToken,checkOfflinePermission('Purchase'),updatePurchase)
+router.put('/purchase',VerifyToken,checkOfflinePermission('Purchase'),updatePurchase)
+
 
 
 //Expense
