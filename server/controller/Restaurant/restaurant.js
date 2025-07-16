@@ -4,7 +4,7 @@ import validatePhoneNumbers from '../../middleware/phoneValidator.js';
 import CUSTOMER_TYPE from '../../model/customerTypes.js'
 import mongoose from 'mongoose';
 import ORDER from '../../model/oreder.js'
-
+import FOOD from '../../model/food.js'
 
 
 const generateUniqueRestaurantId = async () => {

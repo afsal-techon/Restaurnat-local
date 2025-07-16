@@ -45,6 +45,10 @@ const transactionSchema = new mongoose.Schema(
   referenceType:{
     type:String
   },
+  description:{
+    type:String,
+    default:null
+  },
   paymentType:{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Account",

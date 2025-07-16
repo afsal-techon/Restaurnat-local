@@ -151,7 +151,7 @@ const created = await INGREDIENT.create(ingredientData);
         return res.status(404).json({ message: "Ingredient not found!" });
       }
   
-      await INGREDIENT.findByIdAndDelete()
+      await INGREDIENT.findByIdAndDelete(ingredientId)
   
       return res.status(200).json({ message: "Ingredient deleted successfully!" });
     } catch (err) {
