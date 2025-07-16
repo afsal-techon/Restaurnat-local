@@ -27,7 +27,7 @@ import checkOfflinePermission from '../middleware/permission.js'
 import { getPritnerConfigs, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
 import { createSupplier, deleteSupplier, getSuppliers, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
 import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient } from '../controller/purchse-Expense/ingredients.js';
-import { createPurchase, getAllPurchasesReport, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
+import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
 import { createExpense, getAllExpensesReport, getExpenseList } from '../controller/purchse-Expense/Expense.js';
 const router = express.Router();
 
@@ -254,7 +254,9 @@ router.delete('/ingredient/:ingredientId',VerifyToken,checkOfflinePermission('Ad
 router.post('/purchase',VerifyToken,checkOfflinePermission('Purchase'),createPurchase);
 router.get('/purchase',VerifyToken,checkOfflinePermission('Purchase'),getPurchaseList)
 router.get('/purhcase-report',VerifyToken,checkOfflinePermission('Purchase'),getAllPurchasesReport);
-router.put('/purchase',VerifyToken,checkOfflinePermission('Purchase'),updatePurchase)
+router.put('/purchase',VerifyToken,checkOfflinePermission('Purchase'),updatePurchase);
+router.get('/purchase/one/:purchaseId',VerifyToken,checkOfflinePermission('Purchase'),getOnePurchase)
+
 
 
 

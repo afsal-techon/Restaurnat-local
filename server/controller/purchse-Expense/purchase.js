@@ -4,6 +4,7 @@ import RESTAURANT from '../../model/restaurant.js'
 import TRANSACTION from '../../model/transaction.js';
 import { generateUniqueRefId } from '../POS controller/posOrderCntrl.js'
 import PURCHASE from '../../model/purchase.js'
+import mongoose from 'mongoose';
 
 
 
@@ -386,7 +387,7 @@ export const getOnePurchase = async (req, res, next) => {
 
     const objectId = new mongoose.Types.ObjectId(purchaseId);
 
-    const data = await PURCHASE.aggregate([
+    const purchase = await PURCHASE.aggregate([
       { $match: { _id: objectId } },
 
       // Supplier
@@ -478,11 +479,11 @@ export const getOnePurchase = async (req, res, next) => {
       }
     ]);
 
-    if (!data.length) {
+    if (!purchase.length) {
       return res.status(404).json({ message: "Purchase not found!" });
     }
 
-    return res.json({ purchase: data[0] });
+    return res.json({ data: purchase[0] });
 
   } catch (err) {
     next(err);
