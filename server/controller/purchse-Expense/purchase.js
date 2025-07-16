@@ -20,7 +20,8 @@ export const createPurchase = async (req, res, next) => {
       supplierId,
       paymentModeId,
       items,
-      totalAmount
+      totalAmount,
+      vatTotal,
     } = req.body;
 
         if (!date) {
@@ -63,9 +64,11 @@ export const createPurchase = async (req, res, next) => {
         ingredientId: item.ingredientId,
         price: item.price,
         quantity: item.quantity,
-        total: item.price * item.quantity,
+        total: item.total,
+        vatAmount: item.vatAmount,
       })),
       totalAmount,
+      vatTotal,
       createdById: user._id,
       createdBy:user.name,
     });

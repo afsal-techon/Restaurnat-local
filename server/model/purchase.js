@@ -39,9 +39,13 @@ const purchaseSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
-        total: {
-          type: Number, // price * quantity
-          required: true,
+            total: {
+          type: Number,
+          default: 0,
+        },
+        vatAmount: {
+          type: Number,
+          default: 0,
         },
       },
     ],
@@ -49,10 +53,10 @@ const purchaseSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-     vat:{
-        type:Number,
-        default:5
-    },
+     vatTotal:{
+      type: Number,
+      default: 0,
+    } ,
     createdBy:{
         type:String
     },

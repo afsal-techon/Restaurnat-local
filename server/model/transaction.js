@@ -49,6 +49,10 @@ const transactionSchema = new mongoose.Schema(
     type:String,
     default:null
   },
+    vatAmount: {
+    type: Number,
+    default: 0,
+  },
   paymentType:{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Account",

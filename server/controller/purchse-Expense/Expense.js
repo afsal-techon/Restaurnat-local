@@ -91,107 +91,81 @@ export const createExpense = async (req, res, next) => {
       date,
       invoiceNo,
       paymentModeId,
-      accountId,
       supplierId,
       note,
-      amount,
-      qty,
-      expenseItems // [{ accountId, note, amount, qty }]
+      grandTotal,
+      vatTotal,
+      expenseItems, // [{ accountId, note, amount, qty }]
     } = req.body;
 
     if (!date) return res.status(400).json({ message: "Expense date is required!" });
     if (!paymentModeId) return res.status(400).json({ message: "Payment mode (Account ID) is required!" });
-
-    const transactions = [];
+    if (!Array.isArray(expenseItems) || expenseItems.length === 0) {
+      return res.status(400).json({ message: "At least one expense item is required!" });
+    }
+    if (!grandTotal) return res.status(400).json({ message: "Grand total is required!" });
+    if (!vatTotal) return res.status(400).json({ message: "Vat total is required!" });
 
     const refId = await generateUniqueRefId();
 
-    // ==== CASE 1: Sub-Expenses (Multiple items) ====
-    if (Array.isArray(expenseItems) && expenseItems.length > 0) {
-      for (const item of expenseItems) {
-        if (!item.accountId || !item.amount) {
-          return res.status(400).json({ message: "Each expense item must have accountId and amount!" });
-        }
+    //  Create Expense first to get expenseId
+    const expense = await EXPENSE.create({
+      date,
+      invoiceNo,
+      supplierId: supplierId || null,
+      paymentModeId,
+      expenseItems,
+      vatTotal: vatTotal || 0,
+      grandTotal,
+      createdById: user._id,
+      createdBy: user.name
+    });
 
-        const acc = await ACCOUNTS.findById(item.accountId).lean();
-        if (!acc) return res.status(400).json({ message: "Expense account not found!" });
+    const transactions = [];
 
-        const q = item.qty && !isNaN(item.qty) ? item.qty : 1;
-        
-
-        // Debit: to expense account
-        transactions.push({
-          restaurantId: acc.restaurantId || null,
-          accountId: acc._id,
-          paymentType: paymentModeId,
-          supplierId: supplierId || null,
-          amount: item.amount,
-          type: "Debit",
-          referenceId: refId,
-          referenceType: acc.accountType || "Expense",
-          description: item.note || `Expense item`,
-          createdById: user._id,
-          createdBy: user.name,
-        });
+    for (const item of expenseItems) {
+      if (!item.accountId || !item.amount || !item.total) {
+        return res.status(400).json({ message: "Each expense item must have accountId and amount!" });
       }
-    }
 
-    // ==== CASE 2: Single Expense (no expenseItems) ====
-    else {
-      if (!accountId) return res.status(400).json({ message: "Expense Account ID is required!" });
-      if (!amount || isNaN(amount)) return res.status(400).json({ message: "Valid amount is required!" });
-
-      const acc = await ACCOUNTS.findById(accountId).lean();
+      const acc = await ACCOUNTS.findById(item.accountId).lean();
       if (!acc) return res.status(400).json({ message: "Expense account not found!" });
 
-      const q = qty && !isNaN(qty) ? qty : 1;
-     
+      const q = item.qty && !isNaN(item.qty) ? item.qty : 1;
 
-      // Debit: to single expense account
+      // Debit: to expense account
       transactions.push({
         restaurantId: acc.restaurantId || null,
         accountId: acc._id,
         paymentType: paymentModeId,
         supplierId: supplierId || null,
-        amount: amount,
+        amount: item.total,
+        vatAmount: item.vatAmount || 0,
         type: "Debit",
         referenceId: refId,
         referenceType: acc.accountType || "Expense",
-        description: note || `Expense for #${invoiceNo || "N/A"}`,
+        expenseId: expense._id, //  Store expenseId
+        description: item.note || `Expense item`,
         createdById: user._id,
         createdBy: user.name,
       });
     }
 
-       const account = await ACCOUNTS.findById(accountId).lean();
-        if (!acc) return res.status(400).json({ message: "Expense account not found!" });
+    const paymentAccount = await ACCOUNTS.findById(paymentModeId).lean();
+    if (!paymentAccount) return res.status(400).json({ message: "Payment mode account not found!" });
 
-    // Credit: from payment account (once for totalAmount)
+    // Debit: from payment account
     transactions.push({
       restaurantId: user.restaurantId || null,
       accountId: paymentModeId,
-      amount: Array.isArray(expenseItems) && expenseItems.length > 0 ? expenseItems.total : amount || null,
-      type: "Debit", // Your system treats all outflows as Debit
+      amount: grandTotal,
+      type: "Debit",
       referenceId: refId,
-      referenceType: account.accountType || "Expense",
+      referenceType: "Expense",
+      expenseId: expense._id, //  Store expenseId
       description: note || `Payment for Expense #${invoiceNo || "N/A"}`,
       createdById: user._id,
       createdBy: user.name,
-    });
-
-    // Save Expense
-    await EXPENSE.create({
-      date,
-      invoiceNo,
-      accountId: Array.isArray(expenseItems) && expenseItems.length > 0 ? null : accountId || null,
-      supplierId: supplierId || null,
-      paymentModeId,
-      qty: qty || null,
-      amount,
-      note,
-      expenseItems: Array.isArray(expenseItems) ? expenseItems : [],
-      createdById: user._id,
-      createdBy: user.name
     });
 
     // Save Transactions
@@ -202,6 +176,7 @@ export const createExpense = async (req, res, next) => {
     next(err);
   }
 };
+
 
 
 
@@ -242,31 +217,75 @@ export const getExpenseList = async (req, res, next) => {
       },
       { $unwind: { path: "$paymentAccount", preserveNullAndEmptyArrays: true } },
 
-      // Expense category lookup
+      // Unwind expenseItems
+      { $unwind: "$expenseItems" },
+
+      // Lookup account name for each expense item
       {
         $lookup: {
           from: "accounts",
-          localField: "accountId",
+          localField: "expenseItems.accountId",
           foreignField: "_id",
-          as: "expenseAccount"
+          as: "expenseItemAccount"
         }
       },
-      { $unwind: { path: "$expenseAccount", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$expenseItemAccount", preserveNullAndEmptyArrays: true } },
 
-      // Final projection
+      // Rebuild the expenseItems object with account name
+      {
+        $addFields: {
+          "expenseItems.accountId": "$expenseItemAccount._id",
+          "expenseItems.accountName": "$expenseItemAccount.accountName"
+        }
+      },
+
+      // Group back by main expense
+      {
+        $group: {
+          _id: "$_id",
+          date: { $first: "$date" },
+          invoiceNo: { $first: "$invoiceNo" },
+          createdAt: { $first: "$createdAt" },
+          supplier: { $first: "$supplier.supplierName" },
+          supplierId: { $first: "$supplier._id" },
+          paymentModeId: { $first: "$paymentAccount._id" },
+          paymentMode: { $first: "$paymentAccount.accountName" },
+          vatTotal: { $first: "$vatTotal" },
+          grandTotal: { $first: "$grandTotal" },
+          createdBy: { $first: "$createdBy" },
+          createdById: { $first: "$createdById" },
+
+          // Collect full array of expenseItems with selected fields
+          expenseItems: {
+            $push: {
+              accountId: "$expenseItems.accountId",
+              accountName: "$expenseItems.accountName",
+              note: "$expenseItems.note",
+              amount: "$expenseItems.amount",
+              qty: "$expenseItems.qty",
+              total: "$expenseItems.total",
+              vatAmount: "$expenseItems.vatAmount"
+            }
+          }
+        }
+      },
+
+      // Optional final projection
       {
         $project: {
           _id: 1,
           date: 1,
           invoiceNo: 1,
-          qty: 1,
-          amount: 1,
           createdAt: 1,
-          supplier: "$supplier.supplierName",
-          supplierId: "$supplier._id",
-          paymentModeId:"$paymentAccount._id",
-          paymentMode: "$paymentAccount.accountName",
-          expenseAccount: "$expenseAccount.accountName"
+          supplier: 1,
+          supplierId: 1,
+          paymentModeId: 1,
+          paymentMode: 1,
+          vatTotal: 1,
+          grandTotal: 1,
+          createdBy: 1,
+          createdById: 1,
+          expenseItems: 1
         }
       }
     ];
@@ -285,6 +304,7 @@ export const getExpenseList = async (req, res, next) => {
     next(err);
   }
 };
+
 
 
 export const getAllExpensesReport = async (req, res, next) => {
@@ -417,64 +437,100 @@ export const updateExpense = async (req, res, next) => {
       expenseId,
       date,
       invoiceNo,
+      paymentModeId,
       supplierId,
-      amount,
-      qty
+      note,
+      grandTotal,
+      vatTotal,
+      expenseItems, // [{ accountId, note, amount, qty, vatAmount, total }]
     } = req.body;
 
     if (!expenseId) return res.status(400).json({ message: "Expense ID is required!" });
     if (!date) return res.status(400).json({ message: "Expense date is required!" });
-    if (!amount || isNaN(amount)) return res.status(400).json({ message: "Valid amount is required!" });
+    if (!paymentModeId) return res.status(400).json({ message: "Payment mode (Account ID) is required!" });
+    if (!Array.isArray(expenseItems) || expenseItems.length === 0) {
+      return res.status(400).json({ message: "At least one expense item is required!" });
+    }
+    if (!grandTotal) return res.status(400).json({ message: "Grand total is required!" });
+    if (!vatTotal) return res.status(400).json({ message: "VAT total is required!" });
 
-    const quantity = qty && !isNaN(qty) ? qty : 1;
+    const existingExpense = await EXPENSE.findById(expenseId);
+    if (!existingExpense) return res.status(404).json({ message: "Expense not found!" });
 
-    // 1. Update Expense record
+    // Delete previous transactions linked to this expense
+    await TRANSACTION.deleteMany({ expenseId });
+
+    const refId = await generateUniqueRefId(); // You can choose to re-use old one if you store it
+
     const updatedExpense = await EXPENSE.findByIdAndUpdate(
       expenseId,
       {
         date,
         invoiceNo,
         supplierId: supplierId || null,
-        amount,
-        qty: quantity,
+        paymentModeId,
+        expenseItems,
+        vatTotal: vatTotal || 0,
+        grandTotal,
+        createdById: user._id,
         createdBy: user.name,
-        createdById: user._id
       },
       { new: true }
     );
 
-    if (!updatedExpense) {
-      return res.status(404).json({ message: "Expense not found!" });
+    const transactions = [];
+
+    for (const item of expenseItems) {
+      if (!item.accountId || !item.amount || !item.total) {
+        return res.status(400).json({ message: "Each expense item must have accountId and amount!" });
+      }
+
+      const acc = await ACCOUNTS.findById(item.accountId).lean();
+      if (!acc) return res.status(400).json({ message: "Expense account not found!" });
+
+      const q = item.qty && !isNaN(item.qty) ? item.qty : 1;
+
+      transactions.push({
+        restaurantId: acc.restaurantId || null,
+        accountId: acc._id,
+        paymentType: paymentModeId,
+        supplierId: supplierId || null,
+        amount: item.total,
+        vatAmount: item.vatAmount || 0,
+        type: "Debit",
+        referenceId: refId,
+        referenceType: acc.accountType || "Expense",
+        expenseId: expenseId,
+        description: item.note || `Expense item`,
+        createdById: user._id,
+        createdBy: user.name,
+      });
     }
 
-    // 2. Update related Transactions
-    await TRANSACTION.updateMany(
-      { expenseId },
-      [
-        {
-          $set: {
-            amount,
-            supplierId: supplierId || null,
-            description: {
-              $cond: [
-                { $eq: ["$accountId", updatedExpense.accountId] },
-                `Expense for #${invoiceNo || "N/A"}`,
-                `Payment for Expense #${invoiceNo || "N/A"}`
-              ]
-            },
-            updatedById: user._id,
-            updatedBy: user.name,
-            updatedAt: new Date()
-          }
-        }
-      ]
-    );
+    const paymentAccount = await ACCOUNTS.findById(paymentModeId).lean();
+    if (!paymentAccount) return res.status(400).json({ message: "Payment mode account not found!" });
+
+    transactions.push({
+      restaurantId: user.restaurantId || null,
+      accountId: paymentModeId,
+      amount: grandTotal,
+      type: "Debit",
+      referenceId: refId,
+      referenceType: "Expense",
+      expenseId: expenseId,
+      description: note || `Payment for Expense #${invoiceNo || "N/A"}`,
+      createdById: user._id,
+      createdBy: user.name,
+    });
+
+    await TRANSACTION.insertMany(transactions);
 
     return res.status(200).json({ message: "Expense updated successfully!" });
   } catch (err) {
     next(err);
   }
 };
+
 
 
 

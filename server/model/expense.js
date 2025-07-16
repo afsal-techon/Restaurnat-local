@@ -1,5 +1,33 @@
 import mongoose from "mongoose";
 
+const expenseItemSchema = new mongoose.Schema({
+  accountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Account",
+    required: true,
+  },
+  note: {
+    type: String,
+    default: null,
+  },
+  amount: {
+    type: Number,
+    default: 0,
+  },
+  qty: {
+    type: Number,
+    default: 1,
+  },
+  total: {
+    type: Number,
+    default: 0,
+  },
+  vatAmount: {
+    type: Number,
+    default: 0,
+  },
+});
+
 const expenseSchema = new mongoose.Schema(
   {
     date: {
@@ -8,45 +36,36 @@ const expenseSchema = new mongoose.Schema(
     },
     invoiceNo: {
       type: String,
-      default:null
+      default: null,
     },
     supplierId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Supplier",
-      default:null,
+      default: null,
     },
-     accountId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Account",
-        required: true,
-      },
     paymentModeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Account",
       required: true,
     },
-    qty:{
-        type:Number,
-        default:null
+    expenseItems: [expenseItemSchema],
+    createdBy: {
+      type: String,
     },
-    vat:{
-        type:Number,
-        default:5
-    },
-    amount: {
+    vatTotal:{
       type: Number,
-      required: true,
-    },
-    note:{
-      type:String,
-      default:null
-    },
-    createdBy:{
-        type:String
+      default: 0,
+    } ,
+    grandTotal:{
+      type: Number,
+    default: 0,
     },
     createdById: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+    },
+    createdBy:{
+      type:String
     },
   },
   { timestamps: true }
