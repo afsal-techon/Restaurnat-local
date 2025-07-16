@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "chrome-launcher": "^1.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "ejs": "^3.1.10",
@@ -20,10 +21,10 @@
     "mongoose": "^8.15.1",
     "multer": "^2.0.1",
     "node-thermal-printer": "^4.5.0",
+    "node-windows": "^1.0.0-beta.8",
     "nodemon": "^3.1.10",
     "puppeteer": "^24.11.1",
     "puppeteer-core": "^24.11.1",
     "socket.io": "^4.8.1"
   }
 }
-

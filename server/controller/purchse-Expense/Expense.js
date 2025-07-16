@@ -170,7 +170,7 @@ export const createExpense = async (req, res, next) => {
     transactions.push({
       restaurantId: user.restaurantId || null,
       accountId: paymentModeId,
-      amount: Array.isArray(expenseItems) && expenseItems.length > 0 ? item.amount : amount || null,
+      amount: Array.isArray(expenseItems) && expenseItems.length > 0 ? expenseItems.total : amount || null,
       type: "Debit", // Your system treats all outflows as Debit
       referenceId: refId,
       referenceType: account.accountType || "Expense",
