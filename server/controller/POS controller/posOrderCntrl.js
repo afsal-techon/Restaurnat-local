@@ -17,7 +17,9 @@ import { getIO  } from "../../config/socket.js";
 import TRANSACTION from '../../model/transaction.js'
 import PRINTER_CONFIG from '../../model/printConfig.js'
 // import printer from '@thiagoelg/node-printer';
-import { TokenCounter }  from '../../model/tokenCounter.js'
+import { TokenCounter }  from '../../model/tokenCounter.js';
+import SETTINGS from '../../model/posSettings.js'
+import KOT_NOTIFICATION from '../../model/kotNotification.js'
 import moment from 'moment'
 
 // "@thiagoelg/node-printer": "^0.6.2",
@@ -557,9 +559,9 @@ export const createOrder = async (req, res, next) => {
 
     io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
 
-    const shouldPrint = action === 'print';
+    
 
-if (shouldPrint) {
+if (action === 'print' || action === 'kotandPrint') {
   try {
     const printerConfigs = await PRINTER_CONFIG.find({ printerType: 'KOT' }).lean();
     
@@ -587,7 +589,97 @@ if (shouldPrint) {
   }
 }
 
+if (action === 'kot' || action === 'kotandPrint') {
+      const kitchenItemMap = {};
 
+    const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
+
+    for (const item of itemsToCheck) {
+      if (item.isCombo) {
+        // For combos, find the kitchen from the first food item
+        const combo = comboMap[item.comboId];
+        if (!combo || !item.items || item.items.length === 0) continue;
+
+
+        const kitchen = await KITCHEN.findOne({ restaurantId })
+        const kitchenId = kitchen._id;
+              if (!kitchenId) continue;
+
+      if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
+
+      // Prepare combo items array
+      const comboItemsArray = item.items.map(comboItem => {
+        const food = foodMap[comboItem.foodId.toString()];
+        return {
+          foodId: food._id,
+          name: comboItem.foodName || food.foodName,
+          portion: comboItem.portion,
+          quantity: comboItem.qty,
+          status: 'Pending',
+          isComboItem: true
+        };
+      });
+
+      kitchenItemMap[kitchenId].push({
+        foodId: combo._id, // Combo ID as the main identifier
+        name: combo.comboName,
+        quantity: item.qty,
+        status: 'Pending',
+        message: `Combo Order`,
+        isComboItem: true,
+        comboId: combo._id,
+        comboName: combo.comboName,
+        comboItems: comboItemsArray
+      });
+    } else {
+      // Regular food item
+      const food = foodMap[item.foodId.toString()];
+      if (!food?.kitchenId) continue;
+
+      const kitchenId = food.kitchenId.toString();
+      if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
+
+      kitchenItemMap[kitchenId].push({
+        foodId: item.foodId,
+        name: item.foodName || food.foodName,
+        portion: item.portion,
+        quantity: item.qty,
+        status: 'Pending',
+        message: '',
+        isComboItem: false
+      });
+    }
+  }
+
+  // Create KOTs for each kitchen
+  for (const [kitchenId, items] of Object.entries(kitchenItemMap)) {
+    const kitchen = await KITCHEN.findById(kitchenId).lean();
+    if (!kitchen) continue;
+
+    const table = tableId ? await TABLES.findById(tableId).lean() : null;
+
+    const kotData = {
+      restaurantId,
+      kitchenId,
+      tableId,
+      orderType: ctypeName,
+      items,
+      ticketNo,
+      orderNo,
+      orderId: order._id,
+      order_id: order.order_id,
+      status: 'Pending',
+      orderTime: new Date(),
+      isAdditionalKOT: isAdditionalOrder,
+      message: `New ${ctypeName} Order received${table ? ` for Table ${table.name}` : ''}, Ticket #${ticketNo}`,
+    };
+
+    const [createdKOT] = await KOT_NOTIFICATION.create([kotData]);
+    // req.io?.to(`kitchen:${kitchenId}`).emit('kot_notification', createdKOT);
+
+      req.io?.to(`kitchen:${kitchenId}`).emit('kot_status_update',createdKOT);
+  }
+}
   
     return res.status(200).json(responseData);
   } catch (err) {
@@ -992,7 +1084,7 @@ export const generateUniqueRefId = async () => {
           }
           console.log(accounts,'accounts')
 
-               const notValuePaidTypes = ['Due'];
+               const notValuePaidTypes = ['Credit'];
   
               // Validate payment amounts
                const paidAmount = accounts.reduce((sum, acc) => {

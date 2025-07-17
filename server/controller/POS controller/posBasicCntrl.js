@@ -637,7 +637,7 @@ export const getCustomerDueHistory = async (req, res, next) => {
             { referenceType: "Due Payment" },
             {
               referenceType: "Sale",
-              "accountInfo.accountType": "Due"
+              "accountInfo.accountType": "Credit"
             }
           ]
         }
@@ -857,7 +857,7 @@ export const generateCustomerDueHistoryPDF = async (req, res, next) => {
         $match: {
           $or: [
             { referenceType: 'Due Payment' },
-            { referenceType: 'Sale', 'accountInfo.accountType': 'Due' }
+            { referenceType: 'Sale', 'accountInfo.accountType': 'Credit' }
           ]
         }
       },

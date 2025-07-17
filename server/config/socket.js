@@ -15,18 +15,19 @@ export const initSocketServer = (httpServer) => {
   io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
-    socket.on("joinRestaurant", (restaurantId) => {
+      socket.on("joinRestaurant", (restaurantId) => {
       socket.join(`pos-${restaurantId}`);
       socket.join(`pos_menu-${restaurantId}`);
       socket.join(`pos_course-${restaurantId}`);
       socket.join(`pos_category-${restaurantId}`);
       socket.join(`posTable-${restaurantId}`);
       socket.join(`posOrder-${restaurantId}`);
+      //  socket.join(`kitchen:${kitchenId}`);
     });
 
-    socket.on("join_kitchen", ({ kitchenId }) => {
+    socket.on("joinKitchen", ({ kitchenId }) => {
+      console.log('kithcen connected',kitchenId)
       socket.join(`kitchen:${kitchenId}`);
-      console.log(`Socket ${socket.id} joined kitchen:${kitchenId}`);
     });
 
     socket.on("disconnect", () => {

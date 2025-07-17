@@ -888,8 +888,6 @@ export const generateTransactionListPDF = async (req, res, next) => {
 
 
 
-  
-
 export const createTransactionModule= async(req,res,next)=>{
   try {
     console.log(req.body)

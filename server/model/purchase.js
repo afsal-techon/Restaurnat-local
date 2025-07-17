@@ -72,4 +72,6 @@ const purchaseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+purchaseSchema.index({ createdAt: -1 });
+
 export default mongoose.model("Purchase", purchaseSchema);

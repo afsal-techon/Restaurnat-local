@@ -75,4 +75,6 @@ const expenseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+expenseSchema.index({ createdAt: -1 });
+
 export default mongoose.model("Expense", expenseSchema);

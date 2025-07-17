@@ -29,6 +29,7 @@ import { createSupplier, deleteSupplier, getSuppliers, updateSupplier } from '..
 import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient } from '../controller/purchse-Expense/ingredients.js';
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
 import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
+import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
 const router = express.Router();
 
 
@@ -267,7 +268,15 @@ router.put('/expense',VerifyToken,checkOfflinePermission('Admin'),updateExpense)
 router.get('/expense-report',VerifyToken,checkOfflinePermission('Admin'),getAllExpensesReport);
 
 
+//kitchen kot 
+router.get('/get-kot/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getKOTTickets);
+// router.get('/pending-kot/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPendingKOTTickets);
+// router.get('/prepared-kot/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPreparedKOTTickets);
+// router.get('/completed-kot/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getCompltedKOTTickets);
 
+//kot action
+// router.post('/kot/accept',VerifyToken,checkOfflinePermission('Admin'),acceptKOT);
+// router.post('/kot/ready',VerifyToken,checkOfflinePermission('Admin'),readyKOT);
 
 
 
