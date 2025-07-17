@@ -28,7 +28,7 @@ import { getPritnerConfigs, upsertPrinterConfig } from '../controller/printerSet
 import { createSupplier, deleteSupplier, getSuppliers, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
 import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient } from '../controller/purchse-Expense/ingredients.js';
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
-import { createExpense, getAllExpensesReport, getExpenseList } from '../controller/purchse-Expense/Expense.js';
+import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
 const router = express.Router();
 
 
@@ -262,7 +262,8 @@ router.get('/purchase/one/:purchaseId',VerifyToken,checkOfflinePermission('Purch
 
 //Expense
 router.post('/expense',VerifyToken,checkOfflinePermission('Admin'),createExpense);
-router.get('/expense',VerifyToken,checkOfflinePermission('Admin'),getExpenseList)
+router.get('/expense',VerifyToken,checkOfflinePermission('Admin'),getExpenseList);
+router.put('/expense',VerifyToken,checkOfflinePermission('Admin'),updateExpense);
 router.get('/expense-report',VerifyToken,checkOfflinePermission('Admin'),getAllExpensesReport);
 
 

@@ -24,6 +24,10 @@ const purchaseSchema = new mongoose.Schema(
       ref: "Account",
       required: true,
     },
+    isVatInclusive:{
+      type:Boolean,
+      default:true
+    },
     items: [
       {
         ingredientId: {

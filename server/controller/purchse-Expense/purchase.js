@@ -20,8 +20,10 @@ export const createPurchase = async (req, res, next) => {
       supplierId,
       paymentModeId,
       items,
+      note,
       totalAmount,
       vatTotal,
+      isVatInclusive,
     } = req.body;
 
         if (!date) {
@@ -70,6 +72,7 @@ export const createPurchase = async (req, res, next) => {
       totalAmount,
       vatTotal,
       createdById: user._id,
+      isVatInclusive,
       createdBy:user.name,
     });
 
@@ -80,11 +83,12 @@ export const createPurchase = async (req, res, next) => {
       accountId: account._id, // supplier account
       paymentType: paymentModeId,
       supplierId,
+      vatAmount : vatTotal,
       amount: totalAmount,
       type: "Debit",
       referenceId: refId,
       referenceType: account.accountType ||  "Purchase",
-      description: `Purchase from supplier #${invoiceNo}`,
+      description: note || `Purchase from supplier #${invoiceNo}`,
       createdById: user._id,
       createdBy:user.name,
     };
@@ -97,7 +101,7 @@ export const createPurchase = async (req, res, next) => {
       type: "Debit",
       referenceId: refId,
       referenceType: account.accountType ||  "Purchase",
-      description: `Payment for Purchase #${invoiceNo}`,
+      description:note || `Payment for Purchase #${invoiceNo}`,
       createdById: user._id,
       createdBy:user.name,
     };
@@ -156,7 +160,10 @@ export const getPurchaseList = async (req, res, next) => {
           date: 1,
           invoiceNo: 1,
           totalAmount: 1,
+          vatTotal:1,
+          note:1,
           createdAt: 1,
+          isVatInclusive:1,
           supplierId: "$supplier._id",
           supplier: "$supplier.supplierName",
           paymentModeId:"$paymentAccount._id",
@@ -306,35 +313,47 @@ export const updatePurchase = async (req, res, next) => {
       date,
       invoiceNo,
       supplierId,
+      paymentModeId,
       items,
-      totalAmount
+      totalAmount,
+      vatTotal
     } = req.body;
 
     if (!purchaseId) return res.status(400).json({ message: "Purchase ID is required!" });
     if (!date) return res.status(400).json({ message: "Purchase date is required!" });
     if (!supplierId) return res.status(400).json({ message: "Supplier ID is required!" });
+    if (!paymentModeId) return res.status(400).json({ message: "Payment mode (Account ID) is required!" });
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "At least one purchase item is required!" });
     }
 
-    // 1. Recalculate item totals
-    const updatedItems = items.map(item => ({
-      ingredientId: item.ingredientId,
-      price: item.price,
-      quantity: item.quantity,
-      total: item.price * item.quantity
-    }));
+    const account = await ACCOUNTS.findOne({ accountType: 'Purchase' }).lean();
+    if (!account) return res.status(400).json({ message: 'Purchase account not found!' });
 
+    // Get existing purchase and preserve its referenceId (or generate one if missing)
+    const existingPurchase = await PURCHASE.findById(purchaseId).lean();
+    if (!existingPurchase) return res.status(404).json({ message: "Purchase not found!" });
 
-    // 2. Update Purchase
+    const refId =  await generateUniqueRefId();
+
+    // Update purchase with new data
     const updatedPurchase = await PURCHASE.findByIdAndUpdate(
       purchaseId,
       {
         date,
         invoiceNo,
         supplierId,
-        items: updatedItems,
+        paymentModeId,
+        accountId: account._id,
+        items: items.map((item) => ({
+          ingredientId: item.ingredientId,
+          price: item.price,
+          quantity: item.quantity,
+          total: item.total,
+          vatAmount: item.vatAmount,
+        })),
         totalAmount,
+        vatTotal,
         updatedById: user._id,
         createdBy: user.name,
         createdById: user._id
@@ -342,38 +361,46 @@ export const updatePurchase = async (req, res, next) => {
       { new: true }
     );
 
-    if (!updatedPurchase) {
-      return res.status(404).json({ message: "Purchase not found!" });
-    }
+    // Delete old transactions linked to this purchase
+    await TRANSACTION.deleteMany({ purchaseId });
 
-    // 3. Update related transactions
-    await TRANSACTION.updateMany(
-      { purchaseId: purchaseId },
-      [
-        {
-          $set: {
-            amount: totalAmount,
-            supplierId: supplierId,
-            description: {
-              $cond: [
-                { $eq: ["$type", "Debit"] },
-                `Purchase from supplier #${invoiceNo}`,
-                `Payment for Purchase #${invoiceNo}`
-              ]
-            },
-            updatedById: user._id,
-            updatedBy: user.name,
-            updatedAt: new Date()
-          }
-        }
-      ]
-    );
+    // Create new transactions
+    const debitTxn = {
+      restaurantId: account.restaurantId || null,
+      purchaseId: purchaseId,
+      accountId: account._id,
+      paymentType: paymentModeId,
+      supplierId,
+      amount: totalAmount,
+      type: "Debit",
+      referenceId: refId,
+      referenceType: account.accountType || "Purchase",
+      description: note || `Purchase from supplier #${invoiceNo}`,
+      createdById: user._id,
+      createdBy: user.name,
+    };
+
+    const creditTxn = {
+      restaurantId: account.restaurantId || null,
+      purchaseId: purchaseId,
+      accountId: paymentModeId,
+      amount: totalAmount,
+      type: "Debit",
+      referenceId: refId,
+      referenceType: account.accountType || "Purchase",
+      description: note || `Payment for Purchase #${invoiceNo}`,
+      createdById: user._id,
+      createdBy: user.name,
+    };
+
+    await TRANSACTION.insertMany([debitTxn, creditTxn]);
 
     return res.status(200).json({ message: "Purchase updated successfully!" });
   } catch (err) {
     next(err);
   }
 };
+
 
 
 

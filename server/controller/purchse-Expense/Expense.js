@@ -96,6 +96,8 @@ export const createExpense = async (req, res, next) => {
       grandTotal,
       vatTotal,
       expenseItems, // [{ accountId, note, amount, qty }]
+      isVatInclusive,
+
     } = req.body;
 
     if (!date) return res.status(400).json({ message: "Expense date is required!" });
@@ -117,6 +119,7 @@ export const createExpense = async (req, res, next) => {
       expenseItems,
       vatTotal: vatTotal || 0,
       grandTotal,
+      isVatInclusive,
       createdById: user._id,
       createdBy: user.name
     });
@@ -176,9 +179,6 @@ export const createExpense = async (req, res, next) => {
     next(err);
   }
 };
-
-
-
 
 
 export const getExpenseList = async (req, res, next) => {
@@ -253,6 +253,7 @@ export const getExpenseList = async (req, res, next) => {
           vatTotal: { $first: "$vatTotal" },
           grandTotal: { $first: "$grandTotal" },
           createdBy: { $first: "$createdBy" },
+          isVatInclusive: { $first: "$isVatInclusive" },
           createdById: { $first: "$createdById" },
 
           // Collect full array of expenseItems with selected fields
@@ -283,6 +284,7 @@ export const getExpenseList = async (req, res, next) => {
           paymentMode: 1,
           vatTotal: 1,
           grandTotal: 1,
+          isVatInclusive:1,
           createdBy: 1,
           createdById: 1,
           expenseItems: 1
@@ -443,6 +445,7 @@ export const updateExpense = async (req, res, next) => {
       grandTotal,
       vatTotal,
       expenseItems, // [{ accountId, note, amount, qty, vatAmount, total }]
+      isVatInclusive
     } = req.body;
 
     if (!expenseId) return res.status(400).json({ message: "Expense ID is required!" });
@@ -472,6 +475,7 @@ export const updateExpense = async (req, res, next) => {
         expenseItems,
         vatTotal: vatTotal || 0,
         grandTotal,
+        isVatInclusive,
         createdById: user._id,
         createdBy: user.name,
       },

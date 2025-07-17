@@ -60,6 +60,10 @@ const expenseSchema = new mongoose.Schema(
       type: Number,
     default: 0,
     },
+      isVatInclusive:{
+      type:Boolean,
+      default:true
+    },
     createdById: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
