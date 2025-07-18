@@ -6,7 +6,7 @@ import { generateUniqueRefId } from '../POS controller/posOrderCntrl.js'
 import PURCHASE from '../../model/purchase.js'
 import mongoose from 'mongoose';
 
-
+ 
 
 
 export const createPurchase = async (req, res, next) => {

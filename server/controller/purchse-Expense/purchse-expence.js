@@ -13,6 +13,8 @@ export const getPurchaseReport = async (req, res, next) => {
       toDate,
       search = '',
       accountName = '',
+      paymentType = '',
+      supplierName = '',
       minPrice,
       maxPrice
     } = req.query;
@@ -33,7 +35,6 @@ export const getPurchaseReport = async (req, res, next) => {
       matchStage.createdAt = { $gte: start, $lte: end };
     }
 
-    //  Price filter logic
     if (minPrice || maxPrice) {
       matchStage.amount = {};
       if (minPrice) matchStage.amount.$gte = parseFloat(minPrice);
@@ -81,13 +82,33 @@ export const getPurchaseReport = async (req, res, next) => {
       },
       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
 
+      ...(paymentType
+        ? [{ $match: { "paymentTypeInfo.accountName": paymentType } }]
+        : []),
+
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplierInfo"
+        }
+      },
+      { $unwind: { path: "$supplierInfo", preserveNullAndEmptyArrays: true } },
+
+      ...(supplierName
+        ? [{ $match: { "supplierInfo.supplierName": { $regex: supplierName, $options: "i" } } }]
+        : []),
+
       ...(search
         ? [{
             $match: {
               $or: [
                 { referenceId: { $regex: search, $options: 'i' } },
                 { narration: { $regex: search, $options: 'i' } },
-                { "accountInfo.accountName": { $regex: search, $options: 'i' } }
+                { "accountInfo.accountName": { $regex: search, $options: 'i' } },
+                { "paymentTypeInfo.accountName": { $regex: search, $options: 'i' } },
+                { "supplierInfo.supplierName": { $regex: search, $options: 'i' } }
               ]
             }
           }]
@@ -115,6 +136,9 @@ export const getPurchaseReport = async (req, res, next) => {
                 },
                 paymentType: {
                   $ifNull: ["$paymentTypeInfo.accountName", null]
+                },
+                supplierName: {
+                  $ifNull: ["$supplierInfo.supplierName", null]
                 }
               }
             },
@@ -155,6 +179,8 @@ export const getPurchaseReport = async (req, res, next) => {
 };
 
 
+
+
 export const getExpenseReport = async (req, res, next) => {
   try {
     const {
@@ -162,6 +188,8 @@ export const getExpenseReport = async (req, res, next) => {
       toDate,
       search = '',
       accountName = '',
+      paymentType = '',
+      supplierName = '',
       minPrice,
       maxPrice
     } = req.query;
@@ -175,7 +203,6 @@ export const getExpenseReport = async (req, res, next) => {
 
     const matchStage = {};
 
-    //  Date filter
     if (fromDate && toDate) {
       const start = new Date(fromDate);
       const end = new Date(toDate);
@@ -183,7 +210,6 @@ export const getExpenseReport = async (req, res, next) => {
       matchStage.createdAt = { $gte: start, $lte: end };
     }
 
-    //  Price filter
     if (minPrice || maxPrice) {
       matchStage.amount = {};
       if (minPrice) matchStage.amount.$gte = parseFloat(minPrice);
@@ -193,7 +219,6 @@ export const getExpenseReport = async (req, res, next) => {
     const pipeline = [
       { $match: matchStage },
 
-      //  Lookup account details
       {
         $lookup: {
           from: "accounts",
@@ -204,15 +229,12 @@ export const getExpenseReport = async (req, res, next) => {
       },
       { $unwind: "$accountInfo" },
 
-      //  Match only Expense accounts
       { $match: { "accountInfo.accountType": "Expense" } },
 
-      // Optional filter by account name
       ...(accountName
         ? [{ $match: { "accountInfo.accountName": accountName } }]
         : []),
 
-      //  Lookup parent account
       {
         $lookup: {
           from: "accounts",
@@ -225,7 +247,6 @@ export const getExpenseReport = async (req, res, next) => {
       },
       { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
 
-      //  Lookup payment method
       {
         $lookup: {
           from: "accounts",
@@ -236,20 +257,38 @@ export const getExpenseReport = async (req, res, next) => {
       },
       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
 
-      //  Apply search text filter
+      ...(paymentType
+        ? [{ $match: { "paymentTypeInfo.accountName": paymentType } }]
+        : []),
+
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplierInfo"
+        }
+      },
+      { $unwind: { path: "supplierInfo", preserveNullAndEmptyArrays: true } },
+
+      ...(supplierName
+        ? [{ $match: { "supplierInfo.supplierName": { $regex: supplierName, $options: "i" } } }]
+        : []),
+
       ...(search
         ? [{
             $match: {
               $or: [
                 { referenceId: { $regex: search, $options: 'i' } },
                 { narration: { $regex: search, $options: 'i' } },
-                { "accountInfo.accountName": { $regex: search, $options: 'i' } }
+                { "accountInfo.accountName": { $regex: search, $options: 'i' } },
+                { "paymentTypeInfo.accountName": { $regex: search, $options: 'i' } },
+                { "supplierInfo.supplierName": { $regex: search, $options: 'i' } }
               ]
             }
           }]
         : []),
 
-      //  Pagination + Projection + Aggregation
       {
         $facet: {
           data: [
@@ -272,6 +311,9 @@ export const getExpenseReport = async (req, res, next) => {
                 },
                 paymentType: {
                   $ifNull: ["$paymentTypeInfo.accountName", null]
+                },
+                supplierName: {
+                  $ifNull: ["$supplierInfo.supplierName", null]
                 }
               }
             },
@@ -287,7 +329,6 @@ export const getExpenseReport = async (req, res, next) => {
           }]
         }
       },
-
       {
         $project: {
           data: 1,
@@ -311,6 +352,7 @@ export const getExpenseReport = async (req, res, next) => {
     next(err);
   }
 };
+
 
 
 

@@ -421,7 +421,19 @@ export const generateDailyCollectionPDF = async (req, res, next) => {
 
 export const getDailyTransactionReport = async (req, res, next) => {
   try {
-    const { fromDate, toDate, search = '', type } = req.query;
+    const {
+      fromDate,
+      toDate, 
+      search = '',
+      type,
+      accountName = '', 
+      accountType = '',
+      paymentModeName = '',
+    } = req.query;
+
+    console.log(accountName,'accountName')
+    console.log(paymentModeName,'pari')
+
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
@@ -455,6 +467,8 @@ export const getDailyTransactionReport = async (req, res, next) => {
     const pipeline = [
       { $match: matchStage },
       ...(searchStage ? [{ $match: searchStage }] : []),
+
+      // Lookup for account info
       {
         $lookup: {
           from: "accounts",
@@ -464,6 +478,8 @@ export const getDailyTransactionReport = async (req, res, next) => {
         }
       },
       { $unwind: "$accountInfo" },
+
+      // Lookup for payment mode info
       {
         $lookup: {
           from: "accounts",
@@ -473,13 +489,31 @@ export const getDailyTransactionReport = async (req, res, next) => {
         }
       },
       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
-      { $sort: { createdAt: 1 } }, // oldest first
+
+      // Filters based on accountName, accountType, paymentModeName, paymentModeType
+      ...(accountName
+        ? [{ $match: { "accountInfo.accountName": { $regex: accountName, $options: "i" } } }]
+        : []),
+
+      ...(accountType
+        ? [{ $match: { "accountInfo.accountType": accountType } }]
+        : []),
+
+      ...(paymentModeName
+        ? [{ $match: { "paymentTypeInfo.accountName": { $regex: paymentModeName, $options: "i" } } }]
+        : []),
+
+    
+      // Sort and compute credit/debit
+      { $sort: { createdAt: 1 } },
       {
         $addFields: {
           credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
           debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
         }
       },
+
+      // Group and calculate totals
       {
         $group: {
           _id: null,
@@ -488,6 +522,8 @@ export const getDailyTransactionReport = async (req, res, next) => {
           totalDebit: { $sum: "$debit" }
         }
       },
+
+      // Running total calculation
       {
         $addFields: {
           transactionsWithRunningTotal: {
@@ -541,6 +577,8 @@ export const getDailyTransactionReport = async (req, res, next) => {
           }
         }
       },
+
+      // Slice for pagination
       {
         $project: {
           allData: "$transactionsWithRunningTotal.transactions",
@@ -597,6 +635,7 @@ export const getDailyTransactionReport = async (req, res, next) => {
     next(err);
   }
 };
+
 
 
 

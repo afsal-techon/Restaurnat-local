@@ -25,7 +25,7 @@ export const getDailySalesReport = async (req, res, next) => {
       fromDate,
       toDate,
       customerTypeId,
-      paymentMethod,
+      paymentMethod, 
       search,
       minPrice,
       maxPrice
