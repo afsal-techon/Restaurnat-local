@@ -51,7 +51,15 @@ const kotNotificationSchema = new mongoose.Schema({
   orderNo: { type: String },
   ticketNo: { type: String },
   message: { type: String },
-  isAdditionalKOT: { type: Boolean, default: false }
+  isAdditionalKOT: { type: Boolean, default: false },
+       deliveryDate: {
+      type: Date,
+      required: function() { return this.orderType.includes('Home Delivery'); }
+    },
+    deliveryTime: {
+      type: String, // or Date if you prefer
+      required: function() { return this.orderType.includes('Home Delivery'); }
+    },
 }, {
   timestamps: true
 });

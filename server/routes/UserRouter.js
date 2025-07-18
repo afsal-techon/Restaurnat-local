@@ -30,6 +30,7 @@ import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
 import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
+import { createRider, deleteRider, getRiders, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
 const router = express.Router();
 
 
@@ -277,6 +278,18 @@ router.get('/get-kot/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),
 //kot action
 // router.post('/kot/accept',VerifyToken,checkOfflinePermission('Admin'),acceptKOT);
 // router.post('/kot/ready',VerifyToken,checkOfflinePermission('Admin'),readyKOT);
+
+
+
+//riders 
+router.post('/rider',VerifyToken,checkOfflinePermission('Admin'),createRider);
+router.get('/rider',VerifyToken,checkOfflinePermission('Admin'),getRiders);
+router.get('/rider/:riderId',VerifyToken,checkOfflinePermission('Admin'),getRiders);
+router.put('/rider',VerifyToken,checkOfflinePermission('Admin'),updateRider);
+router.delete('/rider',VerifyToken,checkOfflinePermission('Admin'),deleteRider);
+
+
+//Deliver status updates
 
 
 

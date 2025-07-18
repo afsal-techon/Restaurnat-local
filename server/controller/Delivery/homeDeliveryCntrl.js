@@ -1,0 +1,205 @@
+import ORDER from '../../model/oreder.js';
+import USER from '../../model/userModel.js';
+import RESTAURANT from '../../model/restaurant.js';
+import RIDER from '../../model/Riders.js'
+
+
+
+
+export const createRider = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+    const {
+      name,
+      mobileNo,
+      address,
+    } = req.body;
+
+    if (!name || !mobileNo) {
+      return res.status(400).json({ message: "Name, Mobile No and Restaurant ID are required!" });
+    }
+
+    const existing = await RIDER.findOne({ mobileNo });
+    if (existing) {
+      return res.status(400).json({ message: "Rider with this mobile number already exists!" });
+    }
+
+    const rider = await RIDER.create({
+      name,
+      mobileNo,
+      address,
+      createdById: user._id,
+      createdBy: user.name
+    });
+
+    return res.status(200).json({ message: "Rider created successfully", data: rider });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getRiders = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+    const { search = "", page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+
+    if (search.trim()) {
+      const regex = new RegExp(search.trim(), "i");
+      query.$or = [
+        { name: regex },
+        { mobileNo: regex }
+      ];
+    }
+
+    const total = await RIDER.countDocuments(query);
+
+    const riders = await RIDER.find(query)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      data: riders,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalCount: total
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+export const getOneRider = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+    const { riderId } = req.params;
+
+    const rider = await RIDER.findOne(riderId);
+    if (!rider) return res.status(404).json({ message: "Rider not found!" });
+
+    return res.status(200).json({ data:rider });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+export const updateRider = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+
+    const { riderId,name, mobileNo, address } = req.body;
+
+    const rider = await RIDER.findById(riderId);
+    if (!rider) return res.status(404).json({ message: "Rider not found!" });
+
+    if (mobileNo) {
+      const duplicate = await RIDER.findOne({ mobileNo, _id: { $ne: riderId } });
+      if (duplicate) {
+        return res.status(400).json({ message: "Mobile number already used by another rider!" });
+      }
+    }
+
+    rider.name = name || rider.name;
+    rider.mobileNo = mobileNo || rider.mobileNo;
+    rider.address = address || rider.address;
+
+    await rider.save();
+
+    return res.status(200).json({ message: "Rider updated successfully", data: rider });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteRider = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+    const { riderId } = req.params;
+
+    const rider = await RIDER.findByIdAndDelete(riderId);
+    if (!rider) return res.status(404).json({ message: "Rider not found!" });
+
+    return res.status(200).json({ message: "Rider deleted successfully" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+//deivery staus 
+
+export const getHomeDeliveryOrders = async (req, res, next) => {
+  try {
+    const { restaurantId } = req.params;
+    const userId = req.user;
+    const { fromDate, toDate, search } = req.query;
+
+    // Validate user
+    const user = await USER.findById(userId).lean();
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+    const customerType = await CUSTOMER_TYPE.findOne({ type: "Home Delivery" }).lean();
+    if (!customerType) return res.status(400).json({ message: "Home Delivery customer type not found!" });
+
+    const query = {
+      restaurantId,
+      customerTypeId: customerType._id,
+      status: "Placed",
+    };
+
+    // Filter by delivery date range
+    if (fromDate || toDate) {
+      query.deliveryDate = {};
+      if (fromDate) query.deliveryDate.$gte = new Date(fromDate);
+      if (toDate) query.deliveryDate.$lte = new Date(toDate);
+    }
+
+    // Optional search (by order number, customer name, or mobileNo)
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+
+      const customers = await CUSTOMER.find({
+        $or: [{ name: searchRegex }, { mobileNo: searchRegex },],
+      }).select("_id");
+
+      const customerIds = customers.map((c) => c._id);
+
+      query.$or = [
+        { orderNo: searchRegex },
+        { order_id: searchRegex },
+        { customerId: { $in: customerIds } },
+      ];
+    }
+
+    // Fetch orders with sorting by upcoming deliveryDate and deliveryTime
+    const orders = await ORDER.find(query)
+      .sort({ deliveryDate: 1, deliveryTime: 1 }) // Sort by date then time
+      .select(
+        "_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod deliveryDate deliveryTime location"
+      )
+      .populate({ path: "tableId", select: "name" })
+      .populate({ path: "customerTypeId", select: "type" })
+      .populate({ path: "customerId", select: "name mobileNo address" });
+
+    return res.status(200).json({ data: orders });
+  } catch (err) {
+    next(err);
+  }
+};

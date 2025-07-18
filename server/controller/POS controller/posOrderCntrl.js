@@ -73,16 +73,387 @@ const getNextOrderNo = async () => {
 };
 
 
-// const printer = new ThermalPrinter({
-//   type: PrinterTypes.EPSON,
-//   interface: `printer:${printerName}`, // replace with actual printer name from DB
-//   options: { timeout: 5000 },
-//   width: 48, // For 80mm paper (~48 characters)
-//   characterSet: 'SLOVENIA',
-//   removeSpecialCharacters: false,
-//   lineCharacter: "="
-// });
+export const createOrder = async (req, res, next) => {
+  try {
+    console.log(req.body, 'body');
 
+    const {
+      tableId,
+      customerTypeId,
+      subMethod,
+      items,
+      vat,
+      restaurantId,
+      total,
+      subTotal,
+      orderId, // For additional orders
+      counterId,
+      discount,
+      action = 'create',
+      customerId,
+      deliveryDate,
+      deliveryTime,
+      location,
+      printConfig = {},
+    } = req.body;
+
+    const userId = req.user;
+    const isAdditionalOrder = Boolean(orderId);
+    console.log(isAdditionalOrder, 'additional order');
+
+    const user = await USER.findOne({ _id: userId }).lean();
+    if (!user) return res.status(400).json({ message: 'User not found' });
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'No items in order' });
+    }
+
+    const foodIds = [];
+    const comboIds = [];
+
+    items.forEach(item => {
+      if (item.isCombo) {
+        comboIds.push(new mongoose.Types.ObjectId(item.comboId));
+        item.items.forEach(comboItem => {
+          foodIds.push(new mongoose.Types.ObjectId(comboItem.foodId));
+        });
+      } else {
+        foodIds.push(new mongoose.Types.ObjectId(item.foodId));
+      }
+    });
+
+    const uniqueFoodIds = [...new Set(foodIds)];
+
+    const [foodDocs, comboDocs] = await Promise.all([
+      FOOD.find({ _id: { $in: uniqueFoodIds }, restaurantId }).lean(),
+      COMBO.find({ _id: { $in: comboIds }, restaurantId })
+        .populate({ path: 'groups', populate: { path: 'foodItems.foodId', model: 'Food' } })
+        .populate('addOns.addOnId')
+        .lean(),
+    ]);
+
+    const foodMap = {};
+    foodDocs.forEach(food => (foodMap[food._id.toString()] = food));
+
+    const comboMap = {};
+    comboDocs.forEach(combo => (comboMap[combo._id.toString()] = combo));
+
+    const processedItems = await Promise.all(
+      items.map(async item => {
+        if (item.isCombo) {
+          const combo = comboMap[item.comboId];
+          if (!combo) throw new Error(`Invalid combo item: ${item.comboId}`);
+
+          const firstFoodItemId = item.items[0]?.foodId;
+          const firstFoodItem = foodMap[firstFoodItemId];
+          if (!firstFoodItem) throw new Error(`Invalid food item in combo: ${firstFoodItemId}`);
+
+          const comboItems = await Promise.all(
+            item.items.map(async comboItem => {
+              const food = foodMap[comboItem.foodId];
+              if (!food) throw new Error(`Invalid food item in combo: ${comboItem.foodId}`);
+              const portion = comboItem.portion ? food.portions?.find(p => p.name === comboItem.portion) : null;
+              const conversion = portion?.conversion || 1;
+              return {
+                foodId: food._id,
+                foodName: food.foodName,
+                portion: comboItem.portion || null,
+                price: comboItem.price || 0,
+                qty: comboItem.qty,
+                total: comboItem.total,
+                discount: comboItem.discountAmount || 0,
+                choices: [],
+                isAdditional: isAdditionalOrder,
+                conversionFactor: conversion,
+                isComboItem: true,
+                comboId: combo._id,
+                comboName: combo.comboName,
+              };
+            })
+          );
+
+          return {
+            foodId: combo._id,
+            foodName: firstFoodItem.foodName,
+            price: item.comboPrice || combo.comboPrice,
+            comboPrice: item.comboPrice || combo.comboPrice,
+            qty: item.qty ?? 1,
+            total: item.total,
+            discount: item.discountAmount || 0,
+            addOns: item.addOns || [],
+            choices: [],
+            isAdditional: isAdditionalOrder,
+            conversionFactor: 1,
+            isCombo: true,
+            comboId: combo._id,
+            comboName: combo.comboName,
+            items: comboItems,
+          };
+        } else {
+          const food = foodMap[item.foodId];
+          if (!food) throw new Error(`Invalid food item: ${item.foodId}`);
+
+          const portionData = food.portions?.find(p => p.name === item.portion);
+          const conversion = portionData?.conversion || 1;
+
+          return {
+            foodId: item.foodId,
+            foodName: food.foodName,
+            portion: item.portion || null,
+            price: item.price,
+            qty: item.qty ?? 1,
+            total: item.total,
+            discount: item.discountAmount || 0,
+            addOns: item.addOns || [],
+            choices: item.choices || [],
+            isAdditional: isAdditionalOrder,
+            conversionFactor: conversion,
+          };
+        }
+      })
+    );
+
+    let order;
+    let ticketNo = null;
+    let orderNo = null;
+    let ctypeName;
+
+    if (isAdditionalOrder) {
+      order = await ORDER.findOne({ _id: orderId, status: { $nin: ['Completed', 'Cancelled'] } });
+      if (!order) return res.status(404).json({ message: 'Order not found or cannot be modified' });
+      ctypeName = order.orderType;
+    } else {
+      const custType = await CUSTOMER_TYPE.findById(customerTypeId).lean();
+      if (!custType) return res.status(400).json({ message: 'Invalid customer type' });
+      ctypeName = custType.type;
+      const generatedOrderId = await generateOrderId();
+      ticketNo = await getNextTicketNo();
+      orderNo = await getNextOrderNo();
+      console.log('Generated Token No:', orderNo);
+
+      [order] = await ORDER.create([
+        {
+          restaurantId,
+          tableId,
+          customerTypeId,
+          subMethod,
+          items: [],
+          discount: discount || 0,
+          vat,
+          subTotal,
+          totalAmount: total,
+          orderType: ctypeName,
+          order_id: generatedOrderId,
+          ticketNo: ticketNo || null,
+          orderNo: orderNo || null,
+          counterId,
+          status: 'Placed',
+          createdById: user._id,
+          createdBy: user.name,
+        },
+      ]);
+    }
+
+
+    if(ctypeName.includes('Home Delivery')){
+      if(!customerId){
+         return res.status(400).json({ message: 'Customer are required for delivery' });
+      }
+
+        if(!deliveryDate || !deliveryTime) {
+     return res.status(400).json({ message: 'Delivery date and time are required' });
+  }
+
+  if(!location){
+    return res.status(400).json({ message: 'Delivery location is required' });
+  }
+
+      order.customerId = customerId;
+      order.deliveryDate = deliveryDate;
+      order.deliveryTime = deliveryTime;
+      order.location = location;
+    }
+
+    if (isAdditionalOrder) {
+      order.items.push(...processedItems);
+      order.totalAmount += processedItems.reduce((sum, item) => sum + item.total, 0);
+    } else {
+      order.items = processedItems;
+    }
+    await order.save();
+
+    if (ctypeName.includes('Dine-In') && tableId) {
+      const table = await TABLES.findById(tableId);
+      if (!table) return res.status(400).json({ message: 'Table not found' });
+
+      const updatedTable = await TABLES.findOneAndUpdate(
+        { _id: tableId },
+        {
+          currentStatus: 'Running',
+          currentOrderId: order._id,
+          totalAmount: order.totalAmount,
+          runningSince: order.createdAt || new Date(),
+        },
+        { new: true }
+      ).lean();
+
+      const io = getIO();
+      io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
+    }
+
+      const populatedOrder = await ORDER.findById(order._id)
+      .populate('tableId', 'name')
+      .populate('customerId', 'name mobileNo address')
+      //  .populate('restaurantId', 'name logo',)
+      //  .populate('customerTypeId', 'type')
+      .lean();
+
+    const io = getIO();
+    const responseData = {
+      order: populatedOrder,
+    };
+
+    io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
+
+    
+
+if (action === 'print' || action === 'kotandPrint') {
+  try {
+    const printerConfigs = await PRINTER_CONFIG.find({ printerType: 'KOT' }).lean();
+    
+    for (const config of printerConfigs) {
+      const { kitchenId, printerName } = config;
+      // For additional orders, only filter the newly added items
+      const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
+      
+      const kitchenItems = itemsToCheck.filter(item => {
+        const foodId = item.isCombo ? item.items[0]?.foodId : item.foodId;
+        const food = foodDocs.find(f => f._id.toString() === foodId.toString());
+        return food?.kitchenId?.toString() === kitchenId?.toString();
+      });
+
+      if (kitchenItems.length > 0) {
+        await printKOTReceipt(order, kitchenItems, printerName, isAdditionalOrder);
+      }
+    }
+
+       if (ctypeName.includes('Take Away')) {
+      await printTakeawayCustomerReceipt(order,kitchenItems, printerName);
+    }
+
+      if (ctypeName.includes('Home Delivery')) {
+      await printTakeawayCustomerReceipt(order,kitchenItems, printerName);
+    }
+    
+  } catch (printError) {
+    console.error('Printing failed:', printError);
+  }
+}
+
+
+if (action === 'kot' || action === 'kotandPrint') {
+      const kitchenItemMap = {};
+
+    const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
+
+    for (const item of itemsToCheck) {
+      if (item.isCombo) {
+        // For combos, find the kitchen from the first food item
+        const combo = comboMap[item.comboId];
+        if (!combo || !item.items || item.items.length === 0) continue;
+
+
+        const kitchen = await KITCHEN.findOne({ restaurantId })
+        const kitchenId = kitchen._id;
+              if (!kitchenId) continue;
+
+      if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
+
+      // Prepare combo items array
+      const comboItemsArray = item.items.map(comboItem => {
+        const food = foodMap[comboItem.foodId.toString()];
+        return {
+          foodId: food._id,
+          name: comboItem.foodName || food.foodName,
+          portion: comboItem.portion,
+          quantity: comboItem.qty,
+          status: 'Pending',
+          isComboItem: true
+        };
+      });
+
+      kitchenItemMap[kitchenId].push({
+        foodId: combo._id, // Combo ID as the main identifier
+        name: combo.comboName,
+        quantity: item.qty,
+        status: 'Pending',
+        message: `Combo Order`,
+        isComboItem: true,
+        comboId: combo._id,
+        comboName: combo.comboName,
+        comboItems: comboItemsArray
+      });
+    } else {
+      // Regular food item
+      const food = foodMap[item.foodId.toString()];
+      if (!food?.kitchenId) continue;
+
+      const kitchenId = food.kitchenId.toString();
+      if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
+
+      kitchenItemMap[kitchenId].push({
+        foodId: item.foodId,
+        name: item.foodName || food.foodName,
+        portion: item.portion,
+        quantity: item.qty,
+        status: 'Pending',
+        message: '',
+        isComboItem: false
+      });
+    }
+  }
+
+  // Create KOTs for each kitchen
+  for (const [kitchenId, items] of Object.entries(kitchenItemMap)) {
+    const kitchen = await KITCHEN.findById(kitchenId).lean();
+    if (!kitchen) continue;
+
+    const table = tableId ? await TABLES.findById(tableId).lean() : null;
+
+    const kotData = {
+      restaurantId,
+      kitchenId,
+      tableId,
+      orderType: ctypeName,
+      items,
+      ticketNo,
+      orderNo,
+      orderId: order._id,
+      order_id: order.order_id,
+      status: 'Pending',
+      orderTime: new Date(),
+      isAdditionalKOT: isAdditionalOrder,
+      message: `New ${ctypeName} Order received${table ? ` for Table ${table.name}` : ''}, Ticket #${ticketNo}`,
+    };
+
+         if (ctypeName.includes('Home Delivery')) {
+          kotData.deliveryDate = order.deliveryDate;
+          kotData.deliveryTime = order.deliveryTime;
+        }
+
+    const [createdKOT] = await KOT_NOTIFICATION.create([kotData]);
+    // req.io?.to(`kitchen:${kitchenId}`).emit('kot_notification', createdKOT);
+
+      req.io?.to(`kitchen:${kitchenId}`).emit('kot_status_update',createdKOT);
+
+  }
+}
+  
+    return res.status(200).json(responseData);
+  } catch (err) {
+    return next(err);
+  }
+};
 
 // export const createOrder = async (req, res, next) => {
 //   try {
@@ -302,9 +673,9 @@ const getNextOrderNo = async () => {
 
 //     io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
 
-//     const shouldPrint = action === 'print';
+    
 
-// if (shouldPrint) {
+// if (action === 'print' || action === 'kotandPrint') {
 //   try {
 //     const printerConfigs = await PRINTER_CONFIG.find({ printerType: 'KOT' }).lean();
     
@@ -332,360 +703,150 @@ const getNextOrderNo = async () => {
 //   }
 // }
 
+// if (action === 'kot' || action === 'kotandPrint') {
+//       const kitchenItemMap = {};
 
+//     const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
+
+//     for (const item of itemsToCheck) {
+//       if (item.isCombo) {
+//         // For combos, find the kitchen from the first food item
+//         const combo = comboMap[item.comboId];
+//         if (!combo || !item.items || item.items.length === 0) continue;
+
+
+//         const kitchen = await KITCHEN.findOne({ restaurantId })
+//         const kitchenId = kitchen._id;
+//               if (!kitchenId) continue;
+
+//       if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
+
+//       // Prepare combo items array
+//       const comboItemsArray = item.items.map(comboItem => {
+//         const food = foodMap[comboItem.foodId.toString()];
+//         return {
+//           foodId: food._id,
+//           name: comboItem.foodName || food.foodName,
+//           portion: comboItem.portion,
+//           quantity: comboItem.qty,
+//           status: 'Pending',
+//           isComboItem: true
+//         };
+//       });
+
+//       kitchenItemMap[kitchenId].push({
+//         foodId: combo._id, // Combo ID as the main identifier
+//         name: combo.comboName,
+//         quantity: item.qty,
+//         status: 'Pending',
+//         message: `Combo Order`,
+//         isComboItem: true,
+//         comboId: combo._id,
+//         comboName: combo.comboName,
+//         comboItems: comboItemsArray
+//       });
+//     } else {
+//       // Regular food item
+//       const food = foodMap[item.foodId.toString()];
+//       if (!food?.kitchenId) continue;
+
+//       const kitchenId = food.kitchenId.toString();
+//       if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
+
+//       kitchenItemMap[kitchenId].push({
+//         foodId: item.foodId,
+//         name: item.foodName || food.foodName,
+//         portion: item.portion,
+//         quantity: item.qty,
+//         status: 'Pending',
+//         message: '',
+//         isComboItem: false
+//       });
+//     }
+//   }
+
+//   // Create KOTs for each kitchen
+//   for (const [kitchenId, items] of Object.entries(kitchenItemMap)) {
+//     const kitchen = await KITCHEN.findById(kitchenId).lean();
+//     if (!kitchen) continue;
+
+//     const table = tableId ? await TABLES.findById(tableId).lean() : null;
+
+//     const kotData = {
+//       restaurantId,
+//       kitchenId,
+//       tableId,
+//       orderType: ctypeName,
+//       items,
+//       ticketNo,
+//       orderNo,
+//       orderId: order._id,
+//       order_id: order.order_id,
+//       status: 'Pending',
+//       orderTime: new Date(),
+//       isAdditionalKOT: isAdditionalOrder,
+//       message: `New ${ctypeName} Order received${table ? ` for Table ${table.name}` : ''}, Ticket #${ticketNo}`,
+//     };
+
+//     const [createdKOT] = await KOT_NOTIFICATION.create([kotData]);
+//     // req.io?.to(`kitchen:${kitchenId}`).emit('kot_notification', createdKOT);
+
+//       req.io?.to(`kitchen:${kitchenId}`).emit('kot_status_update',createdKOT);
+
+
+//      let maxPrepTime = 0; // in minutes
+
+// for (const item of items) {
+//   if (item.isComboItem) {
+//     // For combo items, take max of inner items
+//     for (const comboItem of item.comboItems || []) {
+//       const food = foodMap[comboItem.foodId?.toString()];
+//       if (food?.preparationTime > maxPrepTime) {
+//         maxPrepTime = food.preparationTime;
+//       }
+//     }
+//   } else {
+//     const food = foodMap[item.foodId?.toString()];
+//     if (food?.preparationTime > maxPrepTime) {
+//       maxPrepTime = food.preparationTime;
+//     }
+//   }
+// }
+
+// // ⏲️ Convert minutes to milliseconds
+// const msDelay = maxPrepTime * 60 * 1000;
+
+// setTimeout(async () => {
+//   try {
+//     const kotStatusCheck = await KOT_NOTIFICATION.findById(createdKOT._id);
+//     if (!kotStatusCheck || kotStatusCheck.status !== 'Pending') return;
+
+//     kotStatusCheck.status = 'Ready';
+//     kotStatusCheck.readyAt = new Date();
+//     await kotStatusCheck.save();
+
+//     req.io?.to(`kitchen:${kitchenId}`).emit('kot_status_update', {
+//       kotId: kotStatusCheck._id,
+//       status: 'Ready',
+//       readyAt: kotStatusCheck.readyAt,
+//     });
+//   } catch (err) {
+//     console.error('Auto KOT ready error:', err);
+//   }
+// }, msDelay);
+
+
+      
+
+
+//   }
+// }
   
 //     return res.status(200).json(responseData);
 //   } catch (err) {
 //     return next(err);
 //   }
 // };
-
-
-export const createOrder = async (req, res, next) => {
-  try {
-    console.log(req.body, 'body');
-
-    const {
-      tableId,
-      customerTypeId,
-      subMethod,
-      items,
-      vat,
-      restaurantId,
-      total,
-      subTotal,
-      orderId, // For additional orders
-      counterId,
-      discount,
-      action = 'create',
-      printConfig = {},
-    } = req.body;
-
-    const userId = req.user;
-    const isAdditionalOrder = Boolean(orderId);
-    console.log(isAdditionalOrder, 'additional order');
-
-    const user = await USER.findOne({ _id: userId }).lean();
-    if (!user) return res.status(400).json({ message: 'User not found' });
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: 'No items in order' });
-    }
-
-    const foodIds = [];
-    const comboIds = [];
-
-    items.forEach(item => {
-      if (item.isCombo) {
-        comboIds.push(new mongoose.Types.ObjectId(item.comboId));
-        item.items.forEach(comboItem => {
-          foodIds.push(new mongoose.Types.ObjectId(comboItem.foodId));
-        });
-      } else {
-        foodIds.push(new mongoose.Types.ObjectId(item.foodId));
-      }
-    });
-
-    const uniqueFoodIds = [...new Set(foodIds)];
-
-    const [foodDocs, comboDocs] = await Promise.all([
-      FOOD.find({ _id: { $in: uniqueFoodIds }, restaurantId }).lean(),
-      COMBO.find({ _id: { $in: comboIds }, restaurantId })
-        .populate({ path: 'groups', populate: { path: 'foodItems.foodId', model: 'Food' } })
-        .populate('addOns.addOnId')
-        .lean(),
-    ]);
-
-    const foodMap = {};
-    foodDocs.forEach(food => (foodMap[food._id.toString()] = food));
-
-    const comboMap = {};
-    comboDocs.forEach(combo => (comboMap[combo._id.toString()] = combo));
-
-    const processedItems = await Promise.all(
-      items.map(async item => {
-        if (item.isCombo) {
-          const combo = comboMap[item.comboId];
-          if (!combo) throw new Error(`Invalid combo item: ${item.comboId}`);
-
-          const firstFoodItemId = item.items[0]?.foodId;
-          const firstFoodItem = foodMap[firstFoodItemId];
-          if (!firstFoodItem) throw new Error(`Invalid food item in combo: ${firstFoodItemId}`);
-
-          const comboItems = await Promise.all(
-            item.items.map(async comboItem => {
-              const food = foodMap[comboItem.foodId];
-              if (!food) throw new Error(`Invalid food item in combo: ${comboItem.foodId}`);
-              const portion = comboItem.portion ? food.portions?.find(p => p.name === comboItem.portion) : null;
-              const conversion = portion?.conversion || 1;
-              return {
-                foodId: food._id,
-                foodName: food.foodName,
-                portion: comboItem.portion || null,
-                price: comboItem.price || 0,
-                qty: comboItem.qty,
-                total: comboItem.total,
-                discount: comboItem.discountAmount || 0,
-                choices: [],
-                isAdditional: isAdditionalOrder,
-                conversionFactor: conversion,
-                isComboItem: true,
-                comboId: combo._id,
-                comboName: combo.comboName,
-              };
-            })
-          );
-
-          return {
-            foodId: combo._id,
-            foodName: firstFoodItem.foodName,
-            price: item.comboPrice || combo.comboPrice,
-            comboPrice: item.comboPrice || combo.comboPrice,
-            qty: item.qty ?? 1,
-            total: item.total,
-            discount: item.discountAmount || 0,
-            addOns: item.addOns || [],
-            choices: [],
-            isAdditional: isAdditionalOrder,
-            conversionFactor: 1,
-            isCombo: true,
-            comboId: combo._id,
-            comboName: combo.comboName,
-            items: comboItems,
-          };
-        } else {
-          const food = foodMap[item.foodId];
-          if (!food) throw new Error(`Invalid food item: ${item.foodId}`);
-
-          const portionData = food.portions?.find(p => p.name === item.portion);
-          const conversion = portionData?.conversion || 1;
-
-          return {
-            foodId: item.foodId,
-            foodName: food.foodName,
-            portion: item.portion || null,
-            price: item.price,
-            qty: item.qty ?? 1,
-            total: item.total,
-            discount: item.discountAmount || 0,
-            addOns: item.addOns || [],
-            choices: item.choices || [],
-            isAdditional: isAdditionalOrder,
-            conversionFactor: conversion,
-          };
-        }
-      })
-    );
-
-    let order;
-    let ticketNo = null;
-    let orderNo = null;
-    let ctypeName;
-
-    if (isAdditionalOrder) {
-      order = await ORDER.findOne({ _id: orderId, status: { $nin: ['Completed', 'Cancelled'] } });
-      if (!order) return res.status(404).json({ message: 'Order not found or cannot be modified' });
-      ctypeName = order.orderType;
-    } else {
-      const custType = await CUSTOMER_TYPE.findById(customerTypeId).lean();
-      if (!custType) return res.status(400).json({ message: 'Invalid customer type' });
-      ctypeName = custType.type;
-      const generatedOrderId = await generateOrderId();
-      ticketNo = await getNextTicketNo();
-      orderNo = await getNextOrderNo();
-      console.log('Generated Token No:', orderNo);
-
-      [order] = await ORDER.create([
-        {
-          restaurantId,
-          tableId,
-          customerTypeId,
-          subMethod,
-          items: [],
-          discount: discount || 0,
-          vat,
-          subTotal,
-          totalAmount: total,
-          orderType: ctypeName,
-          order_id: generatedOrderId,
-          ticketNo: ticketNo || null,
-          orderNo: orderNo || null,
-          counterId,
-          status: 'Placed',
-          createdById: user._id,
-          createdBy: user.name,
-        },
-      ]);
-    }
-
-    if (isAdditionalOrder) {
-      order.items.push(...processedItems);
-      order.totalAmount += processedItems.reduce((sum, item) => sum + item.total, 0);
-    } else {
-      order.items = processedItems;
-    }
-    await order.save();
-
-    if (ctypeName.includes('Dine-In') && tableId) {
-      const table = await TABLES.findById(tableId);
-      if (!table) return res.status(400).json({ message: 'Table not found' });
-
-      const updatedTable = await TABLES.findOneAndUpdate(
-        { _id: tableId },
-        {
-          currentStatus: 'Running',
-          currentOrderId: order._id,
-          totalAmount: order.totalAmount,
-          runningSince: order.createdAt || new Date(),
-        },
-        { new: true }
-      ).lean();
-
-      const io = getIO();
-      io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
-    }
-
-      const populatedOrder = await ORDER.findById(order._id)
-      .populate('tableId', 'name')
-      .populate('customerId', 'name mobileNo')
-      //  .populate('restaurantId', 'name logo',)
-      //  .populate('customerTypeId', 'type')
-      .lean();
-
-    const io = getIO();
-    const responseData = {
-      order: populatedOrder,
-    };
-
-    io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
-
-    
-
-if (action === 'print' || action === 'kotandPrint') {
-  try {
-    const printerConfigs = await PRINTER_CONFIG.find({ printerType: 'KOT' }).lean();
-    
-    for (const config of printerConfigs) {
-      const { kitchenId, printerName } = config;
-      // For additional orders, only filter the newly added items
-      const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
-      
-      const kitchenItems = itemsToCheck.filter(item => {
-        const foodId = item.isCombo ? item.items[0]?.foodId : item.foodId;
-        const food = foodDocs.find(f => f._id.toString() === foodId.toString());
-        return food?.kitchenId?.toString() === kitchenId?.toString();
-      });
-
-      if (kitchenItems.length > 0) {
-        await printKOTReceipt(order, kitchenItems, printerName, isAdditionalOrder);
-      }
-    }
-
-    if (ctypeName.includes('Take Away')) {
-      await printTakeawayCustomerReceipt(order, printConfig);
-    }
-  } catch (printError) {
-    console.error('Printing failed:', printError);
-  }
-}
-
-if (action === 'kot' || action === 'kotandPrint') {
-      const kitchenItemMap = {};
-
-    const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
-
-    for (const item of itemsToCheck) {
-      if (item.isCombo) {
-        // For combos, find the kitchen from the first food item
-        const combo = comboMap[item.comboId];
-        if (!combo || !item.items || item.items.length === 0) continue;
-
-
-        const kitchen = await KITCHEN.findOne({ restaurantId })
-        const kitchenId = kitchen._id;
-              if (!kitchenId) continue;
-
-      if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
-
-      // Prepare combo items array
-      const comboItemsArray = item.items.map(comboItem => {
-        const food = foodMap[comboItem.foodId.toString()];
-        return {
-          foodId: food._id,
-          name: comboItem.foodName || food.foodName,
-          portion: comboItem.portion,
-          quantity: comboItem.qty,
-          status: 'Pending',
-          isComboItem: true
-        };
-      });
-
-      kitchenItemMap[kitchenId].push({
-        foodId: combo._id, // Combo ID as the main identifier
-        name: combo.comboName,
-        quantity: item.qty,
-        status: 'Pending',
-        message: `Combo Order`,
-        isComboItem: true,
-        comboId: combo._id,
-        comboName: combo.comboName,
-        comboItems: comboItemsArray
-      });
-    } else {
-      // Regular food item
-      const food = foodMap[item.foodId.toString()];
-      if (!food?.kitchenId) continue;
-
-      const kitchenId = food.kitchenId.toString();
-      if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
-
-      kitchenItemMap[kitchenId].push({
-        foodId: item.foodId,
-        name: item.foodName || food.foodName,
-        portion: item.portion,
-        quantity: item.qty,
-        status: 'Pending',
-        message: '',
-        isComboItem: false
-      });
-    }
-  }
-
-  // Create KOTs for each kitchen
-  for (const [kitchenId, items] of Object.entries(kitchenItemMap)) {
-    const kitchen = await KITCHEN.findById(kitchenId).lean();
-    if (!kitchen) continue;
-
-    const table = tableId ? await TABLES.findById(tableId).lean() : null;
-
-    const kotData = {
-      restaurantId,
-      kitchenId,
-      tableId,
-      orderType: ctypeName,
-      items,
-      ticketNo,
-      orderNo,
-      orderId: order._id,
-      order_id: order.order_id,
-      status: 'Pending',
-      orderTime: new Date(),
-      isAdditionalKOT: isAdditionalOrder,
-      message: `New ${ctypeName} Order received${table ? ` for Table ${table.name}` : ''}, Ticket #${ticketNo}`,
-    };
-
-    const [createdKOT] = await KOT_NOTIFICATION.create([kotData]);
-    // req.io?.to(`kitchen:${kitchenId}`).emit('kot_notification', createdKOT);
-
-      req.io?.to(`kitchen:${kitchenId}`).emit('kot_status_update',createdKOT);
-  }
-}
-  
-    return res.status(200).json(responseData);
-  } catch (err) {
-    return next(err);
-  }
-};
 
 
 
@@ -1483,3 +1644,6 @@ io.to(`posOrder-${order.restaurantId}`).emit('table_change', { order: populatedO
     next(err)
   }
 }
+
+
+

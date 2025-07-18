@@ -157,9 +157,25 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Placed", "Completed", "Cancelled"],
+      enum: ["Placed", "Completed", "Cancelled" ,"ReadyPickeup","OutForDelivery"],
       default: "Placed",
     },
+    
+        deliveryDate: {
+      type: Date,
+      required: function() { return this.orderType.includes('Home Delivery'); }
+    },
+    deliveryTime: {
+      type: String, // or Date if you prefer
+      required: function() { return this.orderType.includes('Home Delivery'); }
+    },
+     location: {
+      type: String, // or Date if you prefer
+      required: function() { return this.orderType.includes('Home Delivery'); }
+    },
+    
+
+    
     restaurantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Restaurant",
