@@ -61,6 +61,10 @@ const purchaseSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     } ,
+    note:{
+      type:String,
+      default:null
+    },
     createdBy:{
         type:String
     },

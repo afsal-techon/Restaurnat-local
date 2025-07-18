@@ -1092,67 +1092,76 @@ txt += '\n';
 };
 
 
-  export const getTodayOrdersForPOS = async (req, res, next) => {
-    try {
-      const { restaurantId } = req.params;
-      const userId = req.user; 
-  
-      // Validate restaurant access
-      const user = await USER.findOne({ _id: userId });
-      if (!user) return res.status(403).json({ message: "User not found!" });
-  
-      // Get today's date range (start and end of day)
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-  
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-  
-      // Fetch orders in parallel for better performance
-      const [ongoing, completed, cancelled] = await Promise.all([
-        // Ongoing orders (Placed, Preparing, Ready, Served)
-        ORDER.find({
-          restaurantId,
-          createdAt: { $gte: todayStart, $lte: todayEnd },
-          status: "Placed"
-        })
+export const getTodayOrdersForPOS = async (req, res, next) => {
+  try {
+    const { restaurantId } = req.params;
+    const userId = req.user;
+
+    const user = await USER.findById(userId);
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+    const now = new Date();
+
+    // Fetch orders in parallel with per-order 24h logic
+    const [ongoing, completed, cancelled] = await Promise.all([
+      // Ongoing: createdAt + 24h > now
+      ORDER.find({
+        restaurantId,
+        status: "Placed",
+        $expr: {
+          $gt: [
+            { $add: ["$createdAt", 1000 * 60 * 60 * 24] }, // createdAt + 24h
+            now
+          ]
+        }
+      })
         .select("_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod")
-           .populate({ path: "tableId", select: "name" })
-           .populate({ path: "customerTypeId", select: "type" })
-          .sort({ createdAt: -1 }), // Newest first
-        
-        // Completed orders
-        ORDER.find({
-          restaurantId,
-          createdAt: { $gte: todayStart, $lte: todayEnd },
-          status: "Completed",
-          
-        })
+        .populate({ path: "tableId", select: "name" })
+        .populate({ path: "customerTypeId", select: "type" })
+        .sort({ createdAt: -1 }),
+
+      // Completed
+      ORDER.find({
+        restaurantId,
+        status: "Completed",
+        $expr: {
+          $gt: [
+            { $add: ["$createdAt", 1000 * 60 * 60 * 24] },
+            now
+          ]
+        }
+      })
         .select("_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod")
-          .populate("tableId", "name")
-          .sort({ createdAt: -1 }),
-        
-        // Cancelled orders
-        ORDER.find({
-          restaurantId,
-          createdAt: { $gte: todayStart, $lte: todayEnd },
-          status: "Cancelled",
-        })
+        .populate("tableId", "name")
+        .sort({ createdAt: -1 }),
+
+      // Cancelled
+      ORDER.find({
+        restaurantId,
+        status: "Cancelled",
+        $expr: {
+          $gt: [
+            { $add: ["$createdAt", 1000 * 60 * 60 * 24] },
+            now
+          ]
+        }
+      })
         .select("_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod")
-          .populate("tableId", "name")
-          .sort({ createdAt: -1 })
-      ]);
-  
-      return res.status(200).json({
-        ongoing,
-        completed,
-        cancelled
-      });
-  
-    } catch (err) {
-      return next(err);
-    }
-  };
+        .populate("tableId", "name")
+        .sort({ createdAt: -1 })
+    ]);
+
+    return res.status(200).json({
+      ongoing,
+      completed,
+      cancelled
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
 
   export const getOneOrderDetails = async (req, res, next) => {
     try {
@@ -1483,7 +1492,7 @@ const paymentRecord = {
 
 
   } else {
-    console.error("❌ Printer not connected.");
+    console.error(" Printer not connected.");
   }
 }
 

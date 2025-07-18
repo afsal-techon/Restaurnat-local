@@ -4,7 +4,7 @@ import SUPPLIER from '../../model/supplier.js'
 
 export const createSupplier = async (req, res, next) => {
   try {
-    const {  supplierName, mobileNo, address,credit } = req.body;
+    const {  supplierName, mobileNo, address,credit,trn } = req.body;
     const userId = req.user;
 
 
@@ -38,6 +38,7 @@ export const createSupplier = async (req, res, next) => {
         supplierName: supplierName.trim(),
         mobileNo: mobileNo.trim(),
         address: address?.trim() || "",
+        trn:trn || null,
         createdById: user._id,
         createdBy: user.name,
          wallet: {
@@ -90,11 +91,38 @@ export const getSuppliers = async (req, res, next) => {
   }
 };
 
+// export const getOneSupplier = async (req, res, next) => {
+//   try {
+//     const { supplierId } = req.params;
+//     const userId = req.user;
+
+//     if (!supplierId) {
+//       return res.status(400).json({ message: "Supplier Id is required!" });
+//     }
+
+//     const user = await USER.findOne({ _id: userId });
+//     if (!user) {
+//       return res.status(400).json({ message: "User not found!" });
+//     }
+
+//     const supplier = await SUPPLIER.findById(supplierId);
+//     if (!supplier) {
+//       return res.status(404).json({ message: "Supplier not found!" });
+//     }
+
+//     return res
+//       .status(200)
+//       .json({ data: supplier });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
 
 export const updateSupplier = async (req, res, next) => {
   try {
     // vendorId will come from URL params
-    const { supplierId, supplierName, mobileNo, address ,credit  } = req.body;
+    const { supplierId, supplierName, mobileNo, address ,credit,trn  } = req.body;
     const userId = req.user;
 
     if (!supplierId) {
@@ -136,6 +164,7 @@ export const updateSupplier = async (req, res, next) => {
     supplier.supplierName = supplierName.trim();
     supplier.mobileNo = mobileNo.trim();
     supplier.address = address?.trim() || "";
+    supplier.trn = trn ||  null;
     supplier.wallet.credit = credit ;
 
     await supplier.save();

@@ -33,4 +33,5 @@ const riderSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-export default mongoose.model("Rider", riderSchema);
+ const riderModel =  mongoose.model("Rider", riderSchema);
+ export default riderModel;

@@ -20,6 +20,10 @@ const supplierSchema = new mongoose.Schema(
       credit: { type: Number, default: 0 },     // Amount the restaurant still owes to vendor (credit to vendor)
       debit: { type: Number, default: 0 },  // Amount the vendor needs to return to restaurant
     },
+    trn:{
+      type:String,
+      default:null,
+    },
     createdById: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

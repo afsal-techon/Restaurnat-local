@@ -26,7 +26,7 @@ export const  createRestuarantBranch = async (req,res,next)=>{
        console.log(req.body,'--dfid')
         const {
             name, address,country, state, city, email,phone,phone2,phone3,
-            openingTime, closingTime, vatPercentage, currency, currencySymbol,
+            openingTime, closingTime, vatPercentage, currency, currencySymbol,trn,
         } = req.body;
 
           const logo = req.file ? `/uploads/${req.file.filename}` : null;
@@ -97,6 +97,7 @@ export const  createRestuarantBranch = async (req,res,next)=>{
             currencySymbol,
             companyAdmin: companyAdminId,
             logo,
+            trn,
         });
         return res.status(201).json({ message: "Restaurant created successfully", restaurant });
 
@@ -149,7 +150,7 @@ export const updateRestaurantBranch = async (req, res, next) => {
         const {
             restaurantId,
             name, address,country, state, city, email,phone,phone2,phone3,
-            openingTime, closingTime, vatPercentage, currency, currencySymbol,
+            openingTime, closingTime, vatPercentage, currency, currencySymbol,trn
         } = req.body;
 
         const logo = req.file ? `/uploads/${req.file.filename}` : null;
@@ -216,6 +217,7 @@ export const updateRestaurantBranch = async (req, res, next) => {
                 vatPercentage: vatPercentage || restaurant.vatPercentage,
                 currency: currency || restaurant.currency,
                 currencySymbol: currencySymbol || restaurant.currencySymbol,
+                trn: trn || restaurant.trn,
             },
             { new: true } //  Return updated document
         );

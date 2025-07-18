@@ -70,6 +70,7 @@ export const createPurchase = async (req, res, next) => {
         vatAmount: item.vatAmount,
       })),
       totalAmount,
+      note,
       vatTotal,
       createdById: user._id,
       isVatInclusive,
@@ -316,7 +317,8 @@ export const updatePurchase = async (req, res, next) => {
       paymentModeId,
       items,
       totalAmount,
-      vatTotal
+      vatTotal,
+      note
     } = req.body;
 
     if (!purchaseId) return res.status(400).json({ message: "Purchase ID is required!" });
@@ -354,6 +356,7 @@ export const updatePurchase = async (req, res, next) => {
         })),
         totalAmount,
         vatTotal,
+        note,
         updatedById: user._id,
         createdBy: user.name,
         createdById: user._id
