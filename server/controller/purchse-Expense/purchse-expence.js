@@ -269,7 +269,7 @@ export const getExpenseReport = async (req, res, next) => {
           as: "supplierInfo"
         }
       },
-      { $unwind: { path: "supplierInfo", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$supplierInfo", preserveNullAndEmptyArrays: true } },
 
       ...(supplierName
         ? [{ $match: { "supplierInfo.supplierName": { $regex: supplierName, $options: "i" } } }]
