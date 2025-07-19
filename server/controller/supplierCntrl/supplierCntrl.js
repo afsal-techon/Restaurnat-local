@@ -207,3 +207,55 @@ export const deleteSupplier = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+export const paySupplierDue = async (req, res, next) => {
+  try {
+    const userId = req.user;
+    const { restaurantId, supplierId, amount, accountId, note } = req.body;
+
+    if (!supplierId || !amount || !accountId) {
+      return res.status(400).json({ message: "All fields are required!" });
+    }
+
+    const user = await USER.findById(userId).lean();
+    if (!user) return res.status(404).json({ message: "User not found!" });
+
+    const supplier = await SUPPLIER.findById(supplierId);
+    if (!supplier) return res.status(404).json({ message: "Supplier not found!" });
+
+    const currentDue = supplier.due || 0;
+
+    if (amount > currentDue) {
+      return res.status(400).json({ message: "Amount exceeds supplier's due!" });
+    }
+
+    // Deduct due
+    supplier.due = currentDue - amount;
+    await supplier.save();
+
+    // Create Transaction entry - Money going out from account (Cash/Bank)
+    const refId = await generateUniqueRefId();
+
+    await TRANSACTION.create({
+      restaurantId,
+      accountId,              // e.g. cash/bank
+      amount,
+      type: "Debit",          // money going out
+      referenceId: refId,
+      referenceType: "Supplier Due Payment",
+      description: note || `Payment to Supplier: ${supplier.name}`,
+      createdById: userId,
+      createdBy: user.name,
+      supplierId: supplier._id
+    });
+
+    return res.status(200).json({
+      message: "Supplier due payment recorded successfully!",
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};

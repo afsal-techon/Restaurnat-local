@@ -198,9 +198,9 @@ export const assignRiderForOut = async (req, res, next) => {
       return res.status(404).json({ message: "Rider not found!" });
     }
 
-    if (order.status !== "Placed") {
+    if (order.status !== "ReadyPickUp") {
       return res.status(400).json({
-        message: "Only orders with status 'Placed' can be marked as Out For Delivery!",
+        message: "Only orders with status 'ReadyPickup' can be marked as Out For Delivery!",
       });
     }
 
@@ -456,7 +456,7 @@ export const getDeliveredHomeDelivery = async (req, res, next) => {
     const query = {
       restaurantId,
       customerTypeId: customerType._id,
-      status: "completed",
+      status: "Completed",
     };
 
     // Filter by delivery date range
@@ -490,7 +490,7 @@ export const getDeliveredHomeDelivery = async (req, res, next) => {
       .skip(skip)
       .limit(limit)
       .select(
-        "_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod deliveryDate deliveryTime location"
+        "_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod deliveryDate deliveryTime location pickupTime deliveredTime"
       )
       .populate({ path: "tableId", select: "name" })
       .populate({ path: "customerTypeId", select: "type" })

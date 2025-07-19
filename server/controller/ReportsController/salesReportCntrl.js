@@ -11,6 +11,8 @@ import ExcelJS from 'exceljs';
 
 
 
+
+
 export const getDailySalesReport = async (req, res, next) => {
   try {
     const userId = req.user;
@@ -673,6 +675,8 @@ export const getCustomerTypeWiseSalesReport = async (req, res, next) => {
 
 
 
+
+
 //pdf section
 export const generateDailySalesPDF = async (req, res, next) => {
   try {
@@ -1318,8 +1322,10 @@ export const generateCustomerTypeWisePDF = async (req, res, next) => {
 
 
 
-//excle section
 
+
+
+//excle section
 export const categorySalesExcel = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user);

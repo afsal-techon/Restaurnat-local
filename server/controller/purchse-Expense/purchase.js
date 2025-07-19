@@ -94,7 +94,7 @@ export const createPurchase = async (req, res, next) => {
       createdBy:user.name,
     };
 
-    const creditTxn = {
+    const paymentTxn = {
       restaurantId : account.restaurantId || null,
       purchaseId: purchase._id,
       accountId: paymentModeId,
@@ -107,7 +107,7 @@ export const createPurchase = async (req, res, next) => {
       createdBy:user.name,
     };
 
-    await TRANSACTION.insertMany([debitTxn, creditTxn]);
+    await TRANSACTION.insertMany([debitTxn, paymentTxn]);
 
     return res.status(200).json({ message: "Purchase created successfully!" });
   } catch (err) {
