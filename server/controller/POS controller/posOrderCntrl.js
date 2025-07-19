@@ -90,10 +90,7 @@ export const createOrder = async (req, res, next) => {
       counterId,
       discount,
       action = 'create',
-      customerId,
-      deliveryDate,
-      deliveryTime,
-      location,
+      deliveryDetails,
       printConfig = {},
     } = req.body;
 
@@ -256,22 +253,22 @@ export const createOrder = async (req, res, next) => {
 
 
     if(ctypeName.includes('Home Delivery')){
-      if(!customerId){
+      if(!deliveryDetails.customerId){
          return res.status(400).json({ message: 'Customer are required for delivery' });
       }
 
-        if(!deliveryDate || !deliveryTime) {
+        if(!deliveryDetails.deliveryDate || !deliveryDetails.deliveryTime) {
      return res.status(400).json({ message: 'Delivery date and time are required' });
   }
 
-  if(!location){
+  if(!deliveryDetails.location){
     return res.status(400).json({ message: 'Delivery location is required' });
   }
 
-      order.customerId = customerId;
-      order.deliveryDate = deliveryDate;
-      order.deliveryTime = deliveryTime;
-      order.location = location;
+      order.customerId = deliveryDetails.customerId;
+      order.deliveryDate = deliveryDetails.deliveryDate;
+      order.deliveryTime = deliveryDetails.deliveryTime;
+      order.location = deliveryDetails.location;
     }
 
     if (isAdditionalOrder) {
