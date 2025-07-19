@@ -16,8 +16,9 @@ agenda.define("mark kot as ready", async (job) => {
 });
 
 // Start Agenda
-(async function () {
+(async function () { 
   await agenda.start();
 })();
 
 export default agenda;
+  

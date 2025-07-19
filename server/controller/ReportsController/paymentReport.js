@@ -632,7 +632,7 @@ export const getDailyTransactionReport = async (req, res, next) => {
     next(err);
   }
 };
-
+ 
 
 
 
@@ -899,3 +899,134 @@ export const DailyCollectionReportExcel = async (req, res, next) => {
 };
 
 
+
+export const DailyTransactionReportExcel = async (req, res, next) => {
+  try {
+    const {
+      fromDate,
+      toDate,
+      search = "",
+      type,
+      accountName = "",
+      accountType = "",
+      paymentModeName = "",
+    } = req.query;
+
+    const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const matchStage = {};
+
+    if (type) matchStage.type = type;
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const searchStage = search
+      ? {
+          $or: [
+            { referenceId: { $regex: search, $options: "i" } },
+            { referenceType: { $regex: search, $options: "i" } },
+            { narration: { $regex: search, $options: "i" } },
+          ],
+        }
+      : null;
+
+    const pipeline = [
+      { $match: matchStage },
+      ...(searchStage ? [{ $match: searchStage }] : []),
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo",
+        },
+      },
+      { $unwind: "$accountInfo" },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo",
+        },
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+      ...(accountName
+        ? [{ $match: { "accountInfo.accountName": { $regex: accountName, $options: "i" } } }]
+        : []),
+      ...(accountType
+        ? [{ $match: { "accountInfo.accountType": accountType } }]
+        : []),
+      ...(paymentModeName
+        ? [{ $match: { "paymentTypeInfo.accountName": { $regex: paymentModeName, $options: "i" } } }]
+        : []),
+      { $sort: { createdAt: 1 } },
+      {
+        $addFields: {
+          credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+          debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
+        },
+      },
+    ];
+
+    const transactions = await TRANSACTION.aggregate(pipeline);
+
+    // Add running total
+    let runningTotal = 0;
+    const rows = transactions.map((txn) => {
+      const change = txn.type === "Credit" ? txn.amount : -txn.amount;
+      runningTotal += change;
+
+      return {
+        date: txn.createdAt.toISOString().split("T")[0],
+        referenceId: txn.referenceId || "",
+        referenceType: txn.referenceType || "",
+        narration: txn.narration || "",
+        accountName: txn.accountInfo?.accountName || "",
+        accountType: txn.accountInfo?.accountType || "",
+        paymentMode: txn.paymentTypeInfo?.accountName || "",
+        type: txn.type,
+        credit: txn.type === "Credit" ? txn.amount : 0,
+        debit: txn.type === "Debit" ? txn.amount : 0,
+        runningTotal,
+      };
+    });
+
+    // Generate Excel
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Daily Transactions");
+
+    worksheet.columns = [
+      { header: "Date", key: "date", width: 15 },
+      { header: "Reference ID", key: "referenceId", width: 20 },
+      { header: "Reference Type", key: "referenceType", width: 20 },
+      { header: "Narration", key: "narration", width: 25 },
+      { header: "Account Name", key: "accountName", width: 20 },
+      { header: "Account Type", key: "accountType", width: 20 },
+      { header: "Payment Mode", key: "paymentMode", width: 20 },
+      { header: "Type", key: "type", width: 10 },
+      { header: "Credit", key: "credit", width: 15 },
+      { header: "Debit", key: "debit", width: 15 },
+      { header: "Running Total", key: "runningTotal", width: 20 },
+    ];
+
+    worksheet.addRows(rows);
+
+    // Formatting headers
+    worksheet.getRow(1).font = { bold: true };
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=Daily_Transaction_Report.xlsx");
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    next(err);
+  }
+};

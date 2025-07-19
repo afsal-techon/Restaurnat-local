@@ -7,7 +7,7 @@ const svc = new Service({
 });
 
 svc.on('uninstall', () => {
-  console.log('✅ Old service removed completely');
+  console.log('Old service removed completely');
 });
 
 svc.uninstall();
