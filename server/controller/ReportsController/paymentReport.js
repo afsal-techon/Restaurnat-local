@@ -1,13 +1,10 @@
 import mongoose from "mongoose";
 import USER from '../../model/userModel.js';
-import ORDER from '../../model/oreder.js';
-import PAYMENT from '../../model/paymentRecord.js'
 import TRANSACTION from '../../model/transaction.js'
 import CUSTOMER from '../../model/customer.js';
 import RESTAURANT from '../../model/restaurant.js'
 import {  generatePDF } from '../../config/pdfGeneration.js'
-import ACCOUNT from '../../model/account.js'
-
+import ExcelJS from 'exceljs';
 
 
 export const getPaymentSummary = async (req, res, next) => {
@@ -639,5 +636,266 @@ export const getDailyTransactionReport = async (req, res, next) => {
 
 
 
+
+//excel generation
+
+export const PaymentSummaryExcel = async (req, res, next) => {
+  try {
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const { search } = req.query;
+
+    const matchStage = {
+      type: "Credit",
+      referenceType: { $in: ["Sale", "Due Payment"] },
+    };
+
+    const allPayments = await TRANSACTION.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: "$accountId",
+          amount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "_id",
+          foreignField: "_id",
+          as: "accountInfo",
+        },
+      },
+      { $unwind: { path: "$accountInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountInfo.parentAccountId",
+          foreignField: "_id",
+          as: "parentInfo",
+        },
+      },
+      { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          type: "$accountInfo.accountName",
+          amount: 1,
+          count: 1,
+          groupUnder: {
+            accountName: "$parentInfo.accountName",
+            accountType: "$parentInfo.accountType",
+          },
+        },
+      },
+      ...(search
+        ? [
+            {
+              $match: {
+                type: { $regex: search, $options: "i" },
+              },
+            },
+          ]
+        : []),
+    ]);
+
+    const totalCollected = allPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    const dueResult = await CUSTOMER.aggregate([
+      {
+        $match: {
+          credit: { $gt: 0 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalDue: { $sum: "$credit" },
+        },
+      },
+    ]);
+
+    const totalDue = dueResult[0]?.totalDue || 0;
+
+    // ========== Excel Generation ==========
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Payment Summary");
+
+    worksheet.columns = [
+      { header: "S.No", key: "sno", width: 10 },
+      { header: "Payment Method", key: "type", width: 25 },
+      { header: "Group Under", key: "groupUnder", width: 25 },
+      { header: "Transactions", key: "count", width: 15 },
+      { header: "Amount", key: "amount", width: 15 },
+    ];
+
+    allPayments.forEach((entry, index) => {
+      worksheet.addRow({
+        sno: index + 1,
+        type: entry.type || "",
+        groupUnder: entry.groupUnder?.accountName || "",
+        count: entry.count,
+        amount: entry.amount,
+      });
+    });
+
+    // Add summary row (Grand Total)
+    worksheet.addRow({});
+    worksheet.addRow({
+      sno: "",
+      type: "Grand Total",
+      groupUnder: "",
+      count: allPayments.reduce((sum, x) => sum + x.count, 0),
+      amount: totalCollected,
+    });
+
+    // Add Due Summary
+    worksheet.addRow({});
+    worksheet.addRow({
+      sno: "",
+      type: "Total Customer Due",
+      groupUnder: "",
+      count: "",
+      amount: totalDue,
+    });
+
+    // Format header
+    worksheet.getRow(1).font = { bold: true };
+
+    // Set response headers
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=payment_summary.xlsx");
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const DailyCollectionReportExcel = async (req, res, next) => {
+  try {
+    const { fromDate, toDate, search } = req.query;
+
+    if (!fromDate || !toDate) {
+      return res.status(400).json({ message: "Please provide fromDate and toDate" });
+    }
+
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    end.setHours(23, 59, 59, 999);
+
+    const match = {
+      type: "Credit",
+      referenceType: { $in: ["Sale", "Due Payment"] },
+      createdAt: { $gte: start, $lte: end }
+    };
+
+    const pipeline = [
+      { $match: match },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "account"
+        }
+      },
+      { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          amount: 1,
+          accountName: "$account.accountName",
+          date: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          }
+        }
+      },
+      ...(search ? [{
+        $match: {
+          accountName: { $regex: search, $options: "i" }
+        }
+      }] : []),
+      {
+        $group: {
+          _id: { date: "$date", type: "$accountName" },
+          amount: { $sum: "$amount" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $group: {
+          _id: "$_id.date",
+          collections: {
+            $push: {
+              type: "$_id.type",
+              amount: "$amount",
+              count: "$count"
+            }
+          },
+          total: { $sum: "$amount" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: "$_id",
+          collections: 1,
+          total: 1
+        }
+      },
+      { $sort: { date: -1 } }
+    ];
+
+    const result = await TRANSACTION.aggregate(pipeline);
+
+    // ======= Create Excel =======
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Daily Collection Report");
+
+    worksheet.columns = [
+      { header: "Date", key: "date", width: 15 },
+      { header: "Account Name", key: "accountName", width: 25 },
+      { header: "Amount", key: "amount", width: 15 },
+      { header: "Count", key: "count", width: 10 },
+    ];
+
+    result.forEach((day) => {
+      day.collections.forEach((col) => {
+        worksheet.addRow({
+          date: day.date,
+          accountName: col.type,
+          amount: col.amount,
+          count: col.count,
+        });
+      });
+      worksheet.addRow({
+        date: day.date,
+        accountName: "Total",
+        amount: day.total,
+        count: "",
+      });
+      worksheet.addRow({}); // empty row
+    });
+
+    const fileName = `DailyCollection_${fromDate}_to_${toDate}.xlsx`;
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${fileName}"`
+    );
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    next(err);
+  }
+};
 
 

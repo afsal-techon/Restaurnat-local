@@ -254,9 +254,11 @@ export const completeHomeDelivery = async (req, res, next) => {
 
 export const getPlacedHomeDelivery = async (req, res, next) => {
   try {
-    const { restaurantId } = req.params;
-    const userId = req.user;
-    const { fromDate, toDate, search } = req.query;
+
+    const userId = req.user
+    const {restaurantId, fromDate, toDate, search } = req.query;
+
+ 
 
     // Validate user
     const user = await USER.findById(userId).lean();
@@ -314,9 +316,9 @@ export const getPlacedHomeDelivery = async (req, res, next) => {
 
 export const getWaitingForHomeDelivery = async (req, res, next) => {
   try {
-    const { restaurantId } = req.params;
+   
     const userId = req.user;
-    const { fromDate, toDate, search } = req.query;
+    const { restaurantId,fromDate, toDate, search } = req.query;
 
     // Validate user
     const user = await USER.findById(userId).lean();
@@ -374,9 +376,9 @@ export const getWaitingForHomeDelivery = async (req, res, next) => {
 
 export const getOutForHomeDelivery = async (req, res, next) => {
   try {
-    const { restaurantId } = req.params;
+
     const userId = req.user;
-    const { fromDate, toDate, search } = req.query;
+    const {restaurantId, fromDate, toDate, search } = req.query;
 
     // Validate user
     const user = await USER.findById(userId).lean();
@@ -435,9 +437,9 @@ export const getOutForHomeDelivery = async (req, res, next) => {
 
 export const getDeliveredHomeDelivery = async (req, res, next) => {
   try {
-    const { restaurantId } = req.params;
+
     const userId = req.user;
-    const { fromDate, toDate, search, limit: lim, page: pg } = req.query;
+    const {restaurantId, fromDate, toDate, search, limit: lim, page: pg } = req.query;
 
     const limit = parseInt(lim) || 20;
     const page = parseInt(pg) || 1;

@@ -31,6 +31,7 @@ import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList,
 import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
 import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
+import { getProfitAndLossReport } from '../controller/ReportsController/otherReports.js';
 const router = express.Router();
 
 
@@ -290,14 +291,18 @@ router.delete('/rider',VerifyToken,checkOfflinePermission('Admin'),deleteRider);
 
 
 //Deliver listings 
-router.get('/placed/delivery/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPlacedHomeDelivery);
-router.get('/waiting/delivery/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getWaitingForHomeDelivery)
-router.get('/out/delivery/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getOutForHomeDelivery)
-router.get('/completed/delivery/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getDeliveredHomeDelivery);
+router.get('/placed/delivery',VerifyToken,checkOfflinePermission('Admin'),getPlacedHomeDelivery);
+router.get('/waiting/delivery',VerifyToken,checkOfflinePermission('Admin'),getWaitingForHomeDelivery)
+router.get('/out/delivery',VerifyToken,checkOfflinePermission('Admin'),getOutForHomeDelivery)
+router.get('/completed/delivery',VerifyToken,checkOfflinePermission('Admin'),getDeliveredHomeDelivery);
 
 //delivery status chagnes
 router.post('/ready/delivery',VerifyToken,checkOfflinePermission('Admin'),markOrderReadyForPickup)
 router.post('/assign/delivery',VerifyToken,checkOfflinePermission('Admin'),assignRiderForOut)
 router.post('/complete/delivery',VerifyToken,checkOfflinePermission('Admin'),completeHomeDelivery)
+
+
+//profit and loss
+router.get('/profit-loss',VerifyToken,checkOfflinePermission('Reports'),getProfitAndLossReport)
 
 export default router;
