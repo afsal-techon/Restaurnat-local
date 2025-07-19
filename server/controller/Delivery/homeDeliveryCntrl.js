@@ -149,7 +149,7 @@ export const deleteRider = async (req, res, next) => {
 
 export const markOrderReadyForPickup = async (req, res, next) => {
   try {
-    const { orderId } = req.query;
+    const { orderId } = req.body;
 
     if (!orderId) {
       return res.status(400).json({ message: "Order ID is required!" });
@@ -178,7 +178,7 @@ export const markOrderReadyForPickup = async (req, res, next) => {
 
 export const assignRiderForOut = async (req, res, next) => {
   try {
-    const { orderId, riderId } = req.query;
+    const { orderId, riderId } = req.body;
 
     if (!orderId) {
       return res.status(400).json({ message: "Order ID is required!" });
@@ -218,7 +218,7 @@ export const assignRiderForOut = async (req, res, next) => {
 
 export const completeHomeDelivery = async (req, res, next) => {
   try {
-    const { orderId } = req.query;
+    const { orderId } = req.body;
 
     if (!orderId) {
       return res.status(400).json({ message: "Order ID is required!" });

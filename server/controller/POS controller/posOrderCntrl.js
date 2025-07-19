@@ -94,6 +94,8 @@ export const createOrder = async (req, res, next) => {
       printConfig = {},
     } = req.body;
 
+    console.log(deliveryDetails,'deliver')
+
     const userId = req.user;
     const isAdditionalOrder = Boolean(orderId);
     console.log(isAdditionalOrder, 'additional order');

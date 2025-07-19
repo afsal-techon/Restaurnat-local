@@ -30,7 +30,7 @@ import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
 import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
-import { createRider, deleteRider, getRiders, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
+import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
 const router = express.Router();
 
 
@@ -289,8 +289,15 @@ router.put('/rider',VerifyToken,checkOfflinePermission('Admin'),updateRider);
 router.delete('/rider',VerifyToken,checkOfflinePermission('Admin'),deleteRider);
 
 
-//Deliver status updates
+//Deliver listings 
+router.get('/placed/delivery/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPlacedHomeDelivery);
+router.get('/waiting/delivery/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getWaitingForHomeDelivery)
+router.get('/out/delivery/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getOutForHomeDelivery)
+router.get('/completed/delivery/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getDeliveredHomeDelivery);
 
-
+//delivery status chagnes
+router.post('/ready/delivery',VerifyToken,checkOfflinePermission('Admin'),markOrderReadyForPickup)
+router.post('/assign/delivery',VerifyToken,checkOfflinePermission('Admin'),assignRiderForOut)
+router.post('/complete/delivery',VerifyToken,checkOfflinePermission('Admin'),completeHomeDelivery)
 
 export default router;

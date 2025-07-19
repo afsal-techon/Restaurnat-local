@@ -163,15 +163,15 @@ const orderSchema = new mongoose.Schema(
     
         deliveryDate: {
       type: Date,
-      required: function() { return this.orderType.includes('Home Delivery'); }
+      default:null,
     },
     deliveryTime: {
       type: String, // or Date if you prefer
-      required: function() { return this.orderType.includes('Home Delivery'); }
+      default:null,
     },
      location: {
       type: String, // or Date if you prefer
-      required: function() { return this.orderType.includes('Home Delivery'); }
+      default:null,
     },
     riderId:{
       type: mongoose.Schema.Types.ObjectId,
