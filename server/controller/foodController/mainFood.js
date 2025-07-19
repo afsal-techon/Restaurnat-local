@@ -30,6 +30,7 @@ export const createFood = async (req, res, next) => {
       addOnsIds,
       choices,
       offer,
+      preperationTime,
 
     } = req.body;
 
@@ -220,6 +221,7 @@ export const createFood = async (req, res, next) => {
       choices: choiceIds,
       offer: offer ? offer : null,
       special: special ? special : false,
+      preperationTime: preperationTime || null,
       createdById: user._id,
       createdBy:user.name,
       

@@ -112,6 +112,10 @@ const foodSchema =new mongoose.Schema({
         endDate: Date,
         discount: Number
       },
+      preperationTime:{
+        type:String,
+        default:null,
+      },
     createdById: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
