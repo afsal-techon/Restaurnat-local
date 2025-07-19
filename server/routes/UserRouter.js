@@ -303,6 +303,6 @@ router.post('/complete/delivery',VerifyToken,checkOfflinePermission('Admin'),com
 
 
 //profit and loss
-router.get('/profit-loss',VerifyToken,checkOfflinePermission('Reports'),getProfitAndLossReport)
+router.get('/reports/profit-loss',VerifyToken,checkOfflinePermission('Reports'),getProfitAndLossReport)
 
 export default router;
