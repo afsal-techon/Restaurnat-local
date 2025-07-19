@@ -19,13 +19,14 @@ export const getProfitAndLossReport = async (req, res, next) => {
 
     console.log(req.query,'qery')
 
-    if (!fromDate || !toDate) {
-      return res.status(400).json({ message: "From and To dates are required" });
-    }
+    // if (!fromDate || !toDate) {
+    //   return res.status(400).json({ message: "From and To dates are required" });
+    // }
 
-    const start = new Date(fromDate);
-    const end = new Date(toDate);
-    end.setHours(23, 59, 59, 999);
+  const start = fromDate ? new Date(fromDate) : new Date();
+  const end = toDate ? new Date(toDate) : new Date();
+  end.setHours(23, 59, 59, 999);
+
 
     const transactions = await TRANSACTION.aggregate([
       {
@@ -116,9 +117,9 @@ export const downloadProfitAndLossExcel = async (req, res, next) => {
       return res.status(400).json({ message: "From and To dates are required" });
     }
 
-    const start = new Date(fromDate);
-    const end = new Date(toDate);
-    end.setHours(23, 59, 59, 999);
+   const start = fromDate ? new Date(fromDate) : new Date("2000-01-01");
+  const end = toDate ? new Date(toDate) : new Date();
+   end.setHours(23, 59, 59, 999);
 
     const transactions = await TRANSACTION.aggregate([
       {
