@@ -4,6 +4,7 @@ import RESTAURANT from '../../model/restaurant.js'
 import TRANSACTION from '../../model/transaction.js';
 import { generateUniqueRefId } from '../POS controller/posOrderCntrl.js'
 import PURCHASE from '../../model/purchase.js'
+import SUPPLIER from '../../model/supplier.js'
 import mongoose from 'mongoose';
 
  
@@ -47,11 +48,20 @@ export const createPurchase = async (req, res, next) => {
     // }, 0);
 
     const account = await ACCOUNTS.findOne({ accountType:'Purchase'}).lean();
+    const paymentAccount = await ACCOUNTS.findOne({ _id: paymentModeId }).lean();
+    const supplier = await SUPPLIER.findById(supplierId).lean();
+
+    if(paymentAccount.accountType == "Credit"){
+       const previousBalance = supplier.wallet.credit || 0;
+       supplier.wallet.credit = previousBalance + totalAmount;
+       await supplier.save()
+    }
 
     
       if(!account){
       return res.status(400).json({ message:'Account not found!'})
     }
+
 
     const refId = await generateUniqueRefId();
 

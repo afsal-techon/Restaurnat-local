@@ -210,6 +210,240 @@ export const deleteSupplier = async (req, res, next) => {
 
 
 
+export const getSupplierDueHistory = async (req, res, next) => {
+  try {
+    const { supplierId, fromDate, toDate, search = '' } = req.query;
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    const supplier = await SUPPLIER.findById(supplierId);
+    if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+    const matchStage = {
+      supplierId: new mongoose.Types.ObjectId(supplierId)
+    };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (search) {
+      matchStage.$or = [
+        { referenceId: { $regex: search, $options: 'i' } },
+        { referenceType: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      { $sort: { createdAt: 1 } },
+
+      // Join account info
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+
+      // Filter only Supplier Due Payment or Purchase via Credit
+      {
+        $match: {
+          $or: [
+            { referenceType: "Supplier Due Payment" },
+            {
+              referenceType: "Purchase",
+              "accountInfo.accountType": "Credit"
+            }
+          ]
+        }
+      },
+
+      // Join parent account
+      {
+        $lookup: {
+          from: "accounts",
+          let: { parentId: "$accountInfo.parentAccountId" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$parentId"] } } }
+          ],
+          as: "parentInfo"
+        }
+      },
+      { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+
+      // Join payment method
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo"
+        }
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+
+      // Add credit/debit tags for calculation
+      {
+        $addFields: {
+          credit: {
+            $cond: [
+              { $eq: ["$referenceType", "Supplier Due Payment"] },
+              "$amount",
+              0
+            ]
+          },
+          debit: {
+            $cond: [
+              { $eq: ["$referenceType", "Purchase"] },
+              "$amount",
+              0
+            ]
+          }
+        }
+      },
+
+      // Group to calculate totals
+      {
+        $group: {
+          _id: null,
+          transactions: { $push: "$$ROOT" },
+          totalCredit: { $sum: "$credit" },
+          totalDebit: { $sum: "$debit" }
+        }
+      },
+
+      // Add running due balance
+      {
+        $addFields: {
+          transactionsWithRunningBalance: {
+            $reduce: {
+              input: "$transactions",
+              initialValue: {
+                runningDue: 0,
+                transactions: []
+              },
+              in: {
+                runningDue: {
+                  $add: [
+                    "$$value.runningDue",
+                    {
+                      $cond: [
+                        { $eq: ["$$this.referenceType", "Purchase"] },
+                        "$$this.amount",
+                        { $multiply: ["$$this.amount", -1] }
+                      ]
+                    }
+                  ]
+                },
+                transactions: {
+                  $concatArrays: [
+                    "$$value.transactions",
+                    [
+                      {
+                        $mergeObjects: [
+                          "$$this",
+                          {
+                            dueBalance: {
+                              $add: [
+                                "$$value.runningDue",
+                                {
+                                  $cond: [
+                                    { $eq: ["$$this.referenceType", "Purchase"] },
+                                    "$$this.amount",
+                                    { $multiply: ["$$this.amount", -1] }
+                                  ]
+                                }
+                              ]
+                            },
+                            account: {
+                              name: "$$this.accountInfo.accountName",
+                              type: "$$this.accountInfo.accountType"
+                            },
+                            parentAccount: {
+                              name: "$$this.parentInfo.accountName",
+                              type: "$$this.parentInfo.accountType"
+                            },
+                            paymentMethod: {
+                              $ifNull: ["$$this.paymentTypeInfo.accountName", null]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+
+      {
+        $project: {
+          allData: "$transactionsWithRunningBalance.transactions",
+          totalCredit: 1,
+          totalDebit: 1
+        }
+      },
+
+      {
+        $addFields: {
+          data: { $slice: ["$allData", skip, limit] },
+          totalCount: { $size: "$allData" },
+          totalDue: {
+            $subtract: ["$totalDebit", "$totalCredit"]
+          }
+        }
+      },
+
+      {
+        $project: {
+          data: 1,
+          totalCount: 1,
+          totalCredit: 1,
+          totalDebit: 1,
+          totalDue: 1
+        }
+      }
+    ];
+
+    const result = await TRANSACTION.aggregate(pipeline);
+
+    const final = result[0] || {
+      data: [],
+      totalCount: 0,
+      totalCredit: 0,
+      totalDebit: 0,
+      totalDue: 0
+    };
+
+    return res.status(200).json({
+      data: final.data,
+      totalCount: final.totalCount,
+      totalCredit: final.totalCredit,
+      totalDebit: final.totalDebit,
+      totalDue: final.totalDue,
+      page,
+      limit
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+
 export const paySupplierDue = async (req, res, next) => {
   try {
     const userId = req.user;
@@ -225,14 +459,14 @@ export const paySupplierDue = async (req, res, next) => {
     const supplier = await SUPPLIER.findById(supplierId);
     if (!supplier) return res.status(404).json({ message: "Supplier not found!" });
 
-    const currentDue = supplier.due || 0;
+    const currentDue = supplier.wallet.credit || 0;
 
     if (amount > currentDue) {
       return res.status(400).json({ message: "Amount exceeds supplier's due!" });
     }
 
     // Deduct due
-    supplier.due = currentDue - amount;
+    supplier.wallet.credit = currentDue - amount || 0;
     await supplier.save();
 
     // Create Transaction entry - Money going out from account (Cash/Bank)
@@ -259,3 +493,5 @@ export const paySupplierDue = async (req, res, next) => {
     next(err);
   }
 };
+
+

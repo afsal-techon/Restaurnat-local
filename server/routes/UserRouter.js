@@ -25,7 +25,7 @@ import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollecti
 import { generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
 import checkOfflinePermission from '../middleware/permission.js'
 import { getPritnerConfigs, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
-import { createSupplier, deleteSupplier, getSuppliers, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
+import { createSupplier, deleteSupplier, getSupplierDueHistory, getSuppliers, paySupplierDue, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
 import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient } from '../controller/purchse-Expense/ingredients.js';
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
 import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
@@ -245,6 +245,8 @@ router.post('/vendor',VerifyToken,checkOfflinePermission('Admin'),createSupplier
 router.get('/vendor-id',VerifyToken,checkOfflinePermission('Admin'),getSuppliers);
 router.put('/vendor',VerifyToken,checkOfflinePermission('Admin'),updateSupplier);
 router.delete('/vendor/:supplierId',VerifyToken,checkOfflinePermission('Admin'),deleteSupplier);
+router.get('/vendor/credit',VerifyToken,checkOfflinePermission('Admin'),getSupplierDueHistory);
+router.post('/vendor/pay',VerifyToken,checkOfflinePermission('Admin'),paySupplierDue);
 
 
 //ingredients

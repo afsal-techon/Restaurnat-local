@@ -1281,7 +1281,6 @@ export const generateUniqueRefId = async () => {
         customer.credit = previousBalance + dueAmount;
         customer.totalSpend += paidAmount;
         await customer.save();
-
       }
   
           // Create payment records
