@@ -23,9 +23,9 @@ export const getProfitAndLossReport = async (req, res, next) => {
     //   return res.status(400).json({ message: "From and To dates are required" });
     // }
 
-  const start = fromDate ? new Date(fromDate) : new Date();
-  const end = toDate ? new Date(toDate) : new Date();
-  end.setHours(23, 59, 59, 999);
+const start = fromDate ? new Date(fromDate) : new Date("2000-01-01");
+const end = toDate ? new Date(toDate) : new Date();
+ end.setHours(23, 59, 59, 999);
 
 
     const transactions = await TRANSACTION.aggregate([
