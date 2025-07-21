@@ -70,13 +70,14 @@
         <th>#</th>
         <th>Date</th>
         <th>Order ID</th>
+        <th>KOT</th>
         <th>Customer</th>
         <th>Customer Type</th>
+         <th>Payment Methods (<%= currency %>)</th>
         <th>Discount (<%= currency %>)</th>
         <th>Amount (<%= currency %>)</th>
-        <th>Payment Methods (<%= currency %>)</th>
         <th>Status</th>
-        <th>KOT</th>
+        
       </tr>
     </thead>
     <tbody>
@@ -85,6 +86,7 @@
           <td class="nowrap"><%= index + 1 %></td>
           <td class="nowrap"><%= new Date(item.createdAt).toLocaleDateString() %></td>
           <td class="nowrap"><%= item.order_id || "-" %></td>
+           <td class="nowrap"><%= item.ticketNo || "-" %></td>
           <td><%= item.customer || "-" %></td>
          <td>
             <% if (item.customerType === "Dine-In") { %>
@@ -95,15 +97,15 @@
             <% } %>
             </td>
 
-          <td class="nowrap"><%= item.discount?.toFixed(2) || "0.00" %></td>
-          <td class="nowrap"><%= item.amount?.toFixed(2) || "0.00" %></td>
-          <td>
+              <td>
             <% item.paymentMethods?.forEach(method => { %>
               <div><%= method.type %>: <%= method.amount?.toFixed(2) || "0.00" %></div>
             <% }) %>
           </td>
+
+          <td class="nowrap"><%= item.discount?.toFixed(2) || "0.00" %></td>
+          <td class="nowrap"><%= item.amount?.toFixed(2) || "0.00" %></td>
           <td><%= item.status || "-" %></td>
-          <td class="nowrap"><%= item.ticketNo || "-" %></td>
         </tr>
       <% }) %>
     </tbody>

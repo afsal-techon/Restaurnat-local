@@ -675,8 +675,6 @@ export const getCustomerTypeWiseSalesReport = async (req, res, next) => {
 
 
 
-
-
 //pdf section
 export const generateDailySalesPDF = async (req, res, next) => {
   try {

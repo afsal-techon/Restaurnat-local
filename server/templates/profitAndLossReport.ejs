@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Profit & Loss Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #333; }
+    h2 { text-align: center; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; border: 1px solid #ccc; text-align: left; }
+    th { background-color: #f2f2f2; font-weight: bold; }
+    .summary-table td { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Profit & Loss Report</h2>
+
+  <table class="summary-table">
+    <tr>
+      <td>From Date</td>
+      <td><%= filters.fromDate %></td>
+    </tr>
+    <tr>
+      <td>To Date</td>
+      <td><%= filters.toDate %></td>
+    </tr>
+  </table>
+
+  <table>
+    <tr>
+      <th>Description</th>
+      <th>Amount (<%= currency %>)</th>
+    </tr>
+    <tr>
+      <td>Revenue</td>
+      <td><%= data.revenue.toFixed(2) %></td>
+    </tr>
+    <tr>
+      <td>Cost of Goods Sold (COGS)</td>
+      <td><%= data.cogs.toFixed(2) %></td>
+    </tr>
+    <tr>
+      <td>Gross Profit</td>
+      <td><%= data.grossProfit.toFixed(2) %></td>
+    </tr>
+    <tr>
+      <td>Expenses</td>
+      <td><%= data.expenses.toFixed(2) %></td>
+    </tr>
+    <tr>
+      <td>Net Profit</td>
+      <td><%= data.netProfit.toFixed(2) %></td>
+    </tr>
+    <tr>
+      <td>Total Customer Credit</td>
+      <td><%= data.dueAmount.toFixed(2) %></td>
+    </tr>
+  </table>
+</body>
+</html>

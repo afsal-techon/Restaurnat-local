@@ -70,9 +70,10 @@
         <th>Customer Type</th>
         <th>Order No</th>
         <th>Discount (<%= currency %>)</th>
-        <th>Amount (<%= currency %>)</th>
+        
         <th>Payment Methods (<%= currency %>)</th>
-        <th>Credit Amount (<%= currency %>)</th>
+        <th>Amount (<%= currency %>)</th>
+    
       </tr>
     </thead>
     <tbody>
@@ -84,13 +85,13 @@
           <td><%= item.customerType || "-" %></td>
           <td class="nowrap"><%= item.orderNo || "-" %></td>
           <td class="nowrap"><%= item.discount?.toFixed(2) || "0.00" %></td>
-          <td class="nowrap"><%= item.amount?.toFixed(2) || "0.00" %></td>
-          <td>
+             <td>
             <% item.paymentMethods.forEach(method => { %>
               <div><%= method.type %>: <%= method.amount?.toFixed(2) || "0.00" %></div>
             <% }) %>
           </td>
-          <td class="nowrap"><%= item.dueAmount?.toFixed(2) || "0.00" %></td>
+          <td class="nowrap"><%= item.amount?.toFixed(2) || "0.00" %></td>
+      
         </tr>
       <% }) %>
     </tbody>

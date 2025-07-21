@@ -68,38 +68,41 @@
   </div>
 
   <table>
-    <thead>
+<thead>
+  <tr>
+    <th class="nowrap">Date</th>
+    <th class="nowrap">Reference No</th>
+    <th class="nowrap">Account Type</th>
+    <th class="nowrap">Account Name</th>
+    <th class="nowrap">Payment Method</th>
+    <th class="nowrap">Supplier</th>
+    <th class="nowrap">Amount (<%= currency %>)</th>
+  </tr>
+</thead>
+<tbody>
+  <% if (data.length === 0) { %>
+    <tr>
+      <td colspan="7" style="text-align: center;">No data available.</td>
+    </tr>
+  <% } else { %>
+    <% data.forEach(item => { %>
       <tr>
-        <th class="nowrap">Date</th>
-        <th class="nowrap">Reference No</th>
-        <th class="nowrap">Account Type</th>
-        <th class="nowrap">Account Name</th>
-        <th class="nowrap">Payment Method</th>
-        <th class="nowrap">Amount (<%= currency %>)</th>
+        <td class="nowrap"><%= new Date(item.createdAt).toLocaleDateString() %></td>
+        <td><%= item.referenceId || '-' %></td>
+        <td><%= item.accountType || '-' %></td>
+        <td><%= item.accountName || '-' %></td>
+        <td><%= item.paymentType || '-' %></td>
+        <td><%= item.supplierName || '-' %></td>
+        <td class="nowrap"><%= item.amount?.toFixed(2) || '0.00' %></td>
       </tr>
-    </thead>
-    <tbody>
-      <% if (data.length === 0) { %>
-        <tr>
-          <td colspan="6" style="text-align: center;">No data available.</td>
-        </tr>
-      <% } else { %>
-        <% data.forEach(item => { %>
-          <tr>
-            <td class="nowrap"><%= new Date(item.createdAt).toLocaleDateString() %></td>
-            <td><%= item.referenceId || '-' %></td>
-            <td><%= item.accountType || '-' %></td>
-            <td><%= item.accountName || '-' %></td>
-            <td><%= item.paymentType || '-' %></td>
-            <td class="nowrap"><%= item.amount?.toFixed(2) || '0.00' %></td>
-          </tr>
-        <% }) %>
-        <tr class="total-row">
-          <td colspan="5" class="nowrap">Total</td>
-          <td class="nowrap"><%= totalAmount?.toFixed(2) || '0.00' %></td>
-        </tr>
-      <% } %>
-    </tbody>
+    <% }) %>
+    <tr class="total-row">
+      <td colspan="6" class="nowrap">Total</td>
+      <td class="nowrap"><%= totalAmount?.toFixed(2) || '0.00' %></td>
+    </tr>
+  <% } %>
+</tbody>
+
   </table>
 </body>
 </html>

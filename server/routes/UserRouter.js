@@ -21,7 +21,7 @@ import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSumm
 import upload from '../middleware/multer.js'
 import { generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
 import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
-import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
+import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionPDF, getDailyTransactionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
 import { generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
 import checkOfflinePermission from '../middleware/permission.js'
 import { getPritnerConfigs, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
@@ -31,7 +31,7 @@ import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList,
 import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
 import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
-import { getProfitAndLossReport } from '../controller/ReportsController/otherReports.js';
+import { getProfitAndLossReport, profitandLossPdf } from '../controller/ReportsController/otherReports.js';
 const router = express.Router();
 
 
@@ -221,6 +221,7 @@ router.get('/payment-collection/pdf',VerifyToken,checkOfflinePermission('Reports
 
 //daily transaction type 
 router.get('/reports/daily-transaction',VerifyToken,checkOfflinePermission('Reports'),getDailyTransactionReport)
+router.get('/daily-transaction/pdf',VerifyToken,checkOfflinePermission('Reports'),getDailyTransactionPDF)
 
 
 //purchse Expence Report
@@ -303,6 +304,7 @@ router.post('/complete/delivery',VerifyToken,checkOfflinePermission('Admin'),com
 
 
 //profit and loss
-router.get('/reports/profit-loss',VerifyToken,checkOfflinePermission('Reports'),getProfitAndLossReport)
+router.get('/reports/profit-loss',VerifyToken,checkOfflinePermission('Reports'),getProfitAndLossReport);
+router.get('/profit-loss/pdf',VerifyToken,checkOfflinePermission('Reports'),profitandLossPdf);
 
 export default router;

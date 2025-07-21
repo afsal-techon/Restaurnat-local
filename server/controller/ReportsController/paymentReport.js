@@ -416,20 +416,238 @@ export const generateDailyCollectionPDF = async (req, res, next) => {
 };
 
 
+// export const getDailyTransactionReport = async (req, res, next) => {
+//   try {
+//     const {
+//       fromDate,
+//       toDate, 
+//       search = '',
+//       type,
+//       accountName = '', 
+//       accountType = '',
+//       paymentModeName = '',
+//     } = req.query;
+
+//     console.log(accountName,'accountName')
+//     console.log(paymentModeName,'pari')
+
+//     const limit = parseInt(req.query.limit) || 20;
+//     const page = parseInt(req.query.page) || 1;
+//     const skip = (page - 1) * limit;
+
+//     const user = await USER.findById(req.user);
+//     if (!user) return res.status(400).json({ message: "User not found!" });
+
+//     const matchStage = {};
+
+//     if (type) {
+//       matchStage.type = type;
+//     }
+
+//     if (fromDate && toDate) {
+//       const start = new Date(fromDate);
+//       const end = new Date(toDate);
+//       end.setHours(23, 59, 59, 999);
+//       matchStage.createdAt = { $gte: start, $lte: end };
+//     }
+
+//     const searchStage = search
+//       ? {
+//           $or: [
+//             { referenceId: { $regex: search, $options: 'i' } },
+//             { referenceType: { $regex: search, $options: 'i' } },
+//             { narration: { $regex: search, $options: 'i' } },
+//           ]
+//         }
+//       : null;
+
+//     const pipeline = [
+//       { $match: matchStage },
+//       ...(searchStage ? [{ $match: searchStage }] : []),
+
+//       // Lookup for account info
+//       {
+//         $lookup: {
+//           from: "accounts",
+//           localField: "accountId",
+//           foreignField: "_id",
+//           as: "accountInfo"
+//         }
+//       },
+//       { $unwind: "$accountInfo" },
+
+//       // Lookup for payment mode info
+//       {
+//         $lookup: {
+//           from: "accounts",
+//           localField: "paymentType",
+//           foreignField: "_id",
+//           as: "paymentTypeInfo"
+//         }
+//       },
+//       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+
+//       // Filters based on accountName, accountType, paymentModeName, paymentModeType
+//       ...(accountName
+//         ? [{ $match: { "accountInfo.accountName": { $regex: accountName, $options: "i" } } }]
+//         : []),
+
+//       ...(accountType
+//         ? [{ $match: { "accountInfo.accountType": accountType } }]
+//         : []),
+
+//       ...(paymentModeName
+//         ? [{ $match: { "paymentTypeInfo.accountName": { $regex: paymentModeName, $options: "i" } } }]
+//         : []),
+
+    
+//       // Sort and compute credit/debit
+//       { $sort: { createdAt: 1 } },
+//       {
+//         $addFields: {
+//           credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+//           debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
+//         }
+//       },
+
+//       // Group and calculate totals
+//       {
+//         $group: {
+//           _id: null,
+//           transactions: { $push: "$$ROOT" },
+//           totalCredit: { $sum: "$credit" },
+//           totalDebit: { $sum: "$debit" }
+//         }
+//       },
+
+//       // Running total calculation
+//       {
+//         $addFields: {
+//           transactionsWithRunningTotal: {
+//             $reduce: {
+//               input: "$transactions",
+//               initialValue: {
+//                 runningTotal: 0,
+//                 transactions: []
+//               },
+//               in: {
+//                 runningTotal: {
+//                   $add: [
+//                     "$$value.runningTotal",
+//                     {
+//                       $cond: [
+//                         { $eq: ["$$this.type", "Credit"] },
+//                         "$$this.amount",
+//                         { $multiply: ["$$this.amount", -1] }
+//                       ]
+//                     }
+//                   ]
+//                 },
+//                 transactions: {
+//                   $concatArrays: [
+//                     "$$value.transactions",
+//                     [
+//                       {
+//                         $mergeObjects: [
+//                           "$$this",
+//                           {
+//                             total: {
+//                               $add: [
+//                                 "$$value.runningTotal",
+//                                 {
+//                                   $cond: [
+//                                     { $eq: ["$$this.type", "Credit"] },
+//                                     "$$this.amount",
+//                                     { $multiply: ["$$this.amount", -1] }
+//                                   ]
+//                                 }
+//                               ]
+//                             }
+//                           }
+//                         ]
+//                       }
+//                     ]
+//                   ]
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       },
+
+//       // Slice for pagination
+//       {
+//         $project: {
+//           allData: "$transactionsWithRunningTotal.transactions",
+//           totalCredit: 1,
+//           totalDebit: 1
+//         }
+//       },
+//       {
+//         $addFields: {
+//           data: {
+//             $slice: ["$allData", skip, limit]
+//           },
+//           totalCount: { $size: "$allData" },
+//           totalAmount: {
+//             $add: [
+//               "$totalCredit",
+//               { $multiply: ["$totalDebit", -1] }
+//             ]
+//           }
+//         }
+//       },
+//       {
+//         $project: {
+//           data: 1,
+//           totalCount: 1,
+//           totalCredit: 1,
+//           totalDebit: 1,
+//           totalAmount: 1
+//         }
+//       }
+//     ];
+
+//     const result = await TRANSACTION.aggregate(pipeline);
+
+//     const finalResult = result[0] || {
+//       data: [],
+//       totalCount: 0,
+//       totalCredit: 0,
+//       totalDebit: 0,
+//       totalAmount: 0
+//     };
+
+//     return res.status(200).json({
+//       data: finalResult.data,
+//       totalCount: finalResult.totalCount,
+//       totalCredit: finalResult.totalCredit,
+//       totalDebit: finalResult.totalDebit,
+//       totalAmount: finalResult.totalAmount,
+//       page,
+//       limit
+//     });
+
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+
+// Updated Daily Transaction Report API with PDF generation support
+
+
 export const getDailyTransactionReport = async (req, res, next) => {
   try {
     const {
       fromDate,
-      toDate, 
+      toDate,
       search = '',
       type,
-      accountName = '', 
+      accountName = '',
       accountType = '',
       paymentModeName = '',
     } = req.query;
-
-    console.log(accountName,'accountName')
-    console.log(paymentModeName,'pari')
 
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
@@ -440,9 +658,7 @@ export const getDailyTransactionReport = async (req, res, next) => {
 
     const matchStage = {};
 
-    if (type) {
-      matchStage.type = type;
-    }
+    if (type) matchStage.type = type;
 
     if (fromDate && toDate) {
       const start = new Date(fromDate);
@@ -465,7 +681,6 @@ export const getDailyTransactionReport = async (req, res, next) => {
       { $match: matchStage },
       ...(searchStage ? [{ $match: searchStage }] : []),
 
-      // Lookup for account info
       {
         $lookup: {
           from: "accounts",
@@ -476,7 +691,6 @@ export const getDailyTransactionReport = async (req, res, next) => {
       },
       { $unwind: "$accountInfo" },
 
-      // Lookup for payment mode info
       {
         $lookup: {
           from: "accounts",
@@ -487,7 +701,44 @@ export const getDailyTransactionReport = async (req, res, next) => {
       },
       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
 
-      // Filters based on accountName, accountType, paymentModeName, paymentModeType
+      {
+        $lookup: {
+          from: "customers",
+          localField: "customerId",
+          foreignField: "_id",
+          as: "customer"
+        }
+      },
+      { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplier"
+        }
+      },
+      { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+
+      {
+        $addFields: {
+          vendorCustomer: {
+            $cond: [
+              { $ifNull: ["$customer", false] },
+              "$customer.name",
+              {
+                $cond: [
+                  { $ifNull: ["$supplier", false] },
+                  "$supplier.supplierName",
+                  "-"
+                ]
+              }
+            ]
+          }
+        }
+      },
+
       ...(accountName
         ? [{ $match: { "accountInfo.accountName": { $regex: accountName, $options: "i" } } }]
         : []),
@@ -500,9 +751,8 @@ export const getDailyTransactionReport = async (req, res, next) => {
         ? [{ $match: { "paymentTypeInfo.accountName": { $regex: paymentModeName, $options: "i" } } }]
         : []),
 
-    
-      // Sort and compute credit/debit
       { $sort: { createdAt: 1 } },
+
       {
         $addFields: {
           credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
@@ -510,7 +760,6 @@ export const getDailyTransactionReport = async (req, res, next) => {
         }
       },
 
-      // Group and calculate totals
       {
         $group: {
           _id: null,
@@ -520,7 +769,6 @@ export const getDailyTransactionReport = async (req, res, next) => {
         }
       },
 
-      // Running total calculation
       {
         $addFields: {
           transactionsWithRunningTotal: {
@@ -562,7 +810,8 @@ export const getDailyTransactionReport = async (req, res, next) => {
                                   ]
                                 }
                               ]
-                            }
+                            },
+                            referenceId: "$$this.referenceId" // ✅ explicit referenceId inclusion
                           }
                         ]
                       }
@@ -575,7 +824,6 @@ export const getDailyTransactionReport = async (req, res, next) => {
         }
       },
 
-      // Slice for pagination
       {
         $project: {
           allData: "$transactionsWithRunningTotal.transactions",
@@ -632,6 +880,207 @@ export const getDailyTransactionReport = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+
+export const getDailyTransactionPDF = async (req, res, next) => {
+  try {
+    const {
+      fromDate,
+      toDate,
+      search = '',
+      type,
+      accountName = '',
+      accountType = '',
+      paymentModeName = '',
+    } = req.query;
+
+    const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const matchStage = {};
+
+    if (type) matchStage.type = type;
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const searchStage = search
+      ? {
+          $or: [
+            { referenceId: { $regex: search, $options: 'i' } },
+            { referenceType: { $regex: search, $options: 'i' } },
+            { narration: { $regex: search, $options: 'i' } },
+          ]
+        }
+      : null;
+
+    const pipeline = [
+      { $match: matchStage },
+      ...(searchStage ? [{ $match: searchStage }] : []),
+
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo"
+        }
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplier"
+        }
+      },
+      { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "customers",
+          localField: "customerId",
+          foreignField: "_id",
+          as: "customer"
+        }
+      },
+      { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
+
+      ...(accountName ? [{ $match: { "accountInfo.accountName": { $regex: accountName, $options: "i" } } }] : []),
+      ...(accountType ? [{ $match: { "accountInfo.accountType": accountType } }] : []),
+      ...(paymentModeName ? [{ $match: { "paymentTypeInfo.accountName": { $regex: paymentModeName, $options: "i" } } }] : []),
+
+      { $sort: { createdAt: 1 } },
+
+      {
+        $addFields: {
+          credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+          debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
+          vendorCustomer: {
+            $cond: [
+              { $ifNull: ["$supplier", false] },
+              "$supplier.supplierName",
+              {
+                $cond: [
+                  { $ifNull: ["$customer", false] },
+                  "$customer.name",
+                  "-"
+                ]
+              }
+            ]
+          },
+          accountName: "$accountInfo.accountName",
+          accountType: "$accountInfo.accountType",
+          paymentMode: "$paymentTypeInfo.accountName"
+        }
+      },
+
+      {
+        $group: {
+          _id: null,
+          transactions: { $push: "$$ROOT" },
+          totalCredit: { $sum: "$credit" },
+          totalDebit: { $sum: "$debit" }
+        }
+      },
+
+      {
+        $addFields: {
+          transactionsWithTotal: {
+            $reduce: {
+              input: "$transactions",
+              initialValue: {
+                runningTotal: 0,
+                transactions: []
+              },
+              in: {
+                runningTotal: {
+                  $add: [
+                    "$$value.runningTotal",
+                    {
+                      $cond: [
+                        { $eq: ["$$this.type", "Credit"] },
+                        "$$this.amount",
+                        { $multiply: ["$$this.amount", -1] }
+                      ]
+                    }
+                  ]
+                },
+                transactions: {
+                  $concatArrays: [
+                    "$$value.transactions",
+                    [
+                      {
+                        $mergeObjects: ["$$this", { total: "$$value.runningTotal" }]
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+
+      {
+        $project: {
+          data: "$transactionsWithTotal.transactions",
+          totalCredit: 1,
+          totalDebit: 1,
+          totalAmount: {
+            $add: ["$totalCredit", { $multiply: ["$totalDebit", -1] }]
+          }
+        }
+      }
+    ];
+
+    const result = await TRANSACTION.aggregate(pipeline);
+    const final = result[0] || { data: [], totalCredit: 0, totalDebit: 0, totalAmount: 0 };
+
+    const restaurant = await RESTAURANT.findOne().lean();
+    const currency = restaurant?.currency || 'AED';
+
+    const pdfBuffer = await generatePDF("dailyTransactionReport", {
+      data: final.data,
+      filters: { fromDate, toDate, type, search, accountName, accountType, paymentModeName },
+      totalCredit: final.totalCredit,
+      totalDebit: final.totalDebit,
+      totalAmount: final.totalAmount,
+      currency
+    });
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="Daily-report-${Date.now()}.pdf"`
+    });
+
+    return res.send(pdfBuffer);
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
  
 
 

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Daily Transaction Report</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      color: #333;
+      margin: 20px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .filters {
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <h2>Daily Transaction Report</h2>
+
+  <div class="filters">
+    <% if (filters.fromDate && filters.toDate) { %>
+      <strong>Date Range:</strong> <%= filters.fromDate %> to <%= filters.toDate %><br/>
+    <% } %>
+    <% if (filters.type) { %>
+      <strong>Transaction Type:</strong> <%= filters.type %><br/>
+    <% } %>
+    <% if (filters.accountName) { %>
+      <strong>Account Name:</strong> <%= filters.accountName %><br/>
+    <% } %>
+    <% if (filters.accountType) { %>
+      <strong>Account Type:</strong> <%= filters.accountType %><br/>
+    <% } %>
+    <% if (filters.paymentModeName) { %>
+      <strong>Payment Mode:</strong> <%= filters.paymentModeName %><br/>
+    <% } %>
+    <% if (filters.search) { %>
+      <strong>Search:</strong> <%= filters.search %><br/>
+    <% } %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Reference No</th>
+        <th>Account Type</th>
+        <th>Account Name</th>
+        <th>Payment Mode</th>
+        <th>Vendor / Customer</th>
+        <th>Credit (<%= currency %>)</th>
+        <th>Debit (<%= currency %>)</th>
+        <th>Total (<%= currency %>)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach((item, index) => { %>
+        <tr>
+          <td class="nowrap"><%= index + 1 %></td>
+          <td class="nowrap"><%= new Date(item.createdAt).toLocaleDateString() %></td>
+          <td class="nowrap"><%= item.referenceId || '-' %></td>
+          <td><%= item.accountType || '-' %></td>
+          <td><%= item.accountName || '-' %></td>
+          <td><%= item.paymentMode || '-' %></td>
+          <td><%= item.vendorCustomer || '-' %></td>
+          <td class="nowrap"><%= item.type === 'Credit' ? item.amount.toFixed(2) : '0.00' %></td>
+          <td class="nowrap"><%= item.type === 'Debit' ? item.amount.toFixed(2) : '0.00' %></td>
+          <td class="nowrap"><%= item.total?.toFixed(2) || '0.00' %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <br/><br/

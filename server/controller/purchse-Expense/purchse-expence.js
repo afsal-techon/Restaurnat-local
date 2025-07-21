@@ -363,6 +363,8 @@ export const generatePurchaseReportPDF = async (req, res, next) => {
       toDate,
       search = '',
       accountName = '',
+      paymentType = '',
+      supplierName = '',
       minPrice,
       maxPrice
     } = req.query;
@@ -387,6 +389,7 @@ export const generatePurchaseReportPDF = async (req, res, next) => {
 
     const pipeline = [
       { $match: matchStage },
+
       {
         $lookup: {
           from: "accounts",
@@ -396,8 +399,13 @@ export const generatePurchaseReportPDF = async (req, res, next) => {
         }
       },
       { $unwind: "$accountInfo" },
+
       { $match: { "accountInfo.accountType": "Purchase" } },
-      ...(accountName ? [{ $match: { "accountInfo.accountName": accountName } }] : []),
+
+      ...(accountName
+        ? [{ $match: { "accountInfo.accountName": accountName } }]
+        : []),
+
       {
         $lookup: {
           from: "accounts",
@@ -409,6 +417,7 @@ export const generatePurchaseReportPDF = async (req, res, next) => {
         }
       },
       { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+
       {
         $lookup: {
           from: "accounts",
@@ -418,18 +427,41 @@ export const generatePurchaseReportPDF = async (req, res, next) => {
         }
       },
       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+
+      ...(paymentType
+        ? [{ $match: { "paymentTypeInfo.accountName": paymentType } }]
+        : []),
+
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplierInfo"
+        }
+      },
+      { $unwind: { path: "$supplierInfo", preserveNullAndEmptyArrays: true } },
+
+      ...(supplierName
+        ? [{ $match: { "supplierInfo.supplierName": { $regex: supplierName, $options: "i" } } }]
+        : []),
+
       ...(search
         ? [{
             $match: {
               $or: [
                 { referenceId: { $regex: search, $options: 'i' } },
                 { narration: { $regex: search, $options: 'i' } },
-                { "accountInfo.accountName": { $regex: search, $options: 'i' } }
+                { "accountInfo.accountName": { $regex: search, $options: 'i' } },
+                { "paymentTypeInfo.accountName": { $regex: search, $options: 'i' } },
+                { "supplierInfo.supplierName": { $regex: search, $options: 'i' } }
               ]
             }
           }]
         : []),
+
       { $sort: { createdAt: -1 } },
+
       {
         $project: {
           createdAt: 1,
@@ -437,6 +469,7 @@ export const generatePurchaseReportPDF = async (req, res, next) => {
           accountType: "$accountInfo.accountType",
           accountName: "$accountInfo.accountName",
           paymentMethod: "$paymentTypeInfo.accountName",
+          supplierName: "$supplierInfo.supplierName",
           amount: 1
         }
       }
@@ -457,6 +490,8 @@ export const generatePurchaseReportPDF = async (req, res, next) => {
         toDate,
         search,
         accountName,
+        paymentType,
+        supplierName,
         minPrice,
         maxPrice
       }
@@ -472,6 +507,7 @@ export const generatePurchaseReportPDF = async (req, res, next) => {
     next(err);
   }
 };
+
 
 
 
@@ -533,17 +569,31 @@ export const generateExpenseReportPDF = async (req, res, next) => {
         }
       },
       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+
+      // 🔁 Supplier Lookup
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplierInfo"
+        }
+      },
+      { $unwind: { path: "$supplierInfo", preserveNullAndEmptyArrays: true } },
+
       ...(search
         ? [{
             $match: {
               $or: [
                 { referenceId: { $regex: search, $options: 'i' } },
                 { narration: { $regex: search, $options: 'i' } },
-                { "accountInfo.accountName": { $regex: search, $options: 'i' } }
+                { "accountInfo.accountName": { $regex: search, $options: 'i' } },
+                { "supplierInfo.supplierName": { $regex: search, $options: 'i' } }
               ]
             }
           }]
         : []),
+
       { $sort: { createdAt: -1 } },
       {
         $project: {
@@ -552,6 +602,7 @@ export const generateExpenseReportPDF = async (req, res, next) => {
           accountType: "$accountInfo.accountType",
           accountName: "$accountInfo.accountName",
           paymentType: "$paymentTypeInfo.accountName",
+          supplierName: "$supplierInfo.supplierName",
           amount: 1
         }
       }
@@ -587,5 +638,6 @@ export const generateExpenseReportPDF = async (req, res, next) => {
     next(err);
   }
 };
+
 
 

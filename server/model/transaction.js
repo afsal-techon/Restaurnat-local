@@ -50,7 +50,7 @@ const transactionSchema = new mongoose.Schema(
     default:null
   },
     vatAmount: {
-    type: Number,
+    type: Number, 
     default: 0,
   },
   paymentType:{
