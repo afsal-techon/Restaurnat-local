@@ -1,5 +1,8 @@
 import USER from '../../model/userModel.js';
 import SUPPLIER from '../../model/supplier.js'
+import { generateUniqueRefId } from '../POS controller/posOrderCntrl.js';
+import TRANSACTION from '../../model/transaction.js';
+import mongoose from 'mongoose';
 
 
 export const createSupplier = async (req, res, next) => {
@@ -207,6 +210,8 @@ export const deleteSupplier = async (req, res, next) => {
     next(err);
   }
 };
+
+
 
 
 
@@ -442,6 +447,124 @@ export const getSupplierDueHistory = async (req, res, next) => {
 };
 
 
+export const SupplierDueHistoryPdf = async (req, res, next) => {
+  try {
+    const { supplierId, fromDate, toDate, search = "" } = req.query;
+
+    const supplier = await SUPPLIER.findById(supplierId);
+    if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+    const matchStage = {
+      supplierId: new mongoose.Types.ObjectId(supplierId)
+    };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (search) {
+      matchStage.$or = [
+        { referenceId: { $regex: search, $options: "i" } },
+        { referenceType: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      { $sort: { createdAt: 1 } },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+      {
+        $match: {
+          $or: [
+            { referenceType: "Supplier Due Payment" },
+            {
+              referenceType: "Purchase",
+              "accountInfo.accountType": "Credit"
+            }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: "accounts",
+          let: { parentId: "$accountInfo.parentAccountId" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$parentId"] } } }
+          ],
+          as: "parentInfo"
+        }
+      },
+      { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentType",
+          foreignField: "_id",
+          as: "paymentTypeInfo"
+        }
+      },
+      { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          credit: {
+            $cond: [{ $eq: ["$referenceType", "Supplier Due Payment"] }, "$amount", 0]
+          },
+          debit: {
+            $cond: [{ $eq: ["$referenceType", "Purchase"] }, "$amount", 0]
+          }
+        }
+      },
+      {
+        $project: {
+          date: "$createdAt",
+          referenceId: 1,
+          referenceType: 1,
+          accountType: "$accountInfo.accountType",
+          accountName: "$accountInfo.accountName",
+          credit: 1,
+          debit: 1
+        }
+      }
+    ];
+
+    const data = await TRANSACTION.aggregate(pipeline);
+
+    const totalCredit = data.reduce((sum, item) => sum + item.credit, 0);
+    const totalDebit = data.reduce((sum, item) => sum + item.debit, 0);
+    const totalDue = totalDebit - totalCredit;
+
+    const pdfBuffer = await generatePDF("supplierDueHistory", {
+      data,
+      supplier: supplier.name,
+      filters: { fromDate, toDate, search },
+      totalCredit,
+      totalDebit,
+      totalDue
+    });
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="Supplier-Due-History-${Date.now()}.pdf"`
+    });
+
+    res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 
 export const paySupplierDue = async (req, res, next) => {
@@ -460,7 +583,8 @@ export const paySupplierDue = async (req, res, next) => {
     if (!supplier) return res.status(404).json({ message: "Supplier not found!" });
 
     const currentDue = supplier.wallet.credit || 0;
-
+    console.log(amount,'amoun')
+    console.log(currentDue,'curent')
     if (amount > currentDue) {
       return res.status(400).json({ message: "Amount exceeds supplier's due!" });
     }

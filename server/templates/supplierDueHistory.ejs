@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Supplier Due History</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #333; }
+    h2, h4 { text-align: center; margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; border: 1px solid #ccc; text-align: left; }
+    th { background-color: #f2f2f2; font-weight: bold; }
+    .summary-table td { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Supplier Due History</h2>
+  <h4>Supplier: <%= supplier %></h4>
+
+  <table class="summary-table">
+    <tr>
+      <td>From Date</td>
+      <td><%= filters.fromDate || 'All' %></td>
+      <td>To Date</td>
+      <td><%= filters.toDate || 'All' %></td>
+    </tr>
+    <% if (filters.search) { %>
+    <tr>
+      <td>Search</td>
+      <td colspan="3"><%= filters.search %></td>
+    </tr>
+    <% } %>
+  </table>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Reference NO</th>
+        <th>Reference Type</th>
+        <th>Account Type</th>
+        <th>Account Name</th>
+        <th>Credit</th>
+        <th>Debit</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach(item => { %>
+        <tr>
+          <td><%= new Date(item.date).toLocaleDateString() %></td>
+          <td><%= item.referenceId || '-' %></td>
+          <td><%= item.referenceType %></td>
+          <td><%= item.accountType %></td>
+          <td><%= item.accountName %></td>
+          <td><%= item.credit.toFixed(2) %></td>
+          <td><%= item.debit.toFixed(2) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <table class="summary-table" style="margin-top: 20px;">
+    <tr>
+      <td>Total Credit</td>
+      <td><%= totalCredit.toFixed(2) %></td>
+      <td>Total Debit</td>
+      <td><%= totalDebit.toFixed(2) %></td>
+      <td>Total Due</td>
+      <td><%= totalDue.toFixed(2) %></td>
+    </tr>
+  </table>
+</body>
+</html>

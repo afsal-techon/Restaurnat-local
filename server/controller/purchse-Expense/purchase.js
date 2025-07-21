@@ -49,7 +49,7 @@ export const createPurchase = async (req, res, next) => {
 
     const account = await ACCOUNTS.findOne({ accountType:'Purchase'}).lean();
     const paymentAccount = await ACCOUNTS.findOne({ _id: paymentModeId }).lean();
-    const supplier = await SUPPLIER.findById(supplierId).lean();
+    const supplier = await SUPPLIER.findById(supplierId)
 
     if(paymentAccount.accountType == "Credit"){
        const previousBalance = supplier.wallet.credit || 0;
@@ -532,3 +532,5 @@ export const getOnePurchase = async (req, res, next) => {
     next(err);
   }
 };
+
+
