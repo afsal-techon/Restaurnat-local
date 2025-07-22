@@ -16,6 +16,14 @@ const printerConfigSchema = new mongoose.Schema(
       ref: "Kitchen",
       default:null
     },
+    printerIp:{
+      type:String,
+      required:true
+    },
+    printerPort:{
+      type:Number,
+      default:9100
+    },
     customerTypeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "customerTypes",

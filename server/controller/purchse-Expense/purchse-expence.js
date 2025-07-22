@@ -4,6 +4,7 @@ import RESTAURANT from '../../model/restaurant.js'
 import TRANSACTION from '../../model/transaction.js';
 import mongoose from 'mongoose';
 import { generatePDF } from '../../config/pdfGeneration.js';
+import ExcelJS from 'exceljs';
 
 
 export const getPurchaseReport = async (req, res, next) => {
@@ -756,7 +757,6 @@ export const purchaseReportExcel = async (req, res, next) => {
     const transactions = await TRANSACTION.aggregate(pipeline);
 
     // ====== Excel generation ======
-    const ExcelJS = require("exceljs");
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Purchase Report");
 
@@ -961,7 +961,6 @@ export const expenseReportExcel = async (req, res, next) => {
     const transactions = await TRANSACTION.aggregate(pipeline);
 
     // Generate Excel
-    const ExcelJS = require("exceljs");
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Expense Report");
 

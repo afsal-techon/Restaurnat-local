@@ -5,7 +5,7 @@ import { createRestuarantBranch,getAllRestaurant,updateRestaurantBranch,deleteRe
     addCustomerType,updateCustomerTypes,deleteCustomerTypes ,getAllCustomerTypes
 } from '../controller/Restaurant/restaurant.js';
 
-import {createAccounts,getAccounts,updateAccount,deleteAccount,getTransactionList, generateTransactionListPDF, createTransactionModule, getPurchseExpenceList, generatePurchseExpencePDF } from '../controller/Restaurant/accounts.js'
+import {createAccounts,getAccounts,updateAccount,deleteAccount,getTransactionList, generateTransactionListPDF, createTransactionModule, getPurchseExpenceList, generatePurchseExpencePDF, TransactionListExcel } from '../controller/Restaurant/accounts.js'
 
 import { createFloors,deleteFloor,getAllFloorsbyRest,updateFloorName ,createTables,getAllTablesbyRest,updateTable,deleteTable ,addKitchen,deleteKitchen,getAllKitchen,updateKitchen } from '../controller/Restaurant/floors&tables.js'
 import {createCategory,deleteCategory,getAllCategories,updateCategory } from '../controller/foodController/categoryCnrl.js'
@@ -178,6 +178,8 @@ router.get('/accounts/:restaurantId',VerifyToken,getAccounts);
 router.put('/accounts',VerifyToken,checkOfflinePermission('Admin'),updateAccount);
 router.delete('/accounts/:accountId',VerifyToken,checkOfflinePermission('Admin'),deleteAccount);
 router.get('/accounts/transaction/data',VerifyToken,checkOfflinePermission('Admin'),getTransactionList);
+//excel
+router.get('/accounts/history/excel',VerifyToken,checkOfflinePermission('Admin'),TransactionListExcel);
 router.get('/transaction/pdf',VerifyToken,checkOfflinePermission('Admin'),generateTransactionListPDF);
 router.post('/transaction/exp-pur',VerifyToken,checkOfflinePermission('Purchase'),createTransactionModule);
 router.get('/transaction/exp-pur',VerifyToken,checkOfflinePermission('Purchase'),getPurchseExpenceList);

@@ -8,6 +8,8 @@ export const upsertPrinterConfig = async (req, res, next) => {
   
       printerType, // "KOT" or "Receipt"
       printerName,
+      printerIp,
+      printerPort = 9100,
       kitchenId,
       customerTypeId,
     } = req.body;
@@ -15,7 +17,7 @@ export const upsertPrinterConfig = async (req, res, next) => {
     const user = await USER.findById(req.user);
         if (!user) return res.status(400).json({ message: "User not found!" })
 
-    if (!printerName || !printerType ) {
+    if (!printerName || !printerType || printerIp || printerPort ) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
@@ -26,10 +28,12 @@ export const upsertPrinterConfig = async (req, res, next) => {
     const updated = await PRINTER_CONFIG.findOneAndUpdate(
       query,
       {
+        printerType,
         printerName,
+        printerIp,
+        printerPort,
         kitchenId,
         customerTypeId,
-        printerType,
       },
       { upsert: true, new: true }
     );

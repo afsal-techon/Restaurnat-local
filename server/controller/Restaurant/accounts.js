@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import { generatePDF } from '../../config/pdfGeneration.js';
 import {  generateUniqueRefId } from '../../controller/POS controller/posOrderCntrl.js'
 import PAYMENT from '../../model/paymentRecord.js'
-
+import ExcelJS from 'exceljs';
 
 
 export const createAccounts = async (req, res,next) => {
@@ -881,6 +881,158 @@ export const generateTransactionListPDF = async (req, res, next) => {
     });
 
     return res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const TransactionListExcel = async (req, res, next) => {
+  try {
+    const { accountId, fromDate, toDate, search = '', type } = req.query;
+
+    const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const mainAccount = await ACCOUNTS.findById(accountId);
+    if (!mainAccount) return res.status(400).json({ message: "Account not found!" });
+
+    const childAccounts = await ACCOUNTS.find({ parentAccountId: accountId }, { _id: 1 });
+    const accountIdsToMatch = [mainAccount._id, ...childAccounts.map(acc => acc._id)];
+
+    const matchStage = {
+      accountId: { $in: accountIdsToMatch }
+    };
+
+    if (type) matchStage.type = type;
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const searchStage = search
+      ? {
+          $or: [
+            { referenceId: { $regex: search, $options: "i" } },
+            { referenceType: { $regex: search, $options: "i" } },
+            { narration: { $regex: search, $options: "i" } }
+          ]
+        }
+      : null;
+
+    const pipeline = [
+      { $match: matchStage },
+      ...(searchStage ? [{ $match: searchStage }] : []),
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "accountId",
+          foreignField: "_id",
+          as: "accountInfo"
+        }
+      },
+      { $unwind: "$accountInfo" },
+      {
+        $addFields: {
+          credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+          debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] }
+        }
+      },
+      { $sort: { createdAt: 1 } }
+    ];
+
+    const transactions = await TRANSACTION.aggregate(pipeline);
+
+    // Add running total
+    let runningTotal = mainAccount.openingBalance || 0;
+    const enriched = transactions.map((txn) => {
+      const delta = txn.type === "Credit" ? txn.amount : -txn.amount;
+      runningTotal += delta;
+      return {
+        date: txn.createdAt,
+        referenceId: txn.referenceId,
+        referenceType: txn.referenceType,
+        accountType: txn.accountInfo.accountType,
+        accountName: txn.accountInfo.accountName,
+        credit: txn.type === "Credit" ? txn.amount : 0,
+        debit: txn.type === "Debit" ? txn.amount : 0,
+        total: runningTotal
+      };
+    });
+
+    // Create Excel
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Accounts Report");
+
+    // Title
+    worksheet.mergeCells("A1", "H1");
+    worksheet.getCell("A1").value = "Accounts History";
+    worksheet.getCell("A1").font = { bold: true, size: 16 };
+    worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+    // Filters
+    worksheet.addRow([]);
+    worksheet.addRow(["Account", mainAccount.accountName]);
+    worksheet.addRow(["From Date", fromDate || "All"]);
+    worksheet.addRow(["To Date", toDate || "All"]);
+    worksheet.addRow(["Search", search || ""]);
+    worksheet.addRow(["Type", type || "All"]);
+    worksheet.addRow([]);
+
+    // Headers
+    const headers = [
+      "Date",
+      "Reference No",
+      "Reference Type",
+      "Account Type",
+      "Account Name",
+      "Credit",
+      "Debit",
+      "Total"
+    ];
+
+    worksheet.addRow(headers).eachCell(cell => {
+      cell.font = { bold: true };
+      // cell.fill = {
+      //   type: "pattern",
+      //   pattern: "solid",
+      //   fgColor: { argb: "FFD3D3D3" }
+      // };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" }
+      };
+    });
+
+    // Data rows
+    enriched.forEach(txn => {
+      worksheet.addRow([
+        txn.date.toISOString().split("T")[0],
+        txn.referenceId,
+        txn.referenceType,
+        txn.accountType,
+        txn.accountName,
+        txn.credit,
+        txn.debit,
+        txn.total
+      ]);
+    });
+
+    worksheet.columns.forEach(col => {
+      col.width = 18;
+    });
+
+    // Export
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=TransactionListReport.xlsx");
+    res.send(buffer);
+
   } catch (err) {
     next(err);
   }

@@ -20,6 +20,7 @@ import PRINTER_CONFIG from '../../model/printConfig.js'
 import { TokenCounter }  from '../../model/tokenCounter.js';
 import SETTINGS from '../../model/posSettings.js'
 import KOT_NOTIFICATION from '../../model/kotNotification.js'
+import { ThermalPrinter, PrinterTypes } from "node-thermal-printer";
 import moment from 'moment'
 
 // "@thiagoelg/node-printer": "^0.6.2",
@@ -316,14 +317,14 @@ export const createOrder = async (req, res, next) => {
 
     io.to(`posOrder-${order.restaurantId}`).emit('new_order', responseData);
 
-    
 
 if (action === 'print' || action === 'kotandPrint') {
+  
   try {
     const printerConfigs = await PRINTER_CONFIG.find({ printerType: 'KOT' }).lean();
     
     for (const config of printerConfigs) {
-      const { kitchenId, printerName } = config;
+      const { kitchenId, printerIp } = config;
       // For additional orders, only filter the newly added items
       const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
       
@@ -333,17 +334,23 @@ if (action === 'print' || action === 'kotandPrint') {
         return food?.kitchenId?.toString() === kitchenId?.toString();
       });
 
+    
       if (kitchenItems.length > 0) {
-        await printKOTReceipt(order, kitchenItems, printerName, isAdditionalOrder);
+        await printKOTReceipt(order, kitchenItems, printerIp, isAdditionalOrder);
       }
     }
 
-       if (ctypeName.includes('Take Away')) {
-      await printTakeawayCustomerReceipt(order,kitchenItems, printerName);
+     const customerPrinterConfig = await PRINTER_CONFIG.findOne({ printerType: 'KOT' }).lean();
+     const customerPrinterIp = customerPrinterConfig?.printerIp;
+
+      if (!customerPrinterIp) {
+      console.warn("Customer Printer IP not configured.");
+      return;
     }
 
-      if (ctypeName.includes('Home Delivery')) {
-      await printTakeawayCustomerReceipt(order,kitchenItems, printerName);
+
+   if (ctypeName.includes("Take Away") || ctypeName.includes("Home Delivery")) {
+      await printTakeawayCustomerReceipt(order, customerPrinterIp);
     }
     
   } catch (printError) {
@@ -851,12 +858,123 @@ if (action === 'kot' || action === 'kotandPrint') {
 
 
 
- export const printTakeawayCustomerReceipt = async (order, printConfig = {}) => {
+//  export const printTakeawayCustomerReceipt = async (order, printConfig = {}) => {
+//   try {
+//     const popOrder = await ORDER.findById(order._id)
+//       .populate('restaurantId', 'name address phone mobile trn logo')
+//       .populate('tableId', 'name')
+//       .populate('customerTypeId', 'type')
+//       .lean();
+
+//     const customerType = popOrder.customerTypeId?.type || "Order";
+//     const now = new Date();
+//     const dateStr = now.toLocaleDateString("en-GB");
+//     const timeStr = now.toLocaleTimeString("en-GB", {
+//       hour: "2-digit",
+//       minute: "2-digit",
+//     });
+
+//     const LINE_WIDTH = 48;
+//     let txt = '';
+//     const line = '-'.repeat(LINE_WIDTH);
+
+//     // === Header ===
+//     txt += '\x1B\x61\x01'; // Align center
+//     txt += '\x1B\x21\x30'; // Bold + Double height + width
+//     txt += (popOrder.restaurantId?.name || 'RESTAURANT').toUpperCase() + '\n';
+//     txt += '\x1B\x21\x00';
+
+//     if (popOrder.restaurantId?.address) txt += popOrder.restaurantId.address + '\n';
+//     if (popOrder.restaurantId?.phone)
+//       txt += `TEL: ${popOrder.restaurantId.phone}, `;
+//     if (popOrder.restaurantId?.mobile)
+//       txt += `MOB: ${popOrder.restaurantId.phone2}\n`;
+//     if (popOrder.restaurantId?.trn)
+//       txt += `TRN:${popOrder.restaurantId.trn}\n`;
+
+//     txt += '\nTAX INVOICE\n';
+//     txt += `${line}\n`;
+
+//     // === Token No. & Type ===
+//     const typeText = customerType;
+//     const tokenLine = `Token No. : ${popOrder.orderNo || '-'}`;
+//     const typeSpacing = LINE_WIDTH - tokenLine.length - typeText.length;
+//     txt += tokenLine + ' '.repeat(typeSpacing > 0 ? typeSpacing : 1) + typeText + '\n';
+
+//     // === Date, Time, Bill ===
+//     const billDate = `Date : ${dateStr}`;
+//     const billTime = `Time:${timeStr}`;
+//     const spacing = LINE_WIDTH - billDate.length - billTime.length;
+//     txt += billDate + ' '.repeat(spacing > 0 ? spacing : 1) + billTime + '\n';
+
+//     const billNo = `Bill No. : ${popOrder.order_id || '-'}`;
+//     const waiter = `Waiter : ${popOrder.createdBy || '-'}`;
+//     const spacing2 = LINE_WIDTH - billNo.length - waiter.length;
+//     txt += billNo + ' '.repeat(spacing2 > 0 ? spacing2 : 1) + waiter + '\n';
+
+//     txt += `${line}\n`;
+//     txt += `Items              Qty.   Price    Amount\n`;
+//     txt += `${line}\n`;
+
+//     let totalQty = 0;
+//     let total = 0;
+
+//     for (const item of popOrder.items) {
+//       const list = item.isCombo ? item.items : [item];
+//       for (const it of list) {
+//         const name = item.isCombo && item.comboName
+//           ? `${item.comboName}`
+//           : it.foodName;
+
+//         const qty = it.qty?.toString().padStart(2, ' ');
+//         const price = it.price?.toFixed(2).padStart(6, ' ');
+//         const amount = it.total?.toFixed(2).padStart(7, ' ');
+
+//         txt += name.padEnd(18, ' ') + qty + '   ' + price + '   ' + amount + '\n';
+//         totalQty += it.qty || 0;
+//         total += it.total || 0;
+//       }
+//     }
+
+//     txt += `${line}\n`;
+//     txt += `Total Before VAT:`.padEnd(34, ' ') + `${(popOrder.subTotal || 0).toFixed(2)}\n`;
+//     txt += `VAT Incl:`.padEnd(34, ' ') + `${(popOrder.vat || 0).toFixed(2)}\n`;
+//     txt += `${'-'.repeat(LINE_WIDTH)}\n`;
+//     txt += `Total :`.padEnd(34, ' ') + `${(popOrder.totalAmount || total).toFixed(2)}\n`;
+//     txt += `${line}\n`;
+
+//     txt += `\nUser: ${popOrder.createdBy || '-'}\n`;
+//     txt += `Items: ${totalQty.toString().padStart(2, '0')}\n`;
+//     txt += `\nThank You Visit Again\n\n`;
+
+//     txt += '\x1D\x6B\x04'; // Barcode type CODE39
+//     txt += `${popOrder.order_id || ''}\x00\n`;
+
+//     txt += '\n\n\n\x1B\x69'; // Cut paper
+
+//     const targetPrinter = printConfig.printerName || printer.getDefaultPrinterName();
+//     printer.printDirect({
+//       data: txt,
+//       printer: targetPrinter,
+//       type: 'RAW',
+//       success: jobID => console.log(`Printed Customer Receipt (job ${jobID})`),
+//       error: err => console.error('Receipt Print failed:', err),
+//     });
+//   } catch (err) {
+//     console.error('Takeaway Receipt Print Error:', err);
+//   }
+// };  
+
+
+
+export const printTakeawayCustomerReceipt = async (order, printerIp = null) => {
   try {
+    if (!printerIp) throw new Error("No printer IP provided");
+
     const popOrder = await ORDER.findById(order._id)
-      .populate('restaurantId', 'name address phone mobile trn logo')
-      .populate('tableId', 'name')
-      .populate('customerTypeId', 'type')
+      .populate("restaurantId", "name address phone mobile trn logo")
+      .populate("tableId", "name")
+      .populate("customerTypeId", "type")
       .lean();
 
     const customerType = popOrder.customerTypeId?.type || "Order";
@@ -867,112 +985,134 @@ if (action === 'kot' || action === 'kotandPrint') {
       minute: "2-digit",
     });
 
-    const LINE_WIDTH = 48;
-    let txt = '';
-    const line = '-'.repeat(LINE_WIDTH);
+    const printer = new ThermalPrinter({
+      type: PrinterTypes.EPSON,
+      interface: `tcp://${printerIp}`,
+      characterSet: "SLOVENIA",
+      removeSpecialCharacters: false,
+      lineCharacter: "-",
+      options: { timeout: 5000 },
+    });
 
-    // === Header ===
-    txt += '\x1B\x61\x01'; // Align center
-    txt += '\x1B\x21\x30'; // Bold + Double height + width
-    txt += (popOrder.restaurantId?.name || 'RESTAURANT').toUpperCase() + '\n';
-    txt += '\x1B\x21\x00';
+    printer.alignCenter();
+    printer.setTextDoubleWidth();
+    printer.println((popOrder.restaurantId?.name || "RESTAURANT").toUpperCase());
+    printer.setTextNormal();
 
-    if (popOrder.restaurantId?.address) txt += popOrder.restaurantId.address + '\n';
-    if (popOrder.restaurantId?.phone)
-      txt += `TEL: ${popOrder.restaurantId.phone}, `;
-    if (popOrder.restaurantId?.mobile)
-      txt += `MOB: ${popOrder.restaurantId.phone2}\n`;
-    if (popOrder.restaurantId?.trn)
-      txt += `TRN:${popOrder.restaurantId.trn}\n`;
+    if (popOrder.restaurantId?.address) printer.println(popOrder.restaurantId.address);
+    let contact = "";
+    if (popOrder.restaurantId?.phone) contact += `TEL: ${popOrder.restaurantId.phone}`;
+    if (popOrder.restaurantId?.mobile) contact += `, MOB: ${popOrder.restaurantId.mobile}`;
+    if (contact) printer.println(contact);
+    if (popOrder.restaurantId?.trn) printer.println(`TRN: ${popOrder.restaurantId.trn}`);
 
-    txt += '\nTAX INVOICE\n';
-    txt += `${line}\n`;
+    printer.newLine();
+    printer.setTextDoubleHeight();
+    printer.println("TAX INVOICE");
+    printer.setTextNormal();
+    printer.drawLine();
 
-    // === Token No. & Type ===
+    // Token No. & Type
+    const tokenLine = `Token No. : ${popOrder.orderNo || "-"}`;
     const typeText = customerType;
-    const tokenLine = `Token No. : ${popOrder.orderNo || '-'}`;
-    const typeSpacing = LINE_WIDTH - tokenLine.length - typeText.length;
-    txt += tokenLine + ' '.repeat(typeSpacing > 0 ? typeSpacing : 1) + typeText + '\n';
+    const spaceLen = Math.max(0, 48 - tokenLine.length - typeText.length);
+    printer.println(tokenLine + " ".repeat(spaceLen) + typeText);
 
-    // === Date, Time, Bill ===
-    const billDate = `Date : ${dateStr}`;
-    const billTime = `Time:${timeStr}`;
-    const spacing = LINE_WIDTH - billDate.length - billTime.length;
-    txt += billDate + ' '.repeat(spacing > 0 ? spacing : 1) + billTime + '\n';
+    // Date & Time
+    const dateLine = `Date : ${dateStr}`;
+    const timeLine = `Time: ${timeStr}`;
+    const spaceLen2 = Math.max(0, 48 - dateLine.length - timeLine.length);
+    printer.println(dateLine + " ".repeat(spaceLen2) + timeLine);
 
-    const billNo = `Bill No. : ${popOrder.order_id || '-'}`;
-    const waiter = `Waiter : ${popOrder.createdBy || '-'}`;
-    const spacing2 = LINE_WIDTH - billNo.length - waiter.length;
-    txt += billNo + ' '.repeat(spacing2 > 0 ? spacing2 : 1) + waiter + '\n';
+    // Bill No. & Waiter
+    const billNo = `Bill No. : ${popOrder.order_id || "-"}`;
+    const waiter = `Waiter : ${popOrder.createdBy || "-"}`;
+    const spaceLen3 = Math.max(0, 48 - billNo.length - waiter.length);
+    printer.println(billNo + " ".repeat(spaceLen3) + waiter);
 
-    txt += `${line}\n`;
-    txt += `Items              Qty.   Price    Amount\n`;
-    txt += `${line}\n`;
+    printer.drawLine();
+    printer.setTextQuadArea();
+    printer.println("Items              Qty.   Price    Amount");
+    printer.setTextNormal();
+    printer.drawLine();
 
     let totalQty = 0;
     let total = 0;
 
     for (const item of popOrder.items) {
       const list = item.isCombo ? item.items : [item];
+
       for (const it of list) {
-        const name = item.isCombo && item.comboName
-          ? `${item.comboName}`
-          : it.foodName;
+        const name = item.isCombo && item.comboName ? item.comboName : it.foodName;
+        const qty = it.qty?.toString().padStart(2, " ");
+        const price = it.price?.toFixed(2).padStart(6, " ");
+        const amount = it.total?.toFixed(2).padStart(7, " ");
+        const line = name.substring(0, 18).padEnd(18, " ") + qty + "   " + price + "   " + amount;
+        printer.println(line);
 
-        const qty = it.qty?.toString().padStart(2, ' ');
-        const price = it.price?.toFixed(2).padStart(6, ' ');
-        const amount = it.total?.toFixed(2).padStart(7, ' ');
-
-        txt += name.padEnd(18, ' ') + qty + '   ' + price + '   ' + amount + '\n';
         totalQty += it.qty || 0;
         total += it.total || 0;
       }
     }
 
-    txt += `${line}\n`;
-    txt += `Total Before VAT:`.padEnd(34, ' ') + `${(popOrder.subTotal || 0).toFixed(2)}\n`;
-    txt += `VAT Incl:`.padEnd(34, ' ') + `${(popOrder.vat || 0).toFixed(2)}\n`;
-    txt += `${'-'.repeat(LINE_WIDTH)}\n`;
-    txt += `Total :`.padEnd(34, ' ') + `${(popOrder.totalAmount || total).toFixed(2)}\n`;
-    txt += `${line}\n`;
+    printer.drawLine();
+    printer.println(`Total Before VAT:`.padEnd(34) + (popOrder.subTotal || 0).toFixed(2));
+    printer.println(`VAT Incl:`.padEnd(34) + (popOrder.vat || 0).toFixed(2));
+    printer.drawLine();
+    printer.setTextQuadArea();
+    printer.println(`Total :`.padEnd(34) + (popOrder.totalAmount || total).toFixed(2));
+    printer.setTextNormal();
+    printer.drawLine();
 
-    txt += `\nUser: ${popOrder.createdBy || '-'}\n`;
-    txt += `Items: ${totalQty.toString().padStart(2, '0')}\n`;
-    txt += `\nThank You Visit Again\n\n`;
+    printer.newLine();
+    printer.println(`User: ${popOrder.createdBy || "-"}`);
+    printer.println(`Items: ${totalQty.toString().padStart(2, "0")}`);
+    printer.newLine();
+    printer.println("Thank You Visit Again");
 
-    txt += '\x1D\x6B\x04'; // Barcode type CODE39
-    txt += `${popOrder.order_id || ''}\x00\n`;
+    if (popOrder.order_id) {
+      printer.printBarcode(popOrder.order_id, "CODE39", {
+        width: 2,
+        height: 80,
+        position: "below",
+      });
+    }
 
-    txt += '\n\n\n\x1B\x69'; // Cut paper
+    printer.cut();
 
-    const targetPrinter = printConfig.printerName || printer.getDefaultPrinterName();
-    printer.printDirect({
-      data: txt,
-      printer: targetPrinter,
-      type: 'RAW',
-      success: jobID => console.log(`Printed Customer Receipt (job ${jobID})`),
-      error: err => console.error('Receipt Print failed:', err),
-    });
+    const success = await printer.execute();
+    if (success) {
+      console.log("Customer Receipt printed successfully");
+    } else {
+      console.error("Customer Receipt print failed");
+    }
   } catch (err) {
-    console.error('Takeaway Receipt Print Error:', err);
+    console.error("Takeaway Receipt Print Error:", err);
   }
-};  
+};
 
   
-  async function printCustomerReceipt(order, config) {
-    // Implement customer receipt printing
-    console.log(`Printing Customer Receipt for Order #${order.orderNo}`);
-  }
-  
 
-
-export const printKOTReceipt = async (order, kitchenItems = [], printerName = null,isAdditionalOrder = false) => {
+export const printKOTReceipt = async (order, kitchenItems = [], printerIp = null, isAdditionalOrder = false) => {
   try {
+    if (!printerIp) throw new Error("No printer IP provided");
+    console.log(printerIp, 'printerip');
+
+    const printer = new ThermalPrinter({
+      type: PrinterTypes.EPSON,
+      interface: `tcp://${printerIp}`,
+      characterSet: "SLOVENIA",
+      removeSpecialCharacters: false,
+      lineCharacter: "-",
+      options: {
+        timeout: 5000,
+      },
+    });
 
     const popOrder = await ORDER.findById(order._id)
-      .populate('restaurantId', 'name logo')
-      .populate('tableId', 'name')
-      .populate('customerTypeId', 'type')
+      .populate("restaurantId", "name logo")
+      .populate("tableId", "name")
+      .populate("customerTypeId", "type")
       .lean();
 
     const customerType = popOrder.customerTypeId?.type || "Order";
@@ -993,104 +1133,106 @@ export const printKOTReceipt = async (order, kitchenItems = [], printerName = nu
     }
 
     const LINE_WIDTH = 40;
-    let txt = '';
-    const line = '-'.repeat(LINE_WIDTH);
+    const line = "-".repeat(LINE_WIDTH);
+    printer.alignCenter();
 
-    // === Header ===
-txt += '\x1B\x61\x01';    // Align center
-txt += '\x1B\x21\x38';   // Bold + double height
-txt += (popOrder.restaurantId?.name || 'RESTAURANT').toUpperCase() + '\n';
-txt += '\x1B\x21\x00';    // Reset to normal
+    // Header
+    printer.setTextDoubleWidth();
+    printer.println((popOrder.restaurantId?.name || "RESTAURANT").toUpperCase());
+    printer.setTextNormal();
 
     if (isAdditionalOrder) {
-      txt += '\x1B\x21\x30'; // Bold + Double Height
-      txt += 'Additional Order\n';
-      txt += '\x1B\x21\x00'; // Reset font
+      printer.setTextDoubleHeight();
+      printer.println("Additional Order");
+      printer.setTextNormal();
     }
 
-txt += 'Kitchen Order Ticket\n';
-txt += `${line}\n`;
-txt += `${kitchenName}\n\n`;
+    printer.setTextDoubleWidth();
+    printer.println("Kitchen Order Ticket");
+    printer.setTextNormal();
 
-// === Token No. (center + bold)
-txt += '\x1B\x21\x30'; // Bold + Double Height
-txt += `Token No. : ${order.orderNo || '-'}\n`;
-txt += '\x1B\x21\x00'; // Reset font
-txt += '\n';
+    printer.drawLine();
+    printer.println(kitchenName);
+    printer.drawLine();
 
+    // Token No – bold, double width
+    printer.setTextDoubleHeight(); // Slightly taller font
+      printer.println(`Token No. : ${order.orderNo || "-"}`);
+      printer.setTextNormal();
+      printer.newLine();
 
+      if (isAdditionalOrder) {
+  printer.alignCenter();
+  printer.println("Additional Order");
+  printer.newLine();
+}
 
-    // === KOT + Type (with table if dine-in)
-    const kotNo = `KOT No. : ${order.ticketNo || '-'}`;
-    const typeText = customerType === "Dine-In"
-      ? `${customerType}(${popOrder.tableId?.name || '-'})`
-      : customerType;
-    const kotSpacing = LINE_WIDTH - kotNo.length - typeText.length;
-    txt += kotNo + ' '.repeat(kotSpacing > 0 ? kotSpacing : 1) + typeText + '\n\n';
+    // Type & KOT No (aligned nicely)
+    const kotNo = `KOT No. : ${order.ticketNo || "-"}`;
+    const typeText =
+      customerType === "Dine-In"
+        ? `${customerType}(${popOrder.tableId?.name || "-"})`
+        : customerType;
 
-    // === Date + Time
+    printer.alignLeft();
+    printer.println(`${kotNo}${" ".repeat(LINE_WIDTH - kotNo.length - typeText.length)}${typeText}`);
+
+    // Date & Time
     const dateLabel = `Date : ${dateStr}`;
     const timeLabel = `Time: ${timeStr}`;
-    const dateSpacing = LINE_WIDTH - dateLabel.length - timeLabel.length;
-    txt += dateLabel + ' '.repeat(dateSpacing > 0 ? dateSpacing : 1) + timeLabel + '\n\n';
+    printer.println(`${dateLabel}${" ".repeat(LINE_WIDTH - dateLabel.length - timeLabel.length)}${timeLabel}`);
 
-    // === Bill No + Waiter
-    const billNo = `Bill No. : ${order.order_id || '-'}`;
-    const waiter = `Waiter: ${order.createdBy || '-'}`;
-    const billSpacing = LINE_WIDTH - billNo.length - waiter.length;
-    txt += billNo + ' '.repeat(billSpacing > 0 ? billSpacing : 1) + waiter + '\n\n';
+    // Bill No. and Waiter
+    const billNo = `Bill No. : ${order.order_id || "-"}`;
+    const waiter = `Waiter: ${order.createdBy || "-"}`;
+    printer.println(`${billNo}${" ".repeat(LINE_WIDTH - billNo.length - waiter.length)}${waiter}`);
 
-    txt += `${line}\n`;
+    // Items Header
+    printer.drawLine();
+    printer.setTextNormal();
+    printer.println(`Item${" ".repeat(20 - 4)}Portion     Qty`);
+    printer.drawLine();
 
-    // === Table Headers ===
-    txt += `Item${' '.repeat(20 - 4)}Portion     Qty\n`;
-    txt += `${line}\n\n`;
-
-    // === Items ===
+    // Items
     let totalQty = 0;
     let totalItems = 0;
 
     for (const item of kitchenItems) {
       const list = item.isCombo ? item.items : [item];
       for (const it of list) {
-        const name = item.isCombo && item.comboName
-          ? `${item.comboName}`
-          : it.foodName;
+        const name = item.isCombo && item.comboName ? item.comboName : it.foodName;
+        const itemName = name.length > 20 ? name.slice(0, 20) : name.padEnd(20, " ");
+        const portion = (it.portion || "-").padEnd(10, " ");
+        const qty = `x${it.qty}`.padStart(3, " ");
 
-        const itemName = name.length > 20 ? name.slice(0, 20) : name.padEnd(20, ' ');
-        const portion = (it.portion || '-').padEnd(10, ' ');
-        const qty = `x${it.qty}`.padStart(3, ' ');
-
-        txt += `${itemName}${portion}${qty}\n`;
+        printer.println(`${itemName}${portion}${qty}`);
         totalQty += it.qty || 1;
         totalItems++;
       }
     }
 
-    txt += `\n${line}\n`;
-    txt += `Item : ${totalItems}`.padEnd(28, ' ') + `Qty. : ${totalQty}\n`;
-    txt += `${line}\n`;
+    // Totals
+    printer.println("");
+    printer.drawLine();
+    printer.println(`Item : ${totalItems}`.padEnd(28, " ") + `Qty. : ${totalQty}`);
+    printer.drawLine();
 
-    // === Paper feed & cut ===
-    txt += '\n'.repeat(5);
-    txt += '\x1B\x69';
+    // Footer space & cut
+    printer.cut();
 
-    const targetPrinter = printerName || printer.getDefaultPrinterName();
-    printer.printDirect({
-      data: txt,
-      printer: targetPrinter,
-      type: 'RAW',
-      success: jobID => console.log(`Printed KOT (job ${jobID})`),
-      error: err => {
-        console.error('Print failed:', err);
-        throw err;
-      }
-    });
+    const isConnected = await printer.isPrinterConnected();
+    if (!isConnected) throw new Error("Printer is not connected");
+
+    const success = await printer.execute();
+    // if (!success) throw new Error("Failed to execute print job");
+
+    console.log("KOT Printed successfully");
   } catch (err) {
-    console.error('KOT Print Error:', err);
+    console.error("KOT Print Error:", err.message);
     throw err;
   }
 };
+
 
 
 export const getTodayOrdersForPOS = async (req, res, next) => {
