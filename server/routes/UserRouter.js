@@ -19,8 +19,8 @@ import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../c
 import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSummary,getTopSellingItems,getLatestCompletedOrders} from '../controller/DashbordController/dashbordCntrl.js'
 
 import upload from '../middleware/multer.js'
-import { generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport } from '../controller/ReportsController/salesReportCntrl.js';
-import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getSingleOrder } from '../controller/ReportsController/orederReport.js';
+import { categorySalesExcel, customerTypeWiseSalesExcel, DailySalesExcel, generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport, itemWiseSalesExcel } from '../controller/ReportsController/salesReportCntrl.js';
+import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getCancelledOrdersExcel, getSingleOrder, orderSummaryExcel } from '../controller/ReportsController/orederReport.js';
 import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionPDF, getDailyTransactionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
 import { generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
 import checkOfflinePermission from '../middleware/permission.js'
@@ -203,7 +203,11 @@ router.get('/daily-sale/pdf',VerifyToken,checkOfflinePermission('Reports'),gener
 router.get('/category-sale/pdf',VerifyToken,checkOfflinePermission('Reports'),generateCategorySalesPDF);
 router.get('/item-sale/pdf',VerifyToken,checkOfflinePermission('Reports'),generateItemWiseSalesPDF);
 router.get('/customertype-sale/pdf',VerifyToken,checkOfflinePermission('Reports'),generateCustomerTypeWisePDF)
-
+//excel
+router.get('/category-sales/excel',VerifyToken,checkOfflinePermission('Reports'),categorySalesExcel)
+router.get('/Daily-sales/excel',VerifyToken,checkOfflinePermission('Reports'),DailySalesExcel)
+router.get('/item-sales/excel',VerifyToken,checkOfflinePermission('Reports'),itemWiseSalesExcel)
+router.get('/customertypes/excel',VerifyToken,checkOfflinePermission('Reports'),customerTypeWiseSalesExcel)
 
 
 //order report 
@@ -212,6 +216,10 @@ router.get('/reports/one-order/:orderId',VerifyToken,checkOfflinePermission('Rep
 router.get('/reports/cancelled-order',VerifyToken,checkOfflinePermission('Reports'),getCancelledOrders)
 router.get('/order-summary/pdf',VerifyToken,checkOfflinePermission('Reports'),generateOrderSummaryPDF)
 router.get('/cancel-order/pdf',VerifyToken,checkOfflinePermission('Reports'),generateCancelledOrdersPDF)
+//excel
+router.get('/order-summary/excel',VerifyToken,checkOfflinePermission('Reports'),orderSummaryExcel)
+router.get('/cancel-order/excel',VerifyToken,checkOfflinePermission('Reports'),getCancelledOrdersExcel)
+
 
 //Payment  Report 
 router.get('/reports/payment-summary',VerifyToken,checkOfflinePermission('Reports'),getPaymentSummary);
@@ -290,7 +298,7 @@ router.post('/rider',VerifyToken,checkOfflinePermission('Admin'),createRider);
 router.get('/rider',VerifyToken,checkOfflinePermission('Admin'),getRiders);
 router.get('/rider/:riderId',VerifyToken,checkOfflinePermission('Admin'),getRiders);
 router.put('/rider',VerifyToken,checkOfflinePermission('Admin'),updateRider);
-router.delete('/rider',VerifyToken,checkOfflinePermission('Admin'),deleteRider);
+router.delete('/rider/:riderId',VerifyToken,checkOfflinePermission('Admin'),deleteRider);
 
 
 //Deliver listings 

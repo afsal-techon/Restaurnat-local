@@ -4,7 +4,7 @@ import { ThermalPrinter, PrinterTypes, CharacterSet, BreakLine  } from "node-the
 
 const printer = new ThermalPrinter({
   type: PrinterTypes.EPSON, // or STAR if your printer is different
-  interface: "tcp://192.168.1.87", // your printer's IP
+  interface: "tcp://192.168.20.87", // your printer's IP
   characterSet: "SLOVENIA",
   removeSpecialCharacters: false,
   lineCharacter: "-",

@@ -1319,7 +1319,229 @@ export const generateCustomerTypeWisePDF = async (req, res, next) => {
 
 
 
+export const DailySalesExcel = async (req, res, next) => {
+  try {
+    const userId = req.user;
+    const user = await USER.findOne({ _id: userId });
+    if (!user) return res.status(400).json({ message: "User not found!" });
 
+    const {
+      fromDate,
+      toDate,
+      customerTypeId,
+      paymentMethod,
+      search,
+      minPrice,
+      maxPrice
+    } = req.query;
+
+    const matchStage = { "order.status": "Completed" };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (customerTypeId) {
+      matchStage["order.customerTypeId"] = new mongoose.Types.ObjectId(customerTypeId);
+    }
+
+    const basePipeline = [
+      {
+        $lookup: {
+          from: "orders",
+          localField: "orderId",
+          foreignField: "_id",
+          as: "order"
+        }
+      },
+      { $unwind: "$order" },
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: "tables",
+          localField: "order.tableId",
+          foreignField: "_id",
+          as: "table"
+        }
+      },
+      {
+        $lookup: {
+          from: "customertypes",
+          localField: "order.customerTypeId",
+          foreignField: "_id",
+          as: "customerType"
+        }
+      },
+      { $unwind: { path: "$table", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$customerType", preserveNullAndEmptyArrays: true } },
+      { $unwind: "$methods" },
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "methods.accountId",
+          foreignField: "_id",
+          as: "account"
+        }
+      },
+      { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$_id",
+          orderNo: { $first: "$order.orderNo" },
+          orderId: { $first: "$order.order_id" },
+          customerType: { $first: "$customerType.type" },
+          discount: { $first: "$order.discount" },
+          amount: { $first: "$grandTotal" },
+          date: { $first: "$createdAt" },
+          paymentMethods: {
+            $push: {
+              type: "$account.accountName",
+              amount: "$methods.amount"
+            }
+          }
+        }
+      }
+    ];
+
+    const min = parseFloat(minPrice);
+    const max = parseFloat(maxPrice);
+    const priceMatch = {};
+    if (!isNaN(min)) priceMatch.amount = { ...priceMatch.amount, $gte: min };
+    if (!isNaN(max)) priceMatch.amount = { ...priceMatch.amount, $lte: max };
+    if (Object.keys(priceMatch).length) {
+      basePipeline.push({ $match: priceMatch });
+    }
+
+    if (paymentMethod) {
+      basePipeline.push({
+        $match: {
+          paymentMethods: {
+            $elemMatch: { type: paymentMethod }
+          }
+        }
+      });
+    }
+
+    if (search) {
+      basePipeline.push({
+        $match: {
+          $or: [
+            { orderNo: { $regex: search, $options: "i" } },
+            { orderId: { $regex: search, $options: "i" } },
+            { customerType: { $regex: search, $options: "i" } },
+            { "paymentMethods.type": { $regex: search, $options: "i" } }
+          ]
+        }
+      });
+    }
+
+    const data = await PAYMENT.aggregate([...basePipeline, { $sort: { date: -1 } }]);
+
+// Create Excel workbook and worksheet
+const workbook = new ExcelJS.Workbook();
+const worksheet = workbook.addWorksheet("Daily Sales Report");
+
+// Add title row
+worksheet.mergeCells('A1:G1');
+const titleRow = worksheet.getCell('A1');
+titleRow.value = 'Daily Sales Report';
+titleRow.font = { size: 16, bold: true };
+titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+// ==== Filter Info Row ====
+const filters = [];
+
+if (fromDate && toDate) {
+  filters.push(`Date: ${fromDate} to ${toDate}`);
+}
+if (customerTypeId) {
+  const customerTypeDoc = await CUSTOMER_TYPE.findById(customerTypeId);
+  if (customerTypeDoc) {
+    filters.push(`Customer Type: ${customerTypeDoc.type}`);
+  }
+}
+if (!isNaN(min)) {
+  filters.push(`Min Amount: ${min}`);
+}
+if (!isNaN(max)) {
+  filters.push(`Max Amount: ${max}`);
+}
+if (paymentMethod) {
+  filters.push(`Payment Method: ${paymentMethod}`);
+}
+if (search) {
+  filters.push(`Search: ${search}`);
+}
+
+if (filters.length > 0) {
+  const filterText = filters.join(" | ");
+  worksheet.mergeCells('A2:G2');
+  const filterRow = worksheet.getCell('A2');
+  filterRow.value = filterText;
+  filterRow.font = { bold: true, size: 12 };
+  filterRow.alignment = { vertical: 'middle', horizontal: 'left' };
+  worksheet.addRow([]); // spacing row
+} else {
+  worksheet.addRow([]); // still add empty row to keep header at same line
+}
+
+
+// Add column headings manually
+const headerRow = worksheet.addRow([
+  "Date", "Order ID", "Order No", "Customer Type", "Discount", "Payment Methods", "Amount"
+]);
+
+// Make header row bold
+headerRow.eachCell((cell) => {
+  cell.font = { bold: true };
+});
+
+// Set column widths
+worksheet.columns = [
+  { key: "date", width: 20 },
+  { key: "orderId", width: 20 },
+  { key: "orderNo", width: 15 },
+  { key: "customerType", width: 20 },
+  { key: "discount", width: 10 },
+  { key: "paymentMethods", width: 40 },
+  { key: "amount", width: 15 }
+];
+
+// Add rows
+data.forEach((item) => {
+  const paymentMethodsStr = item.paymentMethods.map(pm => `${pm.type}: ${pm.amount}`).join(", ");
+  worksheet.addRow({
+    date: new Date(item.date),
+    orderId: item.orderId,
+    orderNo: item.orderNo,
+    customerType: item.customerType || '-',
+    discount: item.discount || 0,
+    paymentMethods: paymentMethodsStr,
+    amount: item.amount
+  });
+});
+
+    // Set response headers
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="daily-sales-report.xlsx"`
+    );
+
+    // Write to response
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    next(err);
+  }
+};
 
 
 
@@ -1329,133 +1551,234 @@ export const categorySalesExcel = async (req, res, next) => {
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    const { restaurantId } = user;
-    const { minPrice, maxPrice, search } = req.query;
+    const { minPrice, maxPrice, search = "" } = req.query;
+      const restaurant = await RESTAURANT.findOne().lean();
+    const currency = restaurant?.currency || 'AED';
 
-    const matchStage = {
-      status: "Completed",
-      restaurantId,
-    };
 
-    const aggPipeline = [
-      { $match: matchStage },
+
+    const priceFilter = {};
+    if (!isNaN(parseFloat(minPrice))) priceFilter.$gte = parseFloat(minPrice);
+    if (!isNaN(parseFloat(maxPrice))) priceFilter.$lte = parseFloat(maxPrice);
+
+    const pipeline = [
+      { $match: { status: "Completed" } },
+      { $unwind: "$items" },
       {
         $facet: {
           directFood: [
-            { $unwind: "$directFood" },
+            { $match: { "items.isCombo": false } },
+            {
+              $lookup: {
+                from: "foods",
+                localField: "items.foodId",
+                foreignField: "_id",
+                as: "foodInfo"
+              }
+            },
+            { $unwind: "$foodInfo" },
+            {
+              $lookup: {
+                from: "categories",
+                localField: "foodInfo.categoryId",
+                foreignField: "_id",
+                as: "categoryInfo"
+              }
+            },
+            { $unwind: "$categoryInfo" },
             {
               $group: {
                 _id: {
-                  foodId: "$directFood.foodId",
-                  categoryId: "$directFood.categoryId",
+                  categoryId: "$categoryInfo._id",
+                  orderId: "$_id"
                 },
-                totalQty: { $sum: "$directFood.qty" },
-                totalSales: { $sum: "$directFood.subTotal" },
-                totalOrders: { $sum: 1 },
-              },
+                categoryName: { $first: "$categoryInfo.name" },
+                totalQty: { $sum: "$items.qty" },
+                totalSales: { $sum: "$items.total" }
+              }
             },
+            {
+              $group: {
+                _id: "$_id.categoryId",
+                categoryName: { $first: "$categoryName" },
+                totalQty: { $sum: "$totalQty" },
+                totalSales: { $sum: "$totalSales" },
+                orderIds: { $addToSet: "$_id.orderId" }
+              }
+            },
+            {
+              $addFields: {
+                totalOrders: { $size: "$orderIds" }
+              }
+            }
           ],
           comboFood: [
-            { $unwind: "$comboFood" },
+            { $match: { "items.isCombo": true } },
+            { $unwind: "$items.items" },
+            {
+              $addFields: {
+                "items.items.computedQty": {
+                  $multiply: ["$items.items.qty", "$items.qty"]
+                },
+                "items.items.computedTotal": {
+                  $multiply: ["$items.items.price", "$items.qty"]
+                }
+              }
+            },
+            {
+              $lookup: {
+                from: "foods",
+                localField: "items.items.foodId",
+                foreignField: "_id",
+                as: "comboFoodInfo"
+              }
+            },
+            { $unwind: "$comboFoodInfo" },
+            {
+              $lookup: {
+                from: "categories",
+                localField: "comboFoodInfo.categoryId",
+                foreignField: "_id",
+                as: "categoryInfo"
+              }
+            },
+            { $unwind: "$categoryInfo" },
             {
               $group: {
                 _id: {
-                  foodId: "$comboFood.foodId",
-                  categoryId: "$comboFood.categoryId",
+                  categoryId: "$categoryInfo._id",
+                  orderId: "$_id"
                 },
-                totalQty: { $sum: "$comboFood.qty" },
-                totalSales: { $sum: "$comboFood.subTotal" },
-                totalOrders: { $sum: 1 },
-              },
+                categoryName: { $first: "$categoryInfo.name" },
+                totalQty: { $sum: "$items.items.computedQty" },
+                totalSales: { $sum: "$items.items.computedTotal" }
+              }
             },
-          ],
-        },
+            {
+              $group: {
+                _id: "$_id.categoryId",
+                categoryName: { $first: "$categoryName" },
+                totalQty: { $sum: "$totalQty" },
+                totalSales: { $sum: "$totalSales" },
+                orderIds: { $addToSet: "$_id.orderId" }
+              }
+            },
+            {
+              $addFields: {
+                totalOrders: { $size: "$orderIds" }
+              }
+            }
+          ]
+        }
       },
       {
         $project: {
-          all: { $concatArrays: ["$directFood", "$comboFood"] },
-        },
+          all: { $concatArrays: ["$directFood", "$comboFood"] }
+        }
       },
       { $unwind: "$all" },
       {
         $group: {
-          _id: "$all._id.categoryId",
+          _id: "$all._id",
+          categoryName: { $first: "$all.categoryName" },
           totalQty: { $sum: "$all.totalQty" },
           totalSales: { $sum: "$all.totalSales" },
-          totalOrders: { $sum: "$all.totalOrders" },
-        },
+          totalOrders: { $sum: "$all.totalOrders" }
+        }
       },
       {
-        $lookup: {
-          from: "categories",
-          localField: "_id",
-          foreignField: "_id",
-          as: "category",
-        },
+        $match: {
+          ...(search && {
+            categoryName: { $regex: search, $options: "i" }
+          }),
+          ...(Object.keys(priceFilter).length && {
+            totalSales: priceFilter
+          })
+        }
       },
-      { $unwind: "$category" },
-      {
-        $project: {
-          categoryId: "$_id",
-          categoryName: "$category.name",
-          totalQty: 1,
-          totalSales: 1,
-          totalOrders: 1,
-        },
-      },
+      { $sort: { totalSales: -1 } }
     ];
 
-    let result = await ORDER.aggregate(aggPipeline);
+    const result = await ORDER.aggregate(pipeline);
 
-    // Search filter
-    if (search) {
-      const searchRegex = new RegExp(search, "i");
-      result = result.filter((item) => searchRegex.test(item.categoryName));
-    }
+    // Generate Excel
+  const workbook = new ExcelJS.Workbook();
+const worksheet = workbook.addWorksheet("Category Sales");
 
-    // Price filter
-    if (minPrice) {
-      result = result.filter((item) => item.totalSales >= parseFloat(minPrice));
-    }
-    if (maxPrice) {
-      result = result.filter((item) => item.totalSales <= parseFloat(maxPrice));
-    }
+// Add title row (merged and bold)
+worksheet.mergeCells('A1:D1');
+const titleRow = worksheet.getCell('A1');
+titleRow.value = 'Category Sales Report';
+titleRow.font = { size: 16, bold: true };
+titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    // Excel generation
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Category Sales");
+// Empty row after title
+const filters = [];
+if (!isNaN(parseFloat(minPrice)) || !isNaN(parseFloat(maxPrice))) {
+  const min = isNaN(parseFloat(minPrice)) ? 0 : parseFloat(minPrice);
+  const max = isNaN(parseFloat(maxPrice)) ? "∞" : parseFloat(maxPrice);
+  filters.push(`Total Sales: ${min} to ${max} ${currency}`);
+}
+if (search) {
+  filters.push(`Category Name Search: "${search}"`);
+}
 
-    worksheet.columns = [
-      { header: "Category", key: "categoryName", width: 30 },
-      { header: "Total Qty", key: "totalQty", width: 15 },
-      { header: "Total Orders", key: "totalOrders", width: 15 },
-      { header: "Total Sales (₹)", key: "totalSales", width: 20 },
-    ];
+if (filters.length > 0) {
+  const filterRow = worksheet.addRow(filters);
+  filterRow.eachCell(cell => {
+    cell.font = { bold: true };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+  });
+  worksheet.addRow([]); // empty row between filters and headers
+} else {
+  worksheet.addRow([]); // preserve spacing if no filters
+}
 
-    result.forEach((item) => {
-      worksheet.addRow({
-        categoryName: item.categoryName,
-        totalQty: item.totalQty,
-        totalOrders: item.totalOrders,
-        totalSales: item.totalSales,
-      });
-    });
+// Add column headings manually
+const headerRow = worksheet.addRow([
+  "Category",
+  "Total Qty",
+  "Total Orders",
+  `Total Sales (${currency})`
+]);
 
-    // Add total row
-    const totalRow = worksheet.addRow({
-      categoryName: "Grand Total",
-      totalQty: { formula: `SUM(B2:B${result.length + 1})` },
-      totalOrders: { formula: `SUM(C2:C${result.length + 1})` },
-      totalSales: { formula: `SUM(D2:D${result.length + 1})` },
-    });
+// Make column headings bold
+headerRow.eachCell((cell) => {
+  cell.font = { bold: true };
+});
 
-    totalRow.eachCell((cell) => {
-      cell.font = { bold: true };
-    });
+// Set column widths
+worksheet.columns = [
+  { key: "categoryName", width: 30 },
+  { key: "totalQty", width: 15 },
+  { key: "totalOrders", width: 15 },
+  { key: "totalSales", width: 20 }
+];
+
+// Add data rows
+result.forEach(item => {
+  worksheet.addRow({
+    categoryName: item.categoryName,
+    totalQty: item.totalQty,
+    totalOrders: item.totalOrders,
+    totalSales: item.totalSales
+  });
+});
+
+// Grand Total Row
+const totalRow = worksheet.addRow({
+  categoryName: "Grand Total",
+  totalQty: { formula: `SUM(B4:B${result.length + 3})` },
+  totalOrders: { formula: `SUM(C4:C${result.length + 3})` },
+  totalSales: { formula: `SUM(D4:D${result.length + 3})` }
+});
+
+totalRow.eachCell(cell => {
+  cell.font = { bold: true };
+});
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=category-sales.xlsx");
-
+    res.setHeader("Content-Disposition", `attachment; filename=category-sales-${Date.now()}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
@@ -1634,34 +1957,84 @@ export const itemWiseSalesExcel = async (req, res, next) => {
     const result = await ORDER.aggregate(pipeline);
 
     // Generate Excel
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Item Sales");
+   // Generate Excel
+const wb = new ExcelJS.Workbook();
+const ws = wb.addWorksheet("Item Sales");
 
-    ws.columns = [
-      { header: "Item Name", key: "itemName", width: 30 },
-      { header: "Category", key: "category", width: 20 },
-      { header: "Total Qty", key: "totalQty", width: 15 },
-      { header: "Total Orders", key: "totalOrders", width: 15 },
-      { header: `Total Sales (${currency})`, key: "totalSales", width: 20 },
-    ];
+// Title Row (merged + bold)
+ws.mergeCells("A1:E1");
+const titleCell = ws.getCell("A1");
+titleCell.value = "Item Sales Report";
+titleCell.font = { size: 16, bold: true };
+titleCell.alignment = { vertical: "middle", horizontal: "center" };
 
-    result.forEach((r) => {
-      ws.addRow({
-        itemName: r.itemName,
-        category: r.category,
-        totalQty: r.totalQty,
-        totalOrders: r.totalOrders,
-        totalSales: r.totalSales,
-      });
-    });
+// Build filter summary row
+const filters = [];
+if (!isNaN(min) || !isNaN(max)) {
+  const minVal = isNaN(min) ? 0 : min;
+  const maxVal = isNaN(max) ? "∞" : max;
+  filters.push(`Total Sales: ${minVal} to ${maxVal} ${currency}`);
+}
+if (search) {
+  filters.push(`Search: "${search}"`);
+}
 
-    // Totals row
-    ws.addRow({
-      itemName: "Grand Total",
-      totalQty: { formula: `SUM(C2:C${result.length + 1})` },
-      totalOrders: { formula: `SUM(D2:D${result.length + 1})` },
-      totalSales: { formula: `SUM(E2:E${result.length + 1})` },
-    });
+if (filters.length > 0) {
+  const filterRow = ws.addRow(filters);
+  filterRow.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.alignment = { vertical: "middle", horizontal: "left" };
+  });
+  ws.addRow([]); // Spacer row after filters
+} else {
+  ws.addRow([]); // Spacer row if no filters
+}
+
+// Column Headers
+const headerRow = ws.addRow([
+  "Item Name",
+  "Category",
+  "Total Qty",
+  "Total Orders",
+  `Total Sales (${currency})`,
+]);
+
+// Make headers bold
+headerRow.eachCell((cell) => {
+  cell.font = { bold: true };
+});
+
+// Set column widths
+ws.columns = [
+  { key: "itemName", width: 30 },
+  { key: "category", width: 20 },
+  { key: "totalQty", width: 15 },
+  { key: "totalOrders", width: 15 },
+  { key: "totalSales", width: 20 },
+];
+
+// Data Rows
+result.forEach((r) => {
+  ws.addRow({
+    itemName: r.itemName,
+    category: r.category,
+    totalQty: r.totalQty,
+    totalOrders: r.totalOrders,
+    totalSales: r.totalSales,
+  });
+});
+
+// Totals Row
+const totalRow = ws.addRow({
+  itemName: "Grand Total",
+  totalQty: { formula: `SUM(C4:C${result.length + 3})` },
+  totalOrders: { formula: `SUM(D4:D${result.length + 3})` },
+  totalSales: { formula: `SUM(E4:E${result.length + 3})` },
+});
+totalRow.eachCell((cell) => {
+  cell.font = { bold: true };
+});
+
 
     res.setHeader(
       "Content-Type",
@@ -1734,13 +2107,11 @@ export const customerTypeWiseSalesExcel = async (req, res, next) => {
         ? [{ $match: { totalSales: priceFilter } }]
         : []),
       ...(search
-        ? [
-            {
-              $match: {
-                customerType: { $regex: search, $options: "i" },
-              },
+        ? [{
+            $match: {
+              customerType: { $regex: search, $options: "i" },
             },
-          ]
+          }]
         : []),
       {
         $project: {
@@ -1757,20 +2128,47 @@ export const customerTypeWiseSalesExcel = async (req, res, next) => {
     const result = await ORDER.aggregate(pipeline);
 
     // Generate Excel using exceljs
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Customer Type Sales");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Customer Type Sales");
 
-    // Define headers
-    worksheet.columns = [
-      { header: "Customer Type", key: "customerType", width: 30 },
-      { header: "Total Quantity", key: "totalQty", width: 20 },
-      { header: "Total Sales", key: "totalSales", width: 20 },
-      { header: "Order Count", key: "orderCount", width: 15 },
+    // Title row (merged + bold)
+    ws.mergeCells("A1:D1");
+    const titleCell = ws.getCell("A1");
+    titleCell.value = "Customer Type Sales Report";
+    titleCell.font = { size: 16, bold: true };
+    titleCell.alignment = { vertical: "middle", horizontal: "center" };
+
+    // Empty row
+    ws.addRow([]);
+
+    if (search) {
+  const searchRow = ws.addRow([`Search: ${search}`]);
+  searchRow.getCell(1).font = { bold: true };
+  searchRow.getCell(1).alignment = { horizontal: "left" };
+}
+
+    // Header row
+    const headerRow = ws.addRow([
+      "Customer Type",
+      "Total Quantity",
+      "Total Sales",
+      "Order Count",
+    ]);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true };
+    });
+
+    // Set column widths
+    ws.columns = [
+      { key: "customerType", width: 30 },
+      { key: "totalQty", width: 20 },
+      { key: "totalSales", width: 20 },
+      { key: "orderCount", width: 15 },
     ];
 
-    // Add rows
+    // Add data rows
     result.forEach((item) => {
-      worksheet.addRow({
+      ws.addRow({
         customerType: item.customerType,
         totalQty: item.totalQty,
         totalSales: item.totalSales,
@@ -1778,31 +2176,41 @@ export const customerTypeWiseSalesExcel = async (req, res, next) => {
       });
     });
 
-    // Add Grand Total row
+    // Totals
     const totalQty = result.reduce((sum, r) => sum + r.totalQty, 0);
     const totalSales = result.reduce((sum, r) => sum + r.totalSales, 0);
     const orderCount = result.reduce((sum, r) => sum + r.orderCount, 0);
 
-    worksheet.addRow({});
-    worksheet.addRow({
+    // Grand total row (bold)
+    const totalRow = ws.addRow({
       customerType: "Grand Total",
       totalQty,
       totalSales,
       orderCount,
     });
+    totalRow.eachCell((cell) => {
+      cell.font = { bold: true };
+    });
 
-    // Send file as response
+    // Send Excel
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
-    res.setHeader("Content-Disposition", "attachment; filename=CustomerTypeSales.xlsx");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=CustomerTypeSales_${Date.now()}.xlsx`
+    );
 
-    await workbook.xlsx.write(res);
+    await wb.xlsx.write(res);
     res.end();
   } catch (err) {
     next(err);
   }
 };
+
+
+
+
 
 
