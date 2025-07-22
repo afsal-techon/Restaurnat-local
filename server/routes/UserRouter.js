@@ -21,8 +21,8 @@ import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSumm
 import upload from '../middleware/multer.js'
 import { categorySalesExcel, customerTypeWiseSalesExcel, DailySalesExcel, generateCategorySalesPDF, generateCustomerTypeWisePDF, generateDailySalesPDF, generateItemWiseSalesPDF, getCategoryWiseSalesReport, getCustomerTypeWiseSalesReport, getDailySalesReport, getItemWiseSalesReport, itemWiseSalesExcel } from '../controller/ReportsController/salesReportCntrl.js';
 import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary, getCancelledOrders, getCancelledOrdersExcel, getSingleOrder, orderSummaryExcel } from '../controller/ReportsController/orederReport.js';
-import { generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionPDF, getDailyTransactionReport, getPaymentSummary } from '../controller/ReportsController/paymentReport.js';
-import { generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport } from '../controller/purchse-Expense/purchse-expence.js';
+import { dailyCollectionExcel, dailyTransactionExcel, generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionPDF, getDailyTransactionReport, getPaymentSummary, paymentSummaryExcel } from '../controller/ReportsController/paymentReport.js';
+import { expenseReportExcel, generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport, purchaseReportExcel } from '../controller/purchse-Expense/purchse-expence.js';
 import checkOfflinePermission from '../middleware/permission.js'
 import { getPritnerConfigs, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
 import { createSupplier, deleteSupplier, getSupplierDueHistory, getSuppliers, paySupplierDue, SupplierDueHistoryPdf, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
@@ -31,7 +31,7 @@ import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList,
 import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
 import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
-import { getProfitAndLossReport, profitandLossPdf } from '../controller/ReportsController/otherReports.js';
+import { getProfitAndLossReport, profitAndLossExcel, profitandLossPdf } from '../controller/ReportsController/otherReports.js';
 const router = express.Router();
 
 
@@ -226,6 +226,10 @@ router.get('/reports/payment-summary',VerifyToken,checkOfflinePermission('Report
 router.get('/reports/daily-payment',VerifyToken,checkOfflinePermission('Reports'),getDailyCollectionReport);
 router.get('/payment-summary/pdf',VerifyToken,checkOfflinePermission('Reports'),generatePaymentSummaryPDF);
 router.get('/payment-collection/pdf',VerifyToken,checkOfflinePermission('Reports'),generateDailyCollectionPDF)
+//excel 
+router.get('/payment-summary/excel',VerifyToken,checkOfflinePermission('Reports'),paymentSummaryExcel);
+router.get('/daily-collection/excel',VerifyToken,checkOfflinePermission('Reports'),dailyCollectionExcel);
+router.get('/daily-transaction/excel',VerifyToken,checkOfflinePermission('Reports'),dailyTransactionExcel)
 
 //daily transaction type 
 router.get('/reports/daily-transaction',VerifyToken,checkOfflinePermission('Reports'),getDailyTransactionReport)
@@ -237,8 +241,9 @@ router.get('/reports/purchase',VerifyToken,checkOfflinePermission('Reports'),get
 router.get('/reports/expanse',VerifyToken,checkOfflinePermission('Reports'),getExpenseReport);
 router.get('/purchase/pdf',VerifyToken,checkOfflinePermission('Reports'),generatePurchaseReportPDF);
 router.get('/expense/pdf',VerifyToken,checkOfflinePermission('Reports'),generateExpenseReportPDF)
-
-
+//excel
+router.get('/purchase/excel',VerifyToken,checkOfflinePermission('Reports'),purchaseReportExcel)
+router.get('/expense/excel',VerifyToken,checkOfflinePermission('Reports'),expenseReportExcel)
 
 //change table
 router.post('/order/change-table',VerifyToken,checkOfflinePermission('Admin'),changeTable);
@@ -316,5 +321,6 @@ router.post('/complete/delivery',VerifyToken,checkOfflinePermission('Admin'),com
 //profit and loss
 router.get('/reports/profit-loss',VerifyToken,checkOfflinePermission('Reports'),getProfitAndLossReport);
 router.get('/profit-loss/pdf',VerifyToken,checkOfflinePermission('Reports'),profitandLossPdf);
+router.get('/profit-loss/excel',VerifyToken,checkOfflinePermission('Reports'),profitAndLossExcel);
 
 export default router;

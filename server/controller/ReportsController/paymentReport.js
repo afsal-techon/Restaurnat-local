@@ -1088,7 +1088,7 @@ export const getDailyTransactionPDF = async (req, res, next) => {
 
 //excel generation
 
-export const PaymentSummaryExcel = async (req, res, next) => {
+export const paymentSummaryExcel = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found" });
@@ -1129,13 +1129,10 @@ export const PaymentSummaryExcel = async (req, res, next) => {
       { $unwind: { path: "$parentInfo", preserveNullAndEmptyArrays: true } },
       {
         $project: {
+          _id: 0,
           type: "$accountInfo.accountName",
           amount: 1,
           count: 1,
-          groupUnder: {
-            accountName: "$parentInfo.accountName",
-            accountType: "$parentInfo.accountType",
-          },
         },
       },
       ...(search
@@ -1149,83 +1146,63 @@ export const PaymentSummaryExcel = async (req, res, next) => {
         : []),
     ]);
 
-    const totalCollected = allPayments.reduce((sum, p) => sum + p.amount, 0);
+    // === Create Excel Workbook ===
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Payment Summary");
 
-    const dueResult = await CUSTOMER.aggregate([
-      {
-        $match: {
-          credit: { $gt: 0 },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalDue: { $sum: "$credit" },
-        },
-      },
-    ]);
+    // Title Row
+    ws.mergeCells("A1:C1");
+    const titleCell = ws.getCell("A1");
+    titleCell.value = "Payment Summary";
+    titleCell.font = { size: 16, bold: true };
+    titleCell.alignment = { vertical: "middle", horizontal: "center" };
 
-    const totalDue = dueResult[0]?.totalDue || 0;
+    // Empty Row
+    ws.addRow([]);
 
-    // ========== Excel Generation ==========
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Payment Summary");
+    // Search Row (if applicable)
+    if (search) {
+      const searchRow = ws.addRow([`Search: ${search}`]);
+      searchRow.getCell(1).font = { bold: true };
+      searchRow.getCell(1).alignment = { horizontal: "left" };
+    }
 
-    worksheet.columns = [
-      { header: "S.No", key: "sno", width: 10 },
-      { header: "Payment Method", key: "type", width: 25 },
-      { header: "Group Under", key: "groupUnder", width: 25 },
-      { header: "Transactions", key: "count", width: 15 },
-      { header: "Amount", key: "amount", width: 15 },
+    // Column Headings
+    const headerRow = ws.addRow(["Payment Type", "Amount", "No of Transaction"]);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true };
+    });
+
+    // Add Data Rows
+    allPayments.forEach((payment) => {
+      ws.addRow([
+        payment.type,
+        payment.amount,
+        payment.count,
+      ]);
+    });
+
+    // Set Column Widths (optional for better readability)
+    ws.columns = [
+      { width: 30 },
+      { width: 15 },
+      { width: 20 },
     ];
-
-    allPayments.forEach((entry, index) => {
-      worksheet.addRow({
-        sno: index + 1,
-        type: entry.type || "",
-        groupUnder: entry.groupUnder?.accountName || "",
-        count: entry.count,
-        amount: entry.amount,
-      });
-    });
-
-    // Add summary row (Grand Total)
-    worksheet.addRow({});
-    worksheet.addRow({
-      sno: "",
-      type: "Grand Total",
-      groupUnder: "",
-      count: allPayments.reduce((sum, x) => sum + x.count, 0),
-      amount: totalCollected,
-    });
-
-    // Add Due Summary
-    worksheet.addRow({});
-    worksheet.addRow({
-      sno: "",
-      type: "Total Customer Due",
-      groupUnder: "",
-      count: "",
-      amount: totalDue,
-    });
-
-    // Format header
-    worksheet.getRow(1).font = { bold: true };
 
     // Set response headers
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=payment_summary.xlsx");
+    res.setHeader("Content-Disposition", `attachment; filename=payment_summary.xlsx`);
 
-    await workbook.xlsx.write(res);
+    await wb.xlsx.write(res);
     res.end();
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
 
 
-export const DailyCollectionReportExcel = async (req, res, next) => {
+export const dailyCollectionExcel = async (req, res, next) => {
   try {
     const { fromDate, toDate, search } = req.query;
 
@@ -1235,6 +1212,9 @@ export const DailyCollectionReportExcel = async (req, res, next) => {
 
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found" });
+
+     const restaurant = await RESTAURANT.findOne({});
+        const currency = restaurant?.currency || "AED";
 
     const start = new Date(fromDate);
     const end = new Date(toDate);
@@ -1275,7 +1255,7 @@ export const DailyCollectionReportExcel = async (req, res, next) => {
         $group: {
           _id: { date: "$date", type: "$accountName" },
           amount: { $sum: "$amount" },
-          count: { $sum: 1 }
+          count: { $sum: 1 },
         }
       },
       {
@@ -1302,45 +1282,77 @@ export const DailyCollectionReportExcel = async (req, res, next) => {
       { $sort: { date: -1 } }
     ];
 
-    const result = await TRANSACTION.aggregate(pipeline);
+    const reportData = await TRANSACTION.aggregate(pipeline);
 
-    // ======= Create Excel =======
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Daily Collection Report");
+    // ====== Create Excel ======
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Daily Collection Report");
 
-    worksheet.columns = [
-      { header: "Date", key: "date", width: 15 },
-      { header: "Account Name", key: "accountName", width: 25 },
-      { header: "Amount", key: "amount", width: 15 },
-      { header: "Count", key: "count", width: 10 },
-    ];
+    // Title Row
+    ws.mergeCells("A1:C1");
+    const titleCell = ws.getCell("A1");
+    titleCell.value = "Daily Collection Report";
+    titleCell.font = { size: 16, bold: true };
+    titleCell.alignment = { vertical: "middle", horizontal: "center" };
 
-    result.forEach((day) => {
-      day.collections.forEach((col) => {
-        worksheet.addRow({
-          date: day.date,
-          accountName: col.type,
-          amount: col.amount,
-          count: col.count,
-        });
-      });
-      worksheet.addRow({
-        date: day.date,
-        accountName: "Total",
-        amount: day.total,
-        count: "",
-      });
-      worksheet.addRow({}); // empty row
+    // Empty Row
+    ws.addRow([]);
+
+    // Filter Info
+    const filterRow = ws.addRow([
+      `From: ${fromDate}`,
+      `To: ${toDate}`,
+      ...(search ? [`Search: ${search}`] : [])
+    ]);
+    filterRow.eachCell((cell) => {
+      cell.font = { bold: true };
     });
 
-    const fileName = `DailyCollection_${fromDate}_to_${toDate}.xlsx`;
+    // Empty Row
+    ws.addRow([]);
+
+    // Header Row
+    const headerRow = ws.addRow(["Date", "Payment Methods", "Total"]);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center" };
+    });
+
+    // Data Rows
+    reportData.forEach((entry) => {
+      const paymentDetails = entry.collections
+        .map(
+          (c) => `${c.type} (${c.count}) - ${c.amount.toFixed(2)}`
+        )
+        .join("\n");
+
+      const row = ws.addRow([
+        entry.date,
+        paymentDetails,
+        entry.total,
+      ]);
+
+      row.getCell(2).alignment = { wrapText: true };
+    });
+
+    // Column Widths
+    ws.columns = [
+      { key: "date", width: 15 },
+      { key: "methods", width: 50 },
+      { key: "total", width: 15 },
+    ];
+
+    // Set response headers
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${fileName}"`
+      "attachment; filename=daily_collection_report.xlsx"
     );
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
-    await workbook.xlsx.write(res);
+    await wb.xlsx.write(res);
     res.end();
   } catch (err) {
     next(err);
@@ -1349,23 +1361,22 @@ export const DailyCollectionReportExcel = async (req, res, next) => {
 
 
 
-export const DailyTransactionReportExcel = async (req, res, next) => {
+export const dailyTransactionExcel = async (req, res, next) => {
   try {
     const {
       fromDate,
       toDate,
-      search = "",
+      search = '',
       type,
-      accountName = "",
-      accountType = "",
-      paymentModeName = "",
+      accountName = '',
+      accountType = '',
+      paymentModeName = ''
     } = req.query;
 
     const user = await USER.findById(req.user);
     if (!user) return res.status(400).json({ message: "User not found!" });
 
     const matchStage = {};
-
     if (type) matchStage.type = type;
 
     if (fromDate && toDate) {
@@ -1378,10 +1389,10 @@ export const DailyTransactionReportExcel = async (req, res, next) => {
     const searchStage = search
       ? {
           $or: [
-            { referenceId: { $regex: search, $options: "i" } },
-            { referenceType: { $regex: search, $options: "i" } },
-            { narration: { $regex: search, $options: "i" } },
-          ],
+            { referenceId: { $regex: search, $options: 'i' } },
+            { referenceType: { $regex: search, $options: 'i' } },
+            { narration: { $regex: search, $options: 'i' } },
+          ]
         }
       : null;
 
@@ -1393,8 +1404,8 @@ export const DailyTransactionReportExcel = async (req, res, next) => {
           from: "accounts",
           localField: "accountId",
           foreignField: "_id",
-          as: "accountInfo",
-        },
+          as: "accountInfo"
+        }
       },
       { $unwind: "$accountInfo" },
       {
@@ -1402,10 +1413,47 @@ export const DailyTransactionReportExcel = async (req, res, next) => {
           from: "accounts",
           localField: "paymentType",
           foreignField: "_id",
-          as: "paymentTypeInfo",
-        },
+          as: "paymentTypeInfo"
+        }
       },
       { $unwind: { path: "$paymentTypeInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "customers",
+          localField: "customerId",
+          foreignField: "_id",
+          as: "customer"
+        }
+      },
+      { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplier"
+        }
+      },
+      { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          vendorCustomer: {
+            $cond: [
+              { $ifNull: ["$customer", false] },
+              "$customer.name",
+              {
+                $cond: [
+                  { $ifNull: ["$supplier", false] },
+                  "$supplier.supplierName",
+                  "-"
+                ]
+              }
+            ]
+          },
+          credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
+          debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
+        }
+      },
       ...(accountName
         ? [{ $match: { "accountInfo.accountName": { $regex: accountName, $options: "i" } } }]
         : []),
@@ -1418,63 +1466,123 @@ export const DailyTransactionReportExcel = async (req, res, next) => {
       { $sort: { createdAt: 1 } },
       {
         $addFields: {
-          credit: { $cond: [{ $eq: ["$type", "Credit"] }, "$amount", 0] },
-          debit: { $cond: [{ $eq: ["$type", "Debit"] }, "$amount", 0] },
-        },
+          total: {
+            $cond: [
+              { $eq: ["$type", "Credit"] },
+              "$amount",
+              { $multiply: ["$amount", -1] }
+            ]
+          }
+        }
       },
+      {
+        $project: {
+          date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          referenceId: 1,
+          accountType: "$accountInfo.accountType",
+          accountName: "$accountInfo.accountName",
+          paymentMethod: "$paymentTypeInfo.accountName",
+          vendorCustomer: 1,
+          referenceType: 1,
+          credit: 1,
+          debit: 1,
+          total: 1
+        }
+      }
     ];
 
     const transactions = await TRANSACTION.aggregate(pipeline);
 
-    // Add running total
-    let runningTotal = 0;
-    const rows = transactions.map((txn) => {
-      const change = txn.type === "Credit" ? txn.amount : -txn.amount;
-      runningTotal += change;
+    // ====== Create Excel Sheet ======
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Daily Transaction");
 
-      return {
-        date: txn.createdAt.toISOString().split("T")[0],
-        referenceId: txn.referenceId || "",
-        referenceType: txn.referenceType || "",
-        narration: txn.narration || "",
-        accountName: txn.accountInfo?.accountName || "",
-        accountType: txn.accountInfo?.accountType || "",
-        paymentMode: txn.paymentTypeInfo?.accountName || "",
-        type: txn.type,
-        credit: txn.type === "Credit" ? txn.amount : 0,
-        debit: txn.type === "Debit" ? txn.amount : 0,
-        runningTotal,
-      };
+    // Title
+    worksheet.mergeCells("A1:J1");
+    const titleCell = worksheet.getCell("A1");
+    titleCell.value = "Daily Transaction";
+    titleCell.font = { size: 16, bold: true };
+    titleCell.alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.addRow([]);
+
+    // Filters row (only if present)
+    const filters = [];
+
+    if (fromDate) filters.push(`From: ${fromDate}`);
+    if (toDate) filters.push(`To: ${toDate}`);
+    if (search) filters.push(`Search: ${search}`);
+    if (type) filters.push(`Type: ${type}`);
+    if (accountName) filters.push(`Account Name: ${accountName}`);
+    if (accountType) filters.push(`Account Type: ${accountType}`);
+    if (paymentModeName) filters.push(`Payment Mode: ${paymentModeName}`);
+
+    if (filters.length > 0) {
+      const filterRow = worksheet.addRow(filters);
+      filterRow.eachCell(cell => (cell.font = { bold: true }));
+      worksheet.addRow([]);
+    }
+
+    // Header row
+    const headerRow = worksheet.addRow([
+      "Date",
+      "Reference No",
+      "Account Type",
+      "Account Name",
+      "Payment Method",
+      "Vendor/Customer",
+      "Reference Type",
+      "Credit",
+      "Debit",
+      "Total"
+    ]);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center" };
     });
 
-    // Generate Excel
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Daily Transactions");
+    // Data rows
+    transactions.forEach(txn => {
+      worksheet.addRow([
+        txn.date,
+        txn.referenceId || "-",
+        txn.accountType || "-",
+        txn.accountName || "-",
+        txn.paymentMethod || "-",
+        txn.vendorCustomer || "-",
+        txn.referenceType || "-",
+        txn.credit || 0,
+        txn.debit || 0,
+        txn.total || 0
+      ]);
+    });
 
+    // Column widths
     worksheet.columns = [
-      { header: "Date", key: "date", width: 15 },
-      { header: "Reference ID", key: "referenceId", width: 20 },
-      { header: "Reference Type", key: "referenceType", width: 20 },
-      { header: "Narration", key: "narration", width: 25 },
-      { header: "Account Name", key: "accountName", width: 20 },
-      { header: "Account Type", key: "accountType", width: 20 },
-      { header: "Payment Mode", key: "paymentMode", width: 20 },
-      { header: "Type", key: "type", width: 10 },
-      { header: "Credit", key: "credit", width: 15 },
-      { header: "Debit", key: "debit", width: 15 },
-      { header: "Running Total", key: "runningTotal", width: 20 },
+      { width: 12 },
+      { width: 20 },
+      { width: 15 },
+      { width: 25 },
+      { width: 20 },
+      { width: 25 },
+      { width: 20 },
+      { width: 10 },
+      { width: 10 },
+      { width: 12 }
     ];
 
-    worksheet.addRows(rows);
-
-    // Formatting headers
-    worksheet.getRow(1).font = { bold: true };
-
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=Daily_Transaction_Report.xlsx");
+    // Send Excel file
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=daily_transaction_report.xlsx"
+    );
 
     await workbook.xlsx.write(res);
     res.end();
+
   } catch (err) {
     next(err);
   }
