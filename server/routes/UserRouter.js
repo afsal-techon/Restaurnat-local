@@ -14,7 +14,7 @@ import { createAddOns,deleteAddOn,getAllAddOns,updateAddOns } from '../controlle
 import { createFood,deleteFood,getAllFoodbyRestaurat,getOneFood,updateFood } from '../controller/foodController/mainFood.js'
 import {getAllByCategoryForPOS,getAllComboForPOS,getAllFoodForPOS,getComboForPOS,getCourseForPOS,getMenusItemsForPOS,getOneComboForPOS } from '../controller/POS controller/menuCntrl.js';
 import {  getFloorsForPOS,getTablesForPOS ,createCustomerForPOS,getCustomerTypesForPOS,getCustomersForPOS,updateCustomerforPOS, payCustomerDue, getCustomerOrderHistory, getCustomerDueHistory, generateCustomerDueHistoryPDF,} from '../controller/POS controller/posBasicCntrl.js';
-import {createOrder,getOneOrderDetails,getTodayOrdersForPOS,posOrderBilling,cancelOrder, changeTable } from '../controller/POS controller/posOrderCntrl.js';
+import {createOrder,getOneOrderDetails,getTodayOrdersForPOS,posOrderBilling,cancelOrder, changeTable, printDinInCustomerReceipt } from '../controller/POS controller/posOrderCntrl.js';
 import { createCompo,getAllCombo,deleteCombo,getOneCombo,updateCombo} from '../controller/foodController/comboCntrl.js'
 import { getQuickViewDashboard,getSalesOverview ,getPaymentOverview,getOrderSummary,getTopSellingItems,getLatestCompletedOrders} from '../controller/DashbordController/dashbordCntrl.js'
 
@@ -324,5 +324,8 @@ router.post('/complete/delivery',VerifyToken,checkOfflinePermission('Admin'),com
 router.get('/reports/profit-loss',VerifyToken,checkOfflinePermission('Reports'),getProfitAndLossReport);
 router.get('/profit-loss/pdf',VerifyToken,checkOfflinePermission('Reports'),profitandLossPdf);
 router.get('/profit-loss/excel',VerifyToken,checkOfflinePermission('Reports'),profitAndLossExcel);
+
+
+router.get('/print/din-in/:orderId',VerifyToken,checkOfflinePermission('Sale'),printDinInCustomerReceipt)
 
 export default router;

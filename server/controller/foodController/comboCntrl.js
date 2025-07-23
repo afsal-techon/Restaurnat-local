@@ -166,8 +166,8 @@ export const createCompo = async (req,res,next)=>{
             groups: comboGroupIds,
             addOns,
             comboPrice,
-         
-           
+            createdById:user._id,
+            createdBy:user.name,
           })
           
 
