@@ -15,6 +15,16 @@ agenda.define("mark kot as ready", async (job) => {
   }
 });
 
+agenda.define("reject kot after 24 hours", async (job) => {
+  const { kotId } = job.attrs.data;
+  const kot = await KOT_NOTIFICATION.findById(kotId);
+  if (kot && kot.status === 'Pending') {
+    kot.status = 'Rejected';
+    await kot.save();
+    console.log(`KOT ${kotId} marked as Rejected (after 24h)`);
+  }
+});
+
 // Start Agenda
 (async function () { 
   await agenda.start();

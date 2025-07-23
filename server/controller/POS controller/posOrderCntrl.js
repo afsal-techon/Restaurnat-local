@@ -406,24 +406,20 @@ if (action === 'print' || action === 'kotandPrint') {
 
 
 if (action === 'kot' || action === 'kotandPrint') {
-      const kitchenItemMap = {};
+  const kitchenItemMap = {};
+  const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
 
-    const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
+  for (const item of itemsToCheck) {
+    if (item.isCombo) {
+      const combo = comboMap[item.comboId];
+      if (!combo || !item.items?.length) continue;
 
-    for (const item of itemsToCheck) {
-      if (item.isCombo) {
-        // For combos, find the kitchen from the first food item
-        const combo = comboMap[item.comboId];
-        if (!combo || !item.items || item.items.length === 0) continue;
-
-
-        const kitchen = await KITCHEN.findOne({ restaurantId })
-        const kitchenId = kitchen._id;
-              if (!kitchenId) continue;
+      const kitchen = await KITCHEN.findOne({ restaurantId });
+      const kitchenId = kitchen?._id?.toString();
+      if (!kitchenId) continue;
 
       if (!kitchenItemMap[kitchenId]) kitchenItemMap[kitchenId] = [];
 
-      // Prepare combo items array
       const comboItemsArray = item.items.map(comboItem => {
         const food = foodMap[comboItem.foodId.toString()];
         return {
@@ -432,23 +428,23 @@ if (action === 'kot' || action === 'kotandPrint') {
           portion: comboItem.portion,
           quantity: comboItem.qty,
           status: 'Pending',
-          isComboItem: true
+          isComboItem: true,
+          preparationTime: food.preparationTime || 0
         };
       });
 
       kitchenItemMap[kitchenId].push({
-        foodId: combo._id, // Combo ID as the main identifier
+        foodId: combo._id,
         name: combo.comboName,
         quantity: item.qty,
         status: 'Pending',
-        message: `Combo Order`,
+        message: 'Combo Order',
         isComboItem: true,
         comboId: combo._id,
         comboName: combo.comboName,
         comboItems: comboItemsArray
       });
     } else {
-      // Regular food item
       const food = foodMap[item.foodId.toString()];
       if (!food?.kitchenId) continue;
 
@@ -462,22 +458,21 @@ if (action === 'kot' || action === 'kotandPrint') {
         quantity: item.qty,
         status: 'Pending',
         message: '',
-        isComboItem: false
+        isComboItem: false,
+        preparationTime: food.preparationTime || 0
       });
     }
   }
 
   const allKitchenIds = Object.keys(kitchenItemMap);
-const kitchens = await KITCHEN.find({ _id: { $in: allKitchenIds } }).lean();
-const kitchenMap = Object.fromEntries(kitchens.map(k => [k._id.toString(), k]));
+  const kitchens = await KITCHEN.find({ _id: { $in: allKitchenIds } }).lean();
+  const kitchenMap = Object.fromEntries(kitchens.map(k => [k._id.toString(), k]));
 
- const table = tableId ? await TABLES.findById(tableId).lean() : null;
-  // Create KOTs for each kitchen
+  const table = tableId ? await TABLES.findById(tableId).lean() : null;
+
   for (const [kitchenId, items] of Object.entries(kitchenItemMap)) {
-     const kitchen = kitchenMap[kitchenId];
-     if (!kitchen) continue;
-
-   
+    const kitchen = kitchenMap[kitchenId];
+    if (!kitchen) continue;
 
     const kotData = {
       restaurantId,
@@ -495,18 +490,33 @@ const kitchenMap = Object.fromEntries(kitchens.map(k => [k._id.toString(), k]));
       message: `New ${ctypeName} Order received${table ? ` for Table ${table.name}` : ''}, Ticket #${ticketNo}`,
     };
 
-         if (ctypeName.includes('Home Delivery')) {
-          kotData.deliveryDate = order.deliveryDate;
-          kotData.deliveryTime = order.deliveryTime;
-        }
+    if (ctypeName.includes('Home Delivery')) {
+      kotData.deliveryDate = order.deliveryDate;
+      kotData.deliveryTime = order.deliveryTime;
+    }
 
     const [createdKOT] = await KOT_NOTIFICATION.create([kotData]);
-    // req.io?.to(`kitchen:${kitchenId}`).emit('kot_notification', createdKOT);
 
-      req.io?.to(`kitchen:${kitchenId}`).emit('kot_status_update',createdKOT);
+    req.io?.to(`kitchen:${kitchenId}`).emit('kot_status_update', createdKOT);
 
+    // Get max preparation time
+    const maxPrepTime = Math.max(
+      ...items.map(i => {
+        if (i.isComboItem) {
+          return Math.max(...(i.comboItems?.map(ci => ci.preparationTime || 0) || [0]));
+        }
+        return i.preparationTime || 0;
+      })
+    );
+
+    const readyAt = new Date(Date.now() + maxPrepTime * 60 * 1000);
+    const rejectAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await agenda.schedule(readyAt, 'mark kot as ready', { kotId: createdKOT._id });
+    await agenda.schedule(rejectAt, 'reject kot after 24 hours', { kotId: createdKOT._id });
   }
 }
+
   
     return res.status(200).json(responseData);
   } catch (err) {
