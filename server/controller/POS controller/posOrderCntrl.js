@@ -84,7 +84,7 @@ const getNextOrderNo = async () => {
 
 export const createOrder = async (req, res, next) => {
   try {
-    console.log(req.body, 'body');
+    
 
     const {
       tableId,
@@ -395,7 +395,7 @@ if (action === 'print' || action === 'kotandPrint') {
       return;
     }
 
-    if (ctypeName.includes("Take Away") || ctypeName.includes("Home Delivery")) {
+    if (ctypeName.includes("Take Away") || ctypeName.includes("Home Delivery") ||ctypeName.includes("Online") ) {
       await printTakeawayCustomerReceipt(order, customerPrinterIp);
     }
   } catch (printError) {
@@ -703,15 +703,10 @@ export const printKOTReceipt = async (order, kitchenItems = [], printerIp = null
     printer.println((popOrder.restaurantId?.name || "RESTAURANT").toUpperCase());
     printer.setTextNormal();
 
-    if (isAdditionalOrder) {
-      printer.setTextDoubleHeight();
-      printer.println("Additional Order");
-      printer.setTextNormal();
-    }
 
-    printer.setTextDoubleWidth();
-    printer.println("Kitchen Order Ticket");
-    printer.setTextNormal();
+
+printer.println("Kitchen Order Ticket");
+printer.bold(false);
 
     printer.drawLine();
     printer.println(kitchenName);
@@ -722,6 +717,13 @@ export const printKOTReceipt = async (order, kitchenItems = [], printerIp = null
     printer.println(`Token No. : ${order.orderNo || "-"}`);
     printer.setTextNormal();
     printer.newLine();
+
+      if (isAdditionalOrder) {
+      printer.bold(true);
+      printer.println("Additional Order");
+      printer.setTextNormal();
+      printer.newLine();
+    }
 
     // Order Type & KOT No
     const kotNo = `KOT No. : ${order.ticketNo || "-"}`;
