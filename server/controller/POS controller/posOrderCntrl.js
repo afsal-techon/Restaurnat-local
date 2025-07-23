@@ -29,7 +29,7 @@ import { dirname, join ,basename } from 'path';
 import { existsSync ,mkdirSync } from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
+import agenda from '../../config/agenda.js'
 
 
 
@@ -503,9 +503,9 @@ if (action === 'kot' || action === 'kotandPrint') {
     const maxPrepTime = Math.max(
       ...items.map(i => {
         if (i.isComboItem) {
-          return Math.max(...(i.comboItems?.map(ci => ci.preparationTime || 0) || [0]));
+          return Math.max(...(i.comboItems?.map(ci => ci.preperationTime || 0) || [0]));
         }
-        return i.preparationTime || 0;
+        return i.preperationTime || 0;
       })
     );
 
