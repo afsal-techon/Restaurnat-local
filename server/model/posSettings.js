@@ -1,23 +1,9 @@
 import mongoose from 'mongoose';
 
 const posSettingsSchema =new mongoose.Schema({
-    isKotTicket: {
-        type: Boolean,
-        default: false
-    },
-    isPrint:{
-        type:Boolean,
-        default:false
-    },
-    isPrintandKOT:{
-        type:Boolean,
-        default:false
-    },
-    restaurantId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Restaurant',
-        required: true,
-    },
+
+        isKotSave:{ type: Boolean, default: false},
+        isKotPrint:{ type: Boolean, default: false},
     createdById: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

@@ -316,6 +316,7 @@ export const updateFood = async (req, res, next) => {
       special,
       addOnsIds,
       choices,
+      preperationTime,
       offer,
     } = req.body;
 
@@ -453,6 +454,7 @@ export const updateFood = async (req, res, next) => {
     food.kitchenId = kitchenId || null;
     food.special = special || false;
     food.addOnsIds = addOnsIds;
+    food.preperationTime = preperationTime;
     food.choices = choiceIds;
     (food.offer = offer ? offer : null), 
 
