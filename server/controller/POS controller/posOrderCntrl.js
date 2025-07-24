@@ -1586,24 +1586,35 @@ export const printDinInCustomerReceipt = async (req,res,next) => {
     printer.println("Items              Qty.   Price    Amount");
     printer.drawLine();
 
-    let totalQty = 0;
+    
     let total = 0;
 
-    for (const item of popOrder.items) {
-      const list = item.isCombo ? item.items : [item];
+    const orderItems = popOrder.items.filter(item => !item.isComboItem);
+    let totalQty = orderItems.length;
 
-      for (const it of list) {
-        const name = item.isCombo && item.comboName ? item.comboName : it.foodName;
-        const qty = it.qty?.toString().padStart(2, " ");
-        const price = it.price?.toFixed(2).padStart(6, " ");
-        const amount = it.total?.toFixed(2).padStart(7, " ");
-        const line = name.substring(0, 18).padEnd(18, " ") + qty + "   " + price + "   " + amount;
-        printer.println(line);
+    for (const item of orderItems) {
+  if (item.isCombo) {
+    const name = item.comboName?.substring(0, 18).padEnd(18, " ");
+    const qty = item.qty?.toString().padStart(2, " ");
+    const price = (item.comboPrice || item.price)?.toFixed(2).padStart(6, " ");
+    const amount = item.total?.toFixed(2).padStart(7, " ");
 
-        totalQty += it.qty || 0;
-        total += it.total || 0;
-      }
-    }
+    printer.println(`${name}${qty}   ${price}   ${amount}`);
+
+  
+    total += item.total || 0;
+  } else {
+    const name = item.foodName?.substring(0, 18).padEnd(18, " ");
+    const qty = item.qty?.toString().padStart(2, " ");
+    const price = item.price?.toFixed(2).padStart(6, " ");
+    const amount = item.total?.toFixed(2).padStart(7, " ");
+
+    printer.println(`${name}${qty}   ${price}   ${amount}`);
+
+  
+    total += item.total || 0;
+  }
+}
 
     printer.drawLine();
 
