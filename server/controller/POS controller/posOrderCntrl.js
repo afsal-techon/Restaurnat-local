@@ -31,6 +31,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import agenda from '../../config/agenda.js'
 import POS_SETTINGS from '../../model/posSettings.js'
+import { updateTable } from "../Restaurant/floors&tables.js";
 
 
 
@@ -896,8 +897,6 @@ export const createOrder = async (req, res, next) => {
       const populatedOrder = await ORDER.findById(order._id)
       .populate('tableId', 'name')
       .populate('customerId', 'name mobileNo address')
-      //  .populate('restaurantId', 'name logo',)
-      //  .populate('customerTypeId', 'type')
       .lean();
 
     const io = getIO();
@@ -916,11 +915,17 @@ const shouldSendKOT = (
 
 if (action === 'print') {
   try {
-    const printerConfigs = await PRINTER_CONFIG.find({ printerType: 'KOT' }).lean();
+          const printerConfigs = await PRINTER_CONFIG.find({
+          $or: [
+            { printerType: 'KOT' },
+            { isUniversal: true }
+          ]
+        }).lean();
     const kitchenItemMap = {};
 
     const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
 
+    // 1️ Group items by kitchenId
     for (const item of itemsToCheck) {
       if (item.isCombo) {
         const combo = comboDocs.find(c => c._id.toString() === item.comboId.toString());
@@ -968,30 +973,46 @@ if (action === 'print') {
       }
     }
 
-    for (const config of printerConfigs) {
-      const { kitchenId, printerIp } = config;
-      const kitchenItems = kitchenItemMap[kitchenId?.toString()] || [];
+    // 2️ KOT Printing for each kitchenId
+    for (const [kitchenId, items] of Object.entries(kitchenItemMap)) {
+      let matchedPrinter = printerConfigs.find(p => p.kitchenId?.toString() === kitchenId);
+      if (!matchedPrinter) {
+       matchedPrinter = await PRINTER_CONFIG.findOne({ isUniversal: true });
+      }
 
-      if (kitchenItems.length > 0) {
-        await printKOTReceipt(order, kitchenItems, printerIp, isAdditionalOrder);
+      if (matchedPrinter) {
+        await printKOTReceipt(order, items, matchedPrinter.printerIp, isAdditionalOrder);
+      } else {
+        console.warn(`No printer found for kitchenId ${kitchenId} and no universal fallback.`);
       }
     }
 
-    const customerPrinterConfig = await PRINTER_CONFIG.findOne({ printerType: 'KOT' }).lean();
-    const customerPrinterIp = customerPrinterConfig?.printerIp;
+    // 3️ Customer-Type based printing (Take Away, Delivery, Online)
+        let customerPrinters = await PRINTER_CONFIG.find({
+      $or: [
+        { printerType: 'CustomerType', customerTypeId: order.customerTypeId },
+        { isUniversal: true }
+      ]
+    });
 
-    if (!customerPrinterIp) {
-      console.warn("Customer Printer IP not configured.");
-      return;
+    const shouldPrintCustomerBill =
+      ctypeName.includes("Take Away") ||
+      ctypeName.includes("Home Delivery") ||
+      ctypeName.includes("Online");
+
+    if (shouldPrintCustomerBill && customerPrinters.length > 0) {
+      for (const printer of customerPrinters) {
+        await printTakeawayCustomerReceipt(order, printer.printerIp);
+      }
+    } else if (shouldPrintCustomerBill) {
+      console.warn('No customer printer configured and no universal fallback.');
     }
 
-    if (ctypeName.includes("Take Away") || ctypeName.includes("Home Delivery") ||ctypeName.includes("Online") ) {
-      await printTakeawayCustomerReceipt(order, customerPrinterIp);
-    }
   } catch (printError) {
     console.error('Printing failed:', printError);
   }
 }
+
 
 
 
@@ -1444,21 +1465,40 @@ export const printTakeawayCustomerReceipt = async (order, printerIp = null) => {
 };
 
 
-export const printDinInCustomerReceipt = async (orderId) => {
+export const printDinInCustomerReceipt = async (req,res,next) => {
   try {
+  
+    const { orderId } = req.params;
 
-    
-     const customerPrinterConfig = await PRINTER_CONFIG.findOne({ printerType: 'KOT' }).lean();
-
-     const printerIp= customerPrinterConfig?.printerIp;
-
-    if (!printerIp) throw new Error("No printer IP provided");
 
     const popOrder = await ORDER.findById(orderId)
       .populate("restaurantId", "name address phone mobile trn logo")
       .populate("tableId", "name")
       .populate("customerTypeId", "type")
-      .lean();
+      
+
+       const customerTypeId = popOrder.customerTypeId?._id;
+
+    // Step 2: Define fallback search conditions in priority order
+    const printerSearchConditions = [
+      { printerType: 'CustomerType', customerTypeId },
+      { printerType: 'CustomerType', isUniversal: true },
+      { printerType: 'KOT', isUniversal: true }
+    ];
+
+    let customerPrinterConfig = null;
+
+    // Step 3: Try each condition until a match is found
+    for (const condition of printerSearchConditions) {
+      customerPrinterConfig = await PRINTER_CONFIG.findOne(condition).lean();
+      if (customerPrinterConfig) break;
+    }
+
+    // Step 4: Throw if no printer found
+    const printerIp = customerPrinterConfig?.printerIp;
+    if (!printerIp) throw new Error("No printer IP provided");
+
+
 
     const customerType = popOrder.customerTypeId?.type || "Order";
     const now = new Date();
@@ -1527,11 +1567,6 @@ export const printDinInCustomerReceipt = async (orderId) => {
     const token = `Token No. : ${popOrder.orderNo || "-"}`;
     printer.setTextNormal();
     printer.println(token.padEnd(24, " ") + customerType.padStart(24, " "));
-
-    // Customer type – normal font, right aligned
-    const rightType = customerType;
-    printer.println(rightType.padStart(48));
-
       
 
     // Date & Time
@@ -1599,13 +1634,24 @@ export const printDinInCustomerReceipt = async (orderId) => {
      printer.newLine();
     printer.code128(popOrder.order_id, { height: 70 });
 
+      const updatedTable = await TABLES.findOneAndUpdate(
+      { _id: popOrder.tableId },
+      { currentStatus: 'VacatingSoon' },
+      { new: true }
+    ).lean();
+
+    //  Emit before printing — avoids blocking due to network/printer issue
+    const io = getIO();
+    io.to(`posTable-${popOrder.restaurantId._id}`).emit('single_table_update', updatedTable);
+
+   
+      popOrder.status = 'Printed';
+      await popOrder.save();
+
+
+    //  Now do the print
     printer.cut({ feed: 2 });
     await printer.execute();
-
-
-    popOrder.status = "Printed";
-    popOrder.save(); 
-
 
 
   } catch (err) {

@@ -25,6 +25,10 @@ const printerConfigSchema = new mongoose.Schema(
       ref: "customerTypes",
       default:null,
     },
+    isUniversal:{
+       type:Boolean,
+       default:false
+    },
   },
   { timestamps: true }
 );

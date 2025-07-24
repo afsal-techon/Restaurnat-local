@@ -3,25 +3,46 @@ import USER from '../../model/userModel.js'
 import SETTINGS from '../../model/posSettings.js'
 
 
+
 export const upsertPrinterConfig = async (req, res, next) => {
   try {
-
     const {
-      printerType, 
+      printerType,
       printerName,
       printerIp,
       kitchenId,
       customerTypeId,
+      isUniversal = false, // default false if not passed
     } = req.body;
 
     const user = await USER.findById(req.user);
-        if (!user) return res.status(400).json({ message: "User not found!" })
+    if (!user) return res.status(400).json({ message: "User not found!" });
 
-    if (!printerName || !printerType || !printerIp ) {
+    if (!printerName || !printerType || !printerIp) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const query = {  printerType };
+    // Prevent duplicate with same IP + type + kitchen/customer
+    const existing = await PRINTER_CONFIG.findOne({
+      printerType,
+      printerIp,
+      ...(printerType === 'CustomerType' && { customerTypeId }),
+      ...(printerType === 'KOT' && { kitchenId }),
+    });
+
+    if (existing) {
+      return res.status(400).json({ message: 'Printer with same configuration already exists.' });
+    }
+
+    // Optional: Only one universal printer per printerType
+    if (isUniversal) {
+      await PRINTER_CONFIG.updateMany(
+        { printerType, isUniversal: true },
+        { $set: { isUniversal: false } }
+      );
+    }
+
+    const query = { printerType };
     if (printerType === "KOT") query.kitchenId = kitchenId;
     if (printerType === "CustomerType") query.customerTypeId = customerTypeId;
 
@@ -31,17 +52,81 @@ export const upsertPrinterConfig = async (req, res, next) => {
         printerType,
         printerName,
         printerIp,
-        kitchenId : printerType==='KOT'? kitchenId : null,
-        customerTypeId : printerType ==='CustomerType' ? customerTypeId : null,
+        kitchenId: printerType === 'KOT' ? kitchenId : null,
+        customerTypeId: printerType === 'CustomerType' ? customerTypeId : null,
+        isUniversal: isUniversal === true,
       },
       { upsert: true, new: true }
     );
 
-   return res.status(200).json({ message:'Printer configuration saved successfully.',data: updated})
+    return res.status(200).json({ message: 'Printer configuration saved successfully.', data: updated });
   } catch (err) {
     next(err);
   }
 };
+
+
+
+
+export const updatePrinterConfig = async (req, res, next) => {
+  try {
+  
+    const {
+      printerId,
+      printerType,
+      printerName,
+      printerIp,
+      kitchenId,
+      customerTypeId,
+      isUniversal = false, // default to false if not passed
+    } = req.body;
+    const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    if (!printerId || !printerName || !printerType || !printerIp) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // Check for duplicate IP with same config excluding current printerId
+    const duplicate = await PRINTER_CONFIG.findOne({
+      _id: { $ne: printerId },
+      printerType,
+      printerIp,
+      ...(printerType === 'CustomerType' && { customerTypeId }),
+      ...(printerType === 'KOT' && { kitchenId }),
+    });
+
+    if (duplicate) {
+      return res.status(400).json({ message: "Another printer with the same configuration already exists." });
+    }
+
+    const updated = await PRINTER_CONFIG.findByIdAndUpdate(
+      printerId,
+      {
+        printerType,
+        printerName,
+        printerIp,
+        kitchenId: printerType === 'KOT' ? kitchenId : null,
+        customerTypeId: printerType === 'CustomerType' ? customerTypeId : null,
+        isUniversal: isUniversal === true,
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "Printer configuration not found." });
+    }
+
+    return res.status(200).json({
+      message: "Printer configuration updated successfully.",
+      data: updated,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 
 export const getPritnerConfigs = async(req,res,next)=>{
