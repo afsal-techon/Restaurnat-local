@@ -50,6 +50,7 @@ export const getKOTTickets = async (req, res, next) => {
           order_id: 1,
           message: 1,
           isAdditionalKOT: 1,
+          preparedAt:1,
         },
       },
       { $sort: { orderTime: 1 } }
@@ -189,7 +190,7 @@ export const getKOTTickets = async (req, res, next) => {
 
 //     // Update the KOT status to 'Ready' and set preparedAt
 //     kot.status = 'Ready';
-//     kot.preparedAt = new Date();
+//     kot.prepaerdAt = new Date();
 
 //     await kot.save();
 

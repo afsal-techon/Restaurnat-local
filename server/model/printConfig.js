@@ -4,7 +4,7 @@ const printerConfigSchema = new mongoose.Schema(
   {
     printerType: {
       type: String,
-      enum: ["KOT", "Receipt"],
+      enum: ["KOT", "CustomerType"],
       required: true,
     },
     printerName: {
@@ -19,10 +19,6 @@ const printerConfigSchema = new mongoose.Schema(
     printerIp:{
       type:String,
       required:true
-    },
-    printerPort:{
-      type:Number,
-      default:9100
     },
     customerTypeId: {
       type: mongoose.Schema.Types.ObjectId,

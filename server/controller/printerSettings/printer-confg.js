@@ -5,12 +5,11 @@ import SETTINGS from '../../model/posSettings.js'
 
 export const upsertPrinterConfig = async (req, res, next) => {
   try {
+
     const {
-  
-      printerType, // "KOT" or "Receipt"
+      printerType, 
       printerName,
       printerIp,
-      printerPort = 9100,
       kitchenId,
       customerTypeId,
     } = req.body;
@@ -18,13 +17,13 @@ export const upsertPrinterConfig = async (req, res, next) => {
     const user = await USER.findById(req.user);
         if (!user) return res.status(400).json({ message: "User not found!" })
 
-    if (!printerName || !printerType || printerIp || printerPort ) {
+    if (!printerName || !printerType || !printerIp ) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     const query = {  printerType };
     if (printerType === "KOT") query.kitchenId = kitchenId;
-    if (printerType === "Receipt") query.customerTypeId = customerTypeId;
+    if (printerType === "CustomerType") query.customerTypeId = customerTypeId;
 
     const updated = await PRINTER_CONFIG.findOneAndUpdate(
       query,
@@ -32,9 +31,8 @@ export const upsertPrinterConfig = async (req, res, next) => {
         printerType,
         printerName,
         printerIp,
-        printerPort,
-        kitchenId,
-        customerTypeId,
+        kitchenId : printerType==='KOT'? kitchenId : null,
+        customerTypeId : printerType ==='CustomerType' ? customerTypeId : null,
       },
       { upsert: true, new: true }
     );
@@ -65,10 +63,14 @@ export const getPritnerConfigs = async(req,res,next)=>{
 export const updatePosSettings = async (req, res, next) => {
   try {
     const userId = req.user; // You must extract this from middleware
-    const { isKotSave, isKotPrint } = req.body;
+    const { isKotSave, isKotPrint ,restaurantId } = req.body;
 
     if (isKotSave === undefined && isKotPrint === undefined) {
       return res.status(400).json({ message: 'Nothing to update' });
+    }
+
+    if(!restaurantId){
+      return res.status(400).json({ message:"Restaurnat Id is required"})
     }
 
     const user = await USER.findById(userId).lean();
@@ -79,6 +81,7 @@ export const updatePosSettings = async (req, res, next) => {
 
     if (!settings) {
       settings = await SETTINGS.create({
+        restaurantId,
         isKotSave: isKotSave ?? false,
         isKotPrint: isKotPrint ?? false,
         createdById: userId,
@@ -97,3 +100,19 @@ export const updatePosSettings = async (req, res, next) => {
   }
 };
 
+export const getPosSettings = async(req,res,next)=>{
+    try {
+      const { restaurantId } = req.params;
+        const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    if(!restaurantId){
+      return res.status(400).json({ message:'Restaurnat Id is required!'})
+    }
+
+        const configs = await SETTINGS.findOne({ restaurantId })
+       res.status(200).json(configs);
+    } catch (err) {
+        next(err)
+    }
+}

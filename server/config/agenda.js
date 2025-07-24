@@ -10,6 +10,7 @@ agenda.define("mark kot as ready", async (job) => {
   const kot = await KOT_NOTIFICATION.findById(kotId);
   if (kot && kot.status === 'Pending') {
     kot.status = 'Ready';
+    kot.preparedAt = new Date();
     await kot.save();
     console.log(`KOT ${kotId} marked as Ready`);
   }

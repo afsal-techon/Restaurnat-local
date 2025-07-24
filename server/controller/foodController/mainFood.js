@@ -15,6 +15,8 @@ import COMBOGROUP from '../../model/comboGroup.js'
 export const createFood = async (req, res, next) => {
   try {
 
+    
+
     let {
       foodName,
       restaurantId,
@@ -30,9 +32,11 @@ export const createFood = async (req, res, next) => {
       addOnsIds,
       choices,
       offer,
-      preperationTime,
+      preparationTime,
 
     } = req.body;
+
+    
 
     const foodImg = req.file ? `/uploads/${req.file.filename}` : null;
 
@@ -221,7 +225,7 @@ export const createFood = async (req, res, next) => {
       choices: choiceIds,
       offer: offer ? offer : null,
       special: special ? special : false,
-      preperationTime: preperationTime || null,
+      preparationTime: preparationTime || null,
       createdById: user._id,
       createdBy:user.name,
       
@@ -316,7 +320,7 @@ export const updateFood = async (req, res, next) => {
       special,
       addOnsIds,
       choices,
-      preperationTime,
+      preparationTime,
       offer,
     } = req.body;
 
@@ -454,7 +458,7 @@ export const updateFood = async (req, res, next) => {
     food.kitchenId = kitchenId || null;
     food.special = special || false;
     food.addOnsIds = addOnsIds;
-    food.preperationTime = preperationTime;
+    food.preparationTime = preparationTime;
     food.choices = choiceIds;
     (food.offer = offer ? offer : null), 
 

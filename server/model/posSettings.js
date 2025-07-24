@@ -2,6 +2,12 @@ import mongoose from 'mongoose';
 
 const posSettingsSchema =new mongoose.Schema({
 
+         restaurantId: {
+           type: mongoose.Schema.Types.ObjectId,
+           ref: "restaurant",
+           required: true,
+         },
+
         isKotSave:{ type: Boolean, default: false},
         isKotPrint:{ type: Boolean, default: false},
     createdById: {

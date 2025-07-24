@@ -24,7 +24,7 @@ import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary
 import { dailyCollectionExcel, dailyTransactionExcel, generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionPDF, getDailyTransactionReport, getPaymentSummary, paymentSummaryExcel } from '../controller/ReportsController/paymentReport.js';
 import { expenseReportExcel, generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport, purchaseReportExcel } from '../controller/purchse-Expense/purchse-expence.js';
 import checkOfflinePermission from '../middleware/permission.js'
-import { getPritnerConfigs, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
+import { getPosSettings, getPritnerConfigs, updatePosSettings, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
 import { createSupplier, deleteSupplier, getSupplierDueHistory, getSuppliers, paySupplierDue, SupplierDueHistoryPdf, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
 import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient } from '../controller/purchse-Expense/ingredients.js';
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
@@ -253,6 +253,8 @@ router.post('/order/change-table',VerifyToken,checkOfflinePermission('Admin'),ch
 //printer config
 router.post('/printer/upsert',VerifyToken,checkOfflinePermission('Admin'),upsertPrinterConfig);
 router.get('/printer/get',VerifyToken,checkOfflinePermission('Admin'),getPritnerConfigs);
+router.post('/print-settings',VerifyToken,checkOfflinePermission('Admin'),updatePosSettings);
+router.get('/print-settings/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPosSettings)
 
 
 //supplier
