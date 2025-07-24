@@ -3,7 +3,7 @@ const path = require('path');
 
 // Define the service
 const svc = new Service({
-  name: 'MERN POS',
+  name: 'TEC POS',
   description: 'Node.js backend for MERN POS system.',
   script: path.join(__dirname, 'app.js'), // change to your main server file
   nodeOptions: [

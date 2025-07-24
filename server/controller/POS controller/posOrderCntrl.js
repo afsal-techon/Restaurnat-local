@@ -1480,16 +1480,19 @@ export const printDinInCustomerReceipt = async (req,res,next) => {
 
     // Step 2: Define fallback search conditions in priority order
     const printerSearchConditions = [
-      { printerType: 'CustomerType', customerTypeId },
+      // { printerType: 'CustomerType', customerTypeId:customerTypeId  },
+      { printerType: 'CustomerType' },
       { printerType: 'CustomerType', isUniversal: true },
-      { printerType: 'KOT', isUniversal: true }
+      { printerType: 'KOT', isUniversal: true },
     ];
 
     let customerPrinterConfig = null;
 
     // Step 3: Try each condition until a match is found
     for (const condition of printerSearchConditions) {
+      console.log(condition,'condition')
       customerPrinterConfig = await PRINTER_CONFIG.findOne(condition).lean();
+      console.log(customerPrinterConfig,'customer ppringt')
       if (customerPrinterConfig) break;
     }
 
