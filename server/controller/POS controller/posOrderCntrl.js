@@ -1139,7 +1139,7 @@ if (shouldSendKOT) {
 
 export const printKOTReceipt = async (order, kitchenItems = [], printerIp = null, isAdditionalOrder = false) => {
   try {
-    if (!printerIp) throw new Error("No printer IP provided");
+     if (!printerIp) return res.status(400).json({ message:"No printer IP provided"})
     console.log(printerIp, 'printerip');
 
     const printer = new ThermalPrinter({
@@ -1297,7 +1297,7 @@ printer.bold(false);
 
 export const printTakeawayCustomerReceipt = async (order, printerIp = null) => {
   try {
-    if (!printerIp) throw new Error("No printer IP provided");
+    if (!printerIp) return res.status(400).json({ message:"No printer IP provided"})
 
     const popOrder = await ORDER.findById(order._id)
       .populate("restaurantId", "name address phone mobile trn logo")
@@ -1470,7 +1470,6 @@ export const printDinInCustomerReceipt = async (req,res,next) => {
   
     const { orderId } = req.params;
 
-
     const popOrder = await ORDER.findById(orderId)
       .populate("restaurantId", "name address phone mobile trn logo")
       .populate("tableId", "name")
@@ -1494,9 +1493,10 @@ export const printDinInCustomerReceipt = async (req,res,next) => {
       if (customerPrinterConfig) break;
     }
 
+
     // Step 4: Throw if no printer found
     const printerIp = customerPrinterConfig?.printerIp;
-    if (!printerIp) throw new Error("No printer IP provided");
+     if (!printerIp) return res.status(400).json({ message:"No printer IP provided"})
 
 
 
