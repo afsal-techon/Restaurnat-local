@@ -1474,9 +1474,8 @@ export const printDinInCustomerReceipt = async (req,res,next) => {
       .populate("restaurantId", "name address phone mobile trn logo")
       .populate("tableId", "name")
       .populate("customerTypeId", "type")
-      
-
-       const customerTypeId = popOrder.customerTypeId?._id;
+    
+      //  const customerTypeId = popOrder.customerTypeId?._id;
 
     // Step 2: Define fallback search conditions in priority order
     const printerSearchConditions = [
@@ -1490,9 +1489,8 @@ export const printDinInCustomerReceipt = async (req,res,next) => {
 
     // Step 3: Try each condition until a match is found
     for (const condition of printerSearchConditions) {
-      console.log(condition,'condition')
+    
       customerPrinterConfig = await PRINTER_CONFIG.findOne(condition).lean();
-      console.log(customerPrinterConfig,'customer ppringt')
       if (customerPrinterConfig) break;
     }
 
