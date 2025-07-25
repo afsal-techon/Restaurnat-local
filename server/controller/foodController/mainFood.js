@@ -9,6 +9,9 @@ import FOOD from '../../model/food.js'
 import { getIO  } from "../../config/socket.js";
 import ORDER from '../../model/oreder.js';
 import COMBOGROUP from '../../model/comboGroup.js'
+import sharp from 'sharp';
+import fs from 'fs';
+import path from 'path';
 
 
 
@@ -38,8 +41,33 @@ export const createFood = async (req, res, next) => {
 
     
 
-    const foodImg = req.file ? `/uploads/${req.file.filename}` : null;
+    // 1. Compress if needed
+        if (req.file) {
+        const originalPath = req.file.path;
+        const ext = path.extname(req.file.originalname).toLowerCase();
+        const resizedPath = originalPath.replace(ext, '-compressed.webp');
 
+        // Convert to WebP with resize + quality control
+        await sharp(originalPath)
+          .resize({
+            width: 600,               // Adjust as needed
+            withoutEnlargement: true,
+          })
+          .webp({ quality: 70 })      // You can increase to 75–80 if needed
+          .toFile(resizedPath);
+
+        // Delete the original image
+        fs.unlinkSync(originalPath);
+
+        // Update file refernce for further processing
+        req.file.path = resizedPath;
+        req.file.filename = path.basename(resizedPath);
+      }
+
+
+
+      // Now define it AFTER compression is done
+    const foodImg = req.file ? `/uploads/${req.file.filename}` : null
   
     if (typeof menuTypeIds === "string") {
       menuTypeIds = JSON.parse(menuTypeIds); // Parse string into array if necessary
@@ -442,7 +470,33 @@ export const updateFood = async (req, res, next) => {
       }
     }
 
-      const foodImg = req.file ? `/uploads/${req.file.filename}` : food.image;
+       // 1. Compress if needed
+        if (req.file) {
+        const originalPath = req.file.path;
+        const ext = path.extname(req.file.originalname).toLowerCase();
+        const resizedPath = originalPath.replace(ext, '-compressed.webp');
+
+        // Convert to WebP with resize + quality control
+        await sharp(originalPath)
+          .resize({
+            width: 600,               // Adjust as needed
+            withoutEnlargement: true,
+          })
+          .webp({ quality: 70 })      // You can increase to 75–80 if needed
+          .toFile(resizedPath);
+         
+        // Delete the original image
+        fs.unlinkSync(originalPath);
+
+        // Update file refernce for further processing
+        req.file.path = resizedPath;
+        req.file.filename = path.basename(resizedPath);
+      }
+
+      // Now define it AFTER compression is done
+    const foodImg = req.file ? `/uploads/${req.file.filename}` : null
+
+      
 
     food.foodName = foodName;
     food.restaurantId = restaurantId;

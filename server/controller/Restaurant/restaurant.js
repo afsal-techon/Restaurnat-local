@@ -5,6 +5,8 @@ import CUSTOMER_TYPE from '../../model/customerTypes.js'
 import mongoose from 'mongoose';
 import ORDER from '../../model/oreder.js'
 import FOOD from '../../model/food.js'
+import fs from 'fs';
+import path from 'path';
 
 
 const generateUniqueRestaurantId = async () => {
@@ -29,10 +31,23 @@ export const  createRestuarantBranch = async (req,res,next)=>{
             openingTime, closingTime, vatPercentage, currency, currencySymbol,trn,
         } = req.body;
 
-          const logo = req.file ? `/uploads/${req.file.filename}` : null;
 
-      
+            if (!req.file) {
+      return res.status(400).json({ message: "Logo image is required!" });
+    }
 
+     const originalPath = req.file.path;
+    const ext = path.extname(req.file.originalname).toLowerCase();
+     if (ext !== ".png") {
+      // Delete invalid file to clean up
+      fs.unlinkSync(originalPath);
+      return res.status(400).json({ message: "Only PNG logos are allowed!." });
+    }
+
+    //  fter compression
+    const logo = `/uploads/${req.file.filename}`;
+
+    
   
         // Validate required fields
         if (!name) return res.status(400).json({ message: 'Restaurant name is required!' });
@@ -153,7 +168,16 @@ export const updateRestaurantBranch = async (req, res, next) => {
             openingTime, closingTime, vatPercentage, currency, currencySymbol,trn
         } = req.body;
 
-        const logo = req.file ? `/uploads/${req.file.filename}` : null;
+   const originalPath = req.file.path;
+    const ext = path.extname(req.file.originalname).toLowerCase();
+     if (ext !== ".png") {
+      // Delete invalid file to clean up
+      fs.unlinkSync(originalPath);
+      return res.status(400).json({ message: "Only PNG logos are allowed!." });
+    }
+
+    //  fter compression
+    const logo = `/uploads/${req.file.filename}`;
 
 
 
@@ -257,10 +281,6 @@ export const deleteRestaurant = async (req,res,next)=>{
     }
 
 }
-
-
-
-
 
 
 export const addCustomerType = async (req, res, next) => {
