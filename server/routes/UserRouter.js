@@ -332,5 +332,5 @@ router.get('/profit-loss/excel',VerifyToken,checkOfflinePermission('Reports'),pr
 
 router.get('/dineIn/print/:orderId',VerifyToken,checkOfflinePermission('Admin'),printDinInCustomerReceipt);
 router.get('/re-print/:orderId',VerifyToken,checkOfflinePermission('Admin'),rePrintForTakeHome)
-router.get('/re-print/dineIn/:orderId',VerifyToken,checkOfflinePermission('Admin'),rePrintDinIn)
+router.get('/dineIn/re-print/:orderId',VerifyToken,checkOfflinePermission('Admin'),rePrintDinIn)
 export default router;
