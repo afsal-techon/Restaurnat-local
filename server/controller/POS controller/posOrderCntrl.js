@@ -876,7 +876,7 @@ printer.code128(popOrder.order_id, { height: 70 });
 
     printer.cut({ feed: 2 });
 
-    res.status(200).json({ message: "Print started" });
+    // res.status(200).json({ message: "Print started" });
 
       setImmediate(async () => {
         try {
@@ -1313,7 +1313,7 @@ printer.newLine();
 printer.code128(popOrder.order_id, { height: 70 });
     //  Now do the print
     printer.cut({ feed: 2 });
-    
+
      res.status(200).json({ message: "Print started" });
 
 
