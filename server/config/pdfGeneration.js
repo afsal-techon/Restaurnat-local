@@ -20,7 +20,6 @@ if (!chromePath) {
   throw new Error("Google Chrome is not installed. Please install it to generate PDFs.");
 }
 
-
   const templatePath = path.join(__dirname, "../templates", `${templateName}.ejs`);
   const html = await ejs.renderFile(templatePath, data);
 

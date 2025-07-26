@@ -24,7 +24,7 @@ import { generateCancelledOrdersPDF, generateOrderSummaryPDF, getALLOrderSummary
 import { dailyCollectionExcel, dailyTransactionExcel, generateDailyCollectionPDF, generatePaymentSummaryPDF, getDailyCollectionReport, getDailyTransactionPDF, getDailyTransactionReport, getPaymentSummary, paymentSummaryExcel } from '../controller/ReportsController/paymentReport.js';
 import { expenseReportExcel, generateExpenseReportPDF, generatePurchaseReportPDF, getExpenseReport, getPurchaseReport, purchaseReportExcel } from '../controller/purchse-Expense/purchse-expence.js';
 import checkOfflinePermission from '../middleware/permission.js'
-import { getPosSettings, getPritnerConfigs, updatePosSettings, updatePrinterConfig, upsertPrinterConfig } from '../controller/printerSettings/printer-confg.js';
+import { getPosSettings, getPritnerConfigs, updatePosSettings, updatePrinterConfig, upsertPrinterConfig } from '../controller/Settings/printer-settings.js';
 import { createSupplier, deleteSupplier, getSupplierDueHistory, getSuppliers, paySupplierDue, SupplierDueHistoryPdf, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
 import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient } from '../controller/purchse-Expense/ingredients.js';
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
@@ -156,6 +156,8 @@ router.get('/customer/credit',VerifyToken,checkOfflinePermission('Admin'),getCus
 router.get('/credit/pdf',VerifyToken,checkOfflinePermission('Admin'),generateCustomerDueHistoryPDF )
 
 
+
+
 //pos-order-listing
 router.get('/pos/order/list/:restaurantId',VerifyToken,checkOfflinePermission('Sale'),getTodayOrdersForPOS);
 router.get('/pos/order/:orderId',VerifyToken,checkOfflinePermission('Sale'),getOneOrderDetails)
@@ -255,7 +257,10 @@ router.post('/printer/upsert',VerifyToken,checkOfflinePermission('Admin'),upsert
 router.put('/printer/upsert',VerifyToken,checkOfflinePermission('Admin'),updatePrinterConfig);
 router.get('/printer/get',VerifyToken,checkOfflinePermission('Admin'),getPritnerConfigs);
 router.post('/print-settings',VerifyToken,checkOfflinePermission('Admin'),updatePosSettings);
-router.get('/print-settings/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPosSettings)
+router.get('/print-settings/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPosSettings);
+
+//settings 
+router.post('/prcie-vat',VerifyToken,checkOfflinePermission('Admin'),getPosSettings)
 
 
 
@@ -332,5 +337,8 @@ router.get('/profit-loss/excel',VerifyToken,checkOfflinePermission('Reports'),pr
 
 router.get('/dineIn/print/:orderId',VerifyToken,checkOfflinePermission('Admin'),printDinInCustomerReceipt);
 router.get('/re-print/:orderId',VerifyToken,checkOfflinePermission('Admin'),rePrintForTakeHome)
-router.get('/dineIn/re-print/:orderId',VerifyToken,checkOfflinePermission('Admin'),rePrintDinIn)
+router.get('/dineIn/re-print/:orderId',VerifyToken,checkOfflinePermission('Admin'),rePrintDinIn);
+
+
+
 export default router;

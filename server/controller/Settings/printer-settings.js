@@ -201,3 +201,5 @@ export const getPosSettings = async(req,res,next)=>{
         next(err)
     }
 }
+
+
