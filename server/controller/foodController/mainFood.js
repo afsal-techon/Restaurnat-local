@@ -361,6 +361,7 @@ export const updateFood = async (req, res, next) => {
       return res.status(400).json({ message: "User not found!" });
     }
 
+
     if (!restaurantId) {
       return res.status(400).json({ message: "restaurant id is required!" });
     }
@@ -399,6 +400,9 @@ export const updateFood = async (req, res, next) => {
         .status(400)
         .json({ message: "Food with this name already exists!" });
     }
+
+
+    
 
   
 
@@ -470,41 +474,43 @@ export const updateFood = async (req, res, next) => {
       }
     }
 
-       // 1. Compress if needed
-        if (req.file) {
-        const originalPath = req.file.path;
-        const ext = path.extname(req.file.originalname).toLowerCase();
-        const resizedPath = originalPath.replace(ext, '-compressed.webp');
 
-        // Convert to WebP with resize + quality control
-        await sharp(originalPath)
-          .resize({
-            width: 600,               // Adjust as needed
-            withoutEnlargement: true,
-          })
-          .webp({ quality: 70 })      // You can increase to 75–80 if needed
-          .toFile(resizedPath);
-         
-        // Delete the original image
-        fs.unlinkSync(originalPath);
+        // 1. Compress if needed
+      if (req.file) {
+  const originalPath = req.file.path;
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  const resizedPath = originalPath.replace(ext, '-compressed.webp');
 
-        // Update file refernce for further processing
-        req.file.path = resizedPath;
-        req.file.filename = path.basename(resizedPath);
-      }
+  await sharp(originalPath)
+    .resize({ width: 600, withoutEnlargement: true })
+    .webp({ quality: 70 })
+    .toFile(resizedPath);
+
+  try {
+    await fs.promises.unlink(originalPath);  // safer async delete
+  } catch (err) {
+    console.warn("File busy, couldn't delete:", err.message);
+  }
+
+  req.file.path = resizedPath;
+  req.file.filename = path.basename(resizedPath);
+}
+
+
 
       // Now define it AFTER compression is done
-    const foodImg = req.file ? `/uploads/${req.file.filename}` : null
+    const foodImg = req.file 
+  ? `/uploads/${req.file.filename}` 
+  : food.image; 
 
-      
+    
 
     food.foodName = foodName;
     food.restaurantId = restaurantId;
     food.categoryId = categoryId;
     food.foodType = foodType;
     food.menuTypeIds = menuTypeIds;
-      food.image = foodImg
-    food.image = foodImg;
+    food.image = foodImg
     food.courseIds = courseIds;
     food.prices = portions && portions.length > 0 ? null : prices;
     food.basePrice = portions && portions.length > 0 ? null : basePrice,

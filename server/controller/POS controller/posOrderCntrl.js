@@ -662,7 +662,7 @@ printer.bold(false);
       printer.println(`${comboName}${"-".padEnd(10)}${comboQty}`);
       printer.bold(false);
         printer.setTextNormal();
-
+          console.log(item.comboItems,'combo items')
         for (const it of item.comboItems) {
           const itemName = it.name.length > 18
             ? it.name.slice(0, 18)

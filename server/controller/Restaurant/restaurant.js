@@ -7,6 +7,7 @@ import ORDER from '../../model/oreder.js'
 import FOOD from '../../model/food.js'
 import fs from 'fs';
 import path from 'path';
+import sharp  from 'sharp';
 
 
 const generateUniqueRestaurantId = async () => {
@@ -36,16 +37,19 @@ export const  createRestuarantBranch = async (req,res,next)=>{
       return res.status(400).json({ message: "Logo image is required!" });
     }
 
-     const originalPath = req.file.path;
-    const ext = path.extname(req.file.originalname).toLowerCase();
-     if (ext !== ".png") {
-      // Delete invalid file to clean up
-      fs.unlinkSync(originalPath);
-      return res.status(400).json({ message: "Only PNG logos are allowed!." });
-    }
+            const originalPath = req.file.path;
+            const pngPath = originalPath.replace(path.extname(originalPath), ".png");
 
-    //  fter compression
-    const logo = `/uploads/${req.file.filename}`;
+            // Convert to PNG using sharp
+            await sharp(originalPath)
+            .resize({ width: 600, withoutEnlargement: true }) // optional resize
+            .png()
+            .toFile(pngPath);
+
+            // Delete the original uploaded file (non-png)
+            fs.unlinkSync(originalPath);
+
+            const logo = `/uploads/${path.basename(pngPath)}`;
 
     
   
@@ -168,16 +172,19 @@ export const updateRestaurantBranch = async (req, res, next) => {
             openingTime, closingTime, vatPercentage, currency, currencySymbol,trn
         } = req.body;
 
-   const originalPath = req.file.path;
-    const ext = path.extname(req.file.originalname).toLowerCase();
-     if (ext !== ".png") {
-      // Delete invalid file to clean up
-      fs.unlinkSync(originalPath);
-      return res.status(400).json({ message: "Only PNG logos are allowed!." });
-    }
+           const originalPath = req.file.path;
+            const pngPath = originalPath.replace(path.extname(originalPath), ".png");
 
-    //  fter compression
-    const logo = `/uploads/${req.file.filename}`;
+            // Convert to PNG using sharp
+            await sharp(originalPath)
+            .resize({ width: 600, withoutEnlargement: true }) // optional resize
+            .png()
+            .toFile(pngPath);
+
+            // Delete the original uploaded file (non-png)
+            fs.unlinkSync(originalPath);
+
+            const logo = `/uploads/${path.basename(pngPath)}`;
 
 
 
