@@ -334,7 +334,7 @@ if (action === 'print') {
             { printerType: 'KOT' },
             { isUniversal: true }
           ]
-        }).lean();
+        })
     const kitchenItemMap = {};
 
     const itemsToCheck = isAdditionalOrder ? processedItems : order.items;
@@ -397,27 +397,25 @@ if (action === 'print') {
       if (matchedPrinter) {
         await printKOTReceipt(order, items, matchedPrinter.printerIp, isAdditionalOrder);
       } else {
-        console.warn(`No printer found for kitchenId ${kitchenId} and no universal fallback.`);
+       return res.status(400).json({ message:`No printer found for kitchenId ${kitchenId} and no universal fallback.`})
       }
     }
 
     // 3️ Customer-Type based printing (Take Away, Delivery, Online)
-        let customerPrinters = await PRINTER_CONFIG.find({
+        let customerPrinters = await PRINTER_CONFIG.findOne({
       $or: [
         { printerType: 'CustomerType', customerTypeId: order.customerTypeId },
-        { isUniversal: true }
+        {isUniversal: true },
       ]
     });
-
     const shouldPrintCustomerBill =
       ctypeName.includes("Take Away") ||
       ctypeName.includes("Home Delivery") ||
       ctypeName.includes("Online");
 
-    if (shouldPrintCustomerBill && customerPrinters.length > 0) {
-      for (const printer of customerPrinters) {
-        await printTakeawayCustomerReceipt(order, printer.printerIp);
-      }
+    if (shouldPrintCustomerBill && customerPrinters) {
+        await printTakeawayCustomerReceipt(order, customerPrinters.printerIp);
+
     } else if (shouldPrintCustomerBill) {
       return res.status(400).json({ message:"No customer printer configured and no universal fallback."})
     }
@@ -553,7 +551,8 @@ if (shouldSendKOT) {
 
 export const printKOTReceipt = async (order, kitchenItems = [], printerIp = null, isAdditionalOrder = false) => {
   try {
-     if (!printerIp) return res.status(400).json({ message:"No printer IP provided"})
+
+    if (!printerIp)  throw new Error('No printer IP provided');
     console.log(printerIp, 'printerip');
 
     const printer = new ThermalPrinter({
@@ -700,7 +699,16 @@ printer.bold(false);
     const isConnected = await printer.isPrinterConnected();
     if (!isConnected) throw new Error("Printer is not connected");
 
-    await printer.execute();
+    
+
+      setImmediate(async () => {
+        try {
+          const success = await printer.execute();
+        } catch (err) {
+          console.error("Print error:", err.message);
+        }
+      });
+
     console.log("KOT Printed successfully");
   } catch (err) {
     console.error("KOT Print Error:", err.message);
@@ -711,7 +719,7 @@ printer.bold(false);
 
 export const printTakeawayCustomerReceipt = async (order, printerIp = null) => {
   try {
-    if (!printerIp) return res.status(400).json({ message:"No printer IP provided"})
+    if (!printerIp)  throw new Error('No printer IP provided');
 
     const popOrder = await ORDER.findById(order._id)
       .populate("restaurantId", "name address phone mobile trn logo")
@@ -867,7 +875,17 @@ printer.newLine();
 printer.code128(popOrder.order_id, { height: 70 });
 
     printer.cut({ feed: 2 });
-    await printer.execute();
+
+    res.status(200).json({ message: "Print started" });
+
+      setImmediate(async () => {
+        try {
+          const success = await printer.execute();
+        } catch (err) {
+          console.error("Print error:", err.message);
+        }
+      });
+
   } catch (err) {
     console.error("Takeaway Receipt Print Error:", err);
   }
@@ -878,6 +896,9 @@ printer.code128(popOrder.order_id, { height: 70 });
 export const printDinInCustomerReceipt = async (req,res,next) => {
   try {
     const { orderId } = req.params;
+
+    console.log(orderId,'orerId');
+    console.log('api working')
 
     const popOrder = await ORDER.findById(orderId)
       .populate("restaurantId", "name address phone mobile trn logo")
@@ -959,13 +980,23 @@ let total = 0;
 const orderItems = popOrder.items.filter(item => !item.isComboItem);
 let totalQty = orderItems.length;
 
-for (const item of orderItems) {
+ for (const item of orderItems) {
+  if (item.isCombo) {
+    const name = item.comboName?.substring(0, 20).padEnd(20, " ");
+    const qty = item.qty?.toString().padStart(4, " ");
+    const price = (item.comboPrice || item.price)?.toFixed(2).padStart(8, " ");
+    const amount = item.total?.toFixed(2).padStart(16, " ");
+
+     printer.println(`${name}${qty}${price}${amount}`);
+    total += item.total || 0;
+  } else {
   const name = item.foodName?.substring(0, 20).padEnd(20, " ");
   const qty = item.qty?.toString().padStart(4, " ");
   const price = item.price?.toFixed(2).padStart(8, " ");
   const amount = item.total?.toFixed(2).padStart(16, " ");
   printer.println(`${name}${qty}${price}${amount}`);
   total += item.total || 0;
+  }
 }
 
 printer.drawLine();
@@ -1027,7 +1058,17 @@ printer.code128(popOrder.order_id, { height: 70 });
     await popOrder.save();
 
     printer.cut({ feed: 2 });
-    await printer.execute();
+
+    res.status(200).json({ message: "Print started" });
+
+      setImmediate(async () => {
+        try {
+          const success = await printer.execute();
+        } catch (err) {
+          console.error("Print error:", err.message);
+        }
+      });
+
 
   } catch (err) {
     console.error("Takeaway Receipt Print Error:", err);
@@ -1190,13 +1231,12 @@ export const rePrintDinIn = async (req,res,next) => {
     const waiter = `Waiter : ${popOrder.createdBy || "-"}`;
     printer.println(bill.padEnd(24, " ") + waiter.padStart(24, " "));
 
-    printer.drawLine();
 
-    // Table headers
-     printer.setTextNormal();
-     printer.alignLeft();
-      printer.println("ITEMS                 QTY   PRICE         AMOUNT");
-      printer.drawLine();
+    printer.drawLine();
+printer.setTextNormal();
+printer.alignLeft();
+printer.println("ITEMS                 QTY   PRICE         AMOUNT");
+printer.drawLine()
 
     
     let total = 0;
@@ -1206,22 +1246,21 @@ export const rePrintDinIn = async (req,res,next) => {
 
     for (const item of orderItems) {
   if (item.isCombo) {
-    const name = item.comboName?.substring(0, 18).padEnd(18, " ");
-    const qty = item.qty?.toString().padStart(2, " ");
-    const price = (item.comboPrice || item.price)?.toFixed(2).padStart(6, " ");
-    const amount = item.total?.toFixed(2).padStart(7, " ");
+    const name = item.comboName?.substring(0, 20).padEnd(20, " ");
+    const qty = item.qty?.toString().padStart(4, " ");
+    const price = (item.comboPrice || item.price)?.toFixed(2).padStart(8, " ");
+    const amount = item.total?.toFixed(2).padStart(16, " ");
 
-    printer.println(`${name}${qty}   ${price}   ${amount}`);
+    printer.println(`${name}${qty}${price}${amount}`);;
 
   
     total += item.total || 0;
   } else {
-    const name = item.foodName?.substring(0, 18).padEnd(18, " ");
-    const qty = item.qty?.toString().padStart(2, " ");
-    const price = item.price?.toFixed(2).padStart(6, " ");
-    const amount = item.total?.toFixed(2).padStart(7, " ");
-
-    printer.println(`${name}${qty}   ${price}   ${amount}`);
+     const name = item.foodName?.substring(0, 20).padEnd(20, " ");
+  const qty = item.qty?.toString().padStart(4, " ");
+  const price = item.price?.toFixed(2).padStart(8, " ");
+  const amount = item.total?.toFixed(2).padStart(16, " ");
+  printer.println(`${name}${qty}${price}${amount}`);
 
   
     total += item.total || 0;
@@ -1230,38 +1269,61 @@ export const rePrintDinIn = async (req,res,next) => {
 
     printer.drawLine();
 
-    // Totals aligned to right
-    const subTotal = (popOrder.subTotal || 0).toFixed(2).padStart(14, " ");
-    const vat = (popOrder.vat || 0).toFixed(2).padStart(14, " ");
-    const grandTotal = (popOrder.totalAmount || total).toFixed(2).padStart(14, " ");
+   // Totals (right aligned)
+const subTotalRaw = popOrder.subTotal || 0;
+const vatRaw = popOrder.vat || 0;
+const totalBeforeVAT = (subTotalRaw - vatRaw).toFixed(2).padStart(12, " ");
+const vat = vatRaw.toFixed(2).padStart(12, " ");
+const grandTotal = (popOrder.totalAmount || total).toFixed(2).padStart(12, " ");
 
-    printer.println("Total Before VAT:".padStart(34) + subTotal);
-    printer.println("VAT Incl:".padStart(34) + vat);
+// Align all values to right edge, same width
+printer.println("Total Before VAT:".padEnd(36, " ") + totalBeforeVAT);
+printer.println("VAT Incl:".padEnd(36, " ") + vat);
 
-    printer.drawLine();
+printer.drawLine();
 
-    // Grand Total – bold and aligned right
-    printer.setTextNormal();
-    printer.bold(true);
-    printer.println("Total :".padStart(34) + grandTotal);
-    printer.bold(false);
-    printer.setTextNormal();
+// Total – Left label, Right value
+printer.setTextSize(1, 0); // Double width
+printer.setTypeFontB();
+printer.bold(true);
 
-    // Items Count (after Total)
-    const itemsLine = `Items: ${totalQty.toString().padStart(2, "0")}`;
-    printer.println(itemsLine.padStart(48));
+// Build the full line and center it manually
+const totalText = `Total: ${grandTotal.trim()}`;
+const totalLinePadded = totalText.padStart(
+  Math.floor((48 + totalText.length) / 2),
+  " "
+);
+printer.println(totalLinePadded);
 
-    printer.drawLine();
+printer.bold(false);
+printer.setTextNormal();
 
-    // User and thank you message
-    // printer.println(`User: ${popOrder.createdBy || "-"}`);
-    printer.println("Thank You Visit Again");
-     printer.newLine();
-    printer.code128(popOrder.order_id, { height: 70 });
 
+// Items line – right aligned under Total
+const itemsLine = `Items: ${totalQty.toString().padStart(2, "0")}`;
+printer.println(itemsLine);
+
+// Separator
+printer.drawLine();
+
+// Centered message & barcode
+printer.alignCenter();
+printer.println("Thank You Visit Again");
+printer.newLine();
+printer.code128(popOrder.order_id, { height: 70 });
     //  Now do the print
     printer.cut({ feed: 2 });
-    await printer.execute();
+    
+     res.status(200).json({ message: "Print started" });
+
+
+      setImmediate(async () => {
+        try {
+          const success = await printer.execute();
+        } catch (err) {
+          console.error("Print error:", err.message);
+        }
+      });
 
 
   } catch (err) {
