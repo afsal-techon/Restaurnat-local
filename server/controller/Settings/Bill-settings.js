@@ -43,3 +43,19 @@ export const updateBillSettings = async (req, res, next) => {
 };
 
 
+export const getBillSettings = async(req,res,next)=>{
+    try {
+      const { restaurantId } = req.params;
+        const user = await USER.findById(req.user);
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    if(!restaurantId){
+      return res.status(400).json({ message:'Restaurnat Id is required!'})
+    }
+
+        const configs = await BILL_SETTINGS.findOne({ restaurantId })
+       res.status(200).json(configs);
+    } catch (err) {
+        next(err)
+    }
+}

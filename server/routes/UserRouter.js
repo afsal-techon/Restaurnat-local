@@ -32,6 +32,7 @@ import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } fr
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
 import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
 import { getProfitAndLossReport, profitAndLossExcel, profitandLossPdf } from '../controller/ReportsController/otherReports.js';
+import { getBillSettings, updateBillSettings } from '../controller/Settings/Bill-settings.js';
 const router = express.Router();
 
 
@@ -260,7 +261,8 @@ router.post('/print-settings',VerifyToken,checkOfflinePermission('Admin'),update
 router.get('/print-settings/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPosSettings);
 
 //settings 
-router.post('/prcie-vat',VerifyToken,checkOfflinePermission('Admin'),getPosSettings)
+router.post('/bill-settings',VerifyToken,checkOfflinePermission('Admin'),updateBillSettings);
+router.get('/bill-settings/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getBillSettings)
 
 
 
@@ -280,7 +282,7 @@ router.put('/ingredient',VerifyToken,checkOfflinePermission('Admin'),updateIngre
 router.delete('/ingredient/:ingredientId',VerifyToken,checkOfflinePermission('Admin'),deleteIngredient);
 
 
-//purchase
+//purchase     
 router.post('/purchase',VerifyToken,checkOfflinePermission('Purchase'),createPurchase);
 router.get('/purchase',VerifyToken,checkOfflinePermission('Purchase'),getPurchaseList)
 router.get('/purhcase-report',VerifyToken,checkOfflinePermission('Purchase'),getAllPurchasesReport);
@@ -338,6 +340,8 @@ router.get('/profit-loss/excel',VerifyToken,checkOfflinePermission('Reports'),pr
 router.get('/dineIn/print/:orderId',VerifyToken,checkOfflinePermission('Admin'),printDinInCustomerReceipt);
 router.get('/re-print/:orderId',VerifyToken,checkOfflinePermission('Admin'),rePrintForTakeHome)
 router.get('/dineIn/re-print/:orderId',VerifyToken,checkOfflinePermission('Admin'),rePrintDinIn);
+
+
 
 
 

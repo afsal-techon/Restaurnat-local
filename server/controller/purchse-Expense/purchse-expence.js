@@ -126,6 +126,8 @@ export const getPurchaseReport = async (req, res, next) => {
                 narration: 1,
                 type: 1,
                 amount: 1,
+                vatAmount: "$vatAmount",
+                totalBeforeVAT: "$vatAmount",
                 createdAt: 1,
                 account: {
                   name: "$accountInfo.accountName",
@@ -152,14 +154,23 @@ export const getPurchaseReport = async (req, res, next) => {
               _id: null,
               sum: { $sum: "$amount" }
             }
-          }]
+          }],
+          totalVAT: [
+            {
+              $group: {
+                _id: null,
+                sum: { $sum: "$vatAmount" }
+              }
+            }
+          ]
         }
       },
       {
         $project: {
           data: 1,
           totalCount: { $ifNull: [{ $arrayElemAt: ["$totalCount.count", 0] }, 0] },
-          totalAmount: { $ifNull: [{ $arrayElemAt: ["$totalAmount.sum", 0] }, 0] }
+          totalAmount: { $ifNull: [{ $arrayElemAt: ["$totalAmount.sum", 0] }, 0] },
+           totalVAT: { $ifNull: [{ $arrayElemAt: ["$totalVAT.sum", 0] }, 0] }
         }
       }
     ];
@@ -170,6 +181,7 @@ export const getPurchaseReport = async (req, res, next) => {
       data: result[0]?.data || [],
       totalCount: result[0]?.totalCount || 0,
       totalAmount: result[0]?.totalAmount || 0,
+      totalVAT: result[0]?.totalVAT || 0,
       page,
       limit
     });

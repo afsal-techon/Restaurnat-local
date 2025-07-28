@@ -23,6 +23,7 @@ export const createPurchase = async (req, res, next) => {
       items,
       note,
       totalAmount,
+      totalBeforeVAT,
       vatTotal,
       isVatInclusive,
     } = req.body;
@@ -80,6 +81,7 @@ export const createPurchase = async (req, res, next) => {
         vatAmount: item.vatAmount,
       })),
       totalAmount,
+      totalBeforeVAT,
       note,
       vatTotal,
       createdById: user._id,
@@ -96,6 +98,7 @@ export const createPurchase = async (req, res, next) => {
       supplierId,
       vatAmount : vatTotal,
       amount: totalAmount,
+      totalBeforeVAT:totalBeforeVAT,
       type: "Debit",
       referenceId: refId,
       referenceType: account.accountType ||  "Purchase",
@@ -171,6 +174,7 @@ export const getPurchaseList = async (req, res, next) => {
           date: 1,
           invoiceNo: 1,
           totalAmount: 1,
+           totalBeforeVAT: { $subtract: ["$totalAmount", "$vatTotal"] },
           vatTotal:1,
           note:1,
           createdAt: 1,
@@ -187,12 +191,25 @@ export const getPurchaseList = async (req, res, next) => {
 
     const data = await PURCHASE.aggregate(pipeline);
 
+        const totalVATResult = await PURCHASE.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalVAT: { $sum: "$vatTotal" }
+        }
+      }
+    ]);
+
+    const totalVAT = totalVATResult[0]?.totalVAT || 0;
+
+
     const totalCount = await PURCHASE.countDocuments();
 
     return res.json({
       page,
       limit,
       totalCount,
+      totalVAT,
       data
     });
   } catch (err) {

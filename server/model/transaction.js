@@ -49,6 +49,10 @@ const transactionSchema = new mongoose.Schema(
     type:String,
     default:null
   },
+  totalBeforeVAT:{
+    type:Number,
+    default:0
+  },
     vatAmount: {
     type: Number, 
     default: 0,
