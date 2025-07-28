@@ -22,6 +22,14 @@ const paymentSchema = new mongoose.Schema({
       type: Number, 
       required: true 
     },
+    vatAmount: { 
+      type: Number, 
+       default:0,
+    },
+    beforeVat: { 
+      type: Number, 
+      default:0
+    },
     paidAmount: { 
       type: Number, 
       required: true 

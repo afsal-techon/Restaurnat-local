@@ -263,9 +263,10 @@ export const updateUser = async (req, res, next) => {
       name,
       phone,
       accessName,
-      pin: pin ?? userToUpdate.pin,
+      pin: pin ? pin : userToUpdate.pin,
       access
     };
+
 
     const updatedUser = await USER.findByIdAndUpdate(userId, updateData, { new: true });
 

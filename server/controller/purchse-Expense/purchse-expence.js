@@ -1,10 +1,10 @@
-import ACCOUNTS from '../../model/account.js'
 import USER from '../../model/userModel.js';
-import RESTAURANT from '../../model/restaurant.js'
+import RESTAURANT from '../../model/restaurant.js';
 import TRANSACTION from '../../model/transaction.js';
-import mongoose from 'mongoose';
 import { generatePDF } from '../../config/pdfGeneration.js';
 import ExcelJS from 'exceljs';
+
+
 
 
 export const getPurchaseReport = async (req, res, next) => {

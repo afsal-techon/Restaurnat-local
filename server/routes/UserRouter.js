@@ -236,6 +236,7 @@ router.get('/payment-summary/excel',VerifyToken,checkOfflinePermission('Reports'
 router.get('/daily-collection/excel',VerifyToken,checkOfflinePermission('Reports'),dailyCollectionExcel);
 router.get('/daily-transaction/excel',VerifyToken,checkOfflinePermission('Reports'),dailyTransactionExcel)
 
+
 //daily transaction type 
 router.get('/reports/daily-transaction',VerifyToken,checkOfflinePermission('Reports'),getDailyTransactionReport)
 router.get('/daily-transaction/pdf',VerifyToken,checkOfflinePermission('Reports'),getDailyTransactionPDF)
@@ -260,10 +261,10 @@ router.get('/printer/get',VerifyToken,checkOfflinePermission('Admin'),getPritner
 router.post('/print-settings',VerifyToken,checkOfflinePermission('Admin'),updatePosSettings);
 router.get('/print-settings/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getPosSettings);
 
+
 //settings 
 router.post('/bill-settings',VerifyToken,checkOfflinePermission('Admin'),updateBillSettings);
 router.get('/bill-settings/:restaurantId',VerifyToken,checkOfflinePermission('Admin'),getBillSettings)
-
 
 
 //supplier

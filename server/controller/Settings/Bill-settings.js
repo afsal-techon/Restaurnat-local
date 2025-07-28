@@ -5,9 +5,11 @@ import  BILL_SETTINGS from '../../model/billSettings.js'
 export const updateBillSettings = async (req, res, next) => {
   try {
     const userId = req.user; // You must extract this from middleware
-    const { isPriceChange, isIncludeVAT ,restaurantId } = req.body;
+    const { isPriceChange, vatExcluded ,restaurantId } = req.body;
 
-    if (isPriceChange === undefined && isIncludeVAT === undefined) {
+    
+
+    if (isPriceChange === undefined && vatExcluded === undefined) {
       return res.status(400).json({ message: 'Nothing to update' });
     }
 
@@ -25,13 +27,13 @@ export const updateBillSettings = async (req, res, next) => {
       settings = await BILL_SETTINGS.create({
         restaurantId,
         isPriceChange: isPriceChange ?? false,
-        isIncludeVAT: isIncludeVAT ?? false,
+        vatExcluded: vatExcluded ?? false,
         createdById: userId,
         createdBy: user.name,
       });
     } else {
       if (isPriceChange !== undefined) settings.isPriceChange = isPriceChange;
-      if (isIncludeVAT !== undefined) settings.isIncludeVAT = isIncludeVAT;
+      if (vatExcluded !== undefined) settings.vatExcluded = vatExcluded;
       await settings.save();
     }
 

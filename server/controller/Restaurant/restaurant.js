@@ -41,14 +41,19 @@ export const  createRestuarantBranch = async (req,res,next)=>{
             const pngPath = originalPath.replace(path.extname(originalPath), ".png");
 
             // Convert to PNG using sharp
-            await sharp(originalPath)
-            .resize({ width: 600, withoutEnlargement: true }) // optional resize
-            .png()
-            .toFile(pngPath);
+                    await sharp(originalPath)
+                .resize({ width: 600, withoutEnlargement: true })
+                .png()
+                .toFile(pngPath);
 
-            // Delete the original uploaded file (non-png)
-            fs.unlinkSync(originalPath);
+                // Wait briefly to ensure file is fully released
+                await new Promise(resolve => setTimeout(resolve, 200));
 
+                fs.unlink(originalPath, (err) => {
+                if (err) {
+                    console.error('Failed to delete original file:', err.message);
+                }
+                });
             const logo = `/uploads/${path.basename(pngPath)}`;
 
     
@@ -176,13 +181,19 @@ export const updateRestaurantBranch = async (req, res, next) => {
             const pngPath = originalPath.replace(path.extname(originalPath), ".png");
 
             // Convert to PNG using sharp
-            await sharp(originalPath)
-            .resize({ width: 600, withoutEnlargement: true }) // optional resize
-            .png()
-            .toFile(pngPath);
+                        await sharp(originalPath)
+                .resize({ width: 600, withoutEnlargement: true })
+                .png()
+                .toFile(pngPath);
 
-            // Delete the original uploaded file (non-png)
-            fs.unlinkSync(originalPath);
+                // Wait briefly to ensure file is fully released
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                fs.unlink(originalPath, (err) => {
+                if (err) {
+                    console.error('Failed to delete original file:', err.message);
+                }
+                });
 
             const logo = `/uploads/${path.basename(pngPath)}`;
 

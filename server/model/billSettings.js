@@ -9,7 +9,7 @@ const billSettings =new mongoose.Schema({
          },
 
         isPriceChange:{ type: Boolean, default: false},
-        isIncludeVAT:{ type: Boolean, default: false},
+        vatExcluded:{ type: Boolean, default: false},
     createdById: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

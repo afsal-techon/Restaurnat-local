@@ -31,7 +31,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import agenda from '../../config/agenda.js'
 import POS_SETTINGS from '../../model/posSettings.js'
-import { updateTable } from "../Restaurant/floors&tables.js";
+import ACCOUNTS from '../../model/account.js'
 
 
 
@@ -99,14 +99,12 @@ export const createOrder = async (req, res, next) => {
       discount,
       action = 'create',
       deliveryDetails,
-      printConfig = {},
+      
     } = req.body;
 
-    console.log(deliveryDetails,'deliver')
 
     const userId = req.user;
     const isAdditionalOrder = Boolean(orderId);
-    console.log(isAdditionalOrder, 'additional order');
 
     const user = await USER.findOne({ _id: userId }).lean();
     if (!user) return res.status(400).json({ message: 'User not found' });
@@ -1485,6 +1483,12 @@ export const generateUniqueRefId = async () => {
       if(!restaurantId){
         return res.status(400).json({ message: "Restaurnat Id not found!" })
       }
+
+      const incomeAcc = await ACCOUNTS.findOne({ accountType:'Income',accountName:'Sale'}).lean();
+
+      if(!incomeAcc){
+        return res.status(400).json({ message:'Cannot find income account!'})
+      }
   
           // Get and validate order
           const order = await ORDER.findOne({
@@ -1495,7 +1499,6 @@ export const generateUniqueRefId = async () => {
           if (!order) {
             return res.status(404).json({ message: "Order not found or already completed/cancelled" });
           }
-          console.log(accounts,'accounts')
 
                const notValuePaidTypes = ['Credit'];
   
@@ -1505,9 +1508,6 @@ export const generateUniqueRefId = async () => {
                   return sum + acc.amount;
                 }, 0);
             
-  
-      
-  
       if (dueAmount > 0) {
         if (!customerId) {
           return res.status(400).json({ message: "Customer Id  required for due payments" });
@@ -1534,6 +1534,8 @@ const paymentRecord = {
     amount: acc.amount,
   })),
   grandTotal,
+  vatAmount: order.vat,
+  beforeVat: order.subTotal,
   paidAmount,
   dueAmount ,
   createdById: userId,
@@ -1553,6 +1555,8 @@ const paymentRecord = {
         restaurantId,
         accountId: acc.accountId,
         amount: acc.amount,
+        vatAmount:order.vat,
+        totalBeforeVAT:order.subTotal,
         type: "Credit",
         description: `POS Sale for Order ${order.order_id}`,
         referenceId: refId,
@@ -1561,9 +1565,27 @@ const paymentRecord = {
         createdById: userId,
         createdBy:user.name,
 
-       
       });
+
     }
+
+    const refId = await generateUniqueRefId();
+
+     await  TRANSACTION.create({
+      restaurantId : incomeAcc.restaurantId || null,
+      paymentId: paymentRecord._id,
+      accountId: incomeAcc._id, // supplier account
+      paymentType: paymentRecord.methods.accountId,
+      vatAmount : order.vat,
+      amount: paymentRecord.grandTotal,
+      totalBeforeVAT:order.subTotal,
+      type: "Credit",
+      referenceId: refId,
+      referenceType: incomeAcc.accountType ||  "Income",
+      description: note || `POS Sale for Order ${order.order_id}`,
+      createdById: user._id,
+      createdBy:user.name,
+    });
   
              // Update order status
       order.status = "Completed";
@@ -1616,127 +1638,6 @@ const paymentRecord = {
 
 
 
-
-  async function generateCustomerBillForDineIn(orderId) {
-  const order = await ORDER.findById(orderId).lean();
-  if (!order) throw new Error("Order not found");
-
-  const restaurant = await RESTAURANT.findById(order.restaurantId).lean();
-  const table = await TABLES.findById(order.tableId).lean();
-  const customerType = await CUSTOMER_TYPE.findById(order.customerTypeId).lean();
-
-  const now = new Date();
-  const dateStr = now.toLocaleDateString();
-  const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-  // Start Printing
-  printer.clear();
-  printer.alignCenter();
-  printer.setTextDoubleHeight();
-  printer.println(restaurant?.name?.toUpperCase() || "RESTAURANT");
-  printer.setTextNormal();
-  if (restaurant?.phone) printer.println(`Tel: ${restaurant.phone}`);
-  if (restaurant?.trn) printer.println(`Trn:${restaurant.trn}`);
-  printer.drawLine();
-
-  printer.println(customerType?.type || "Dine-in");
-  printer.drawLine();
-
-  // Bill info
-  printer.alignLeft();
-  printer.println(`Bill No. : ${order.order_id || "-"}`);
-  printer.println(`Table No. : ${table?.name || "-"}`);
-  printer.println(`Bill Date : ${dateStr}  ${timeStr}`);
-  printer.println(`Operator Id. : ${order.createdBy || "Admin"}`);
-  printer.println(`Payment Mode : cash`);
-  printer.println(`Table No. : ${table?.name || "-"}`);
-
-  printer.drawLine();
-
-  // Item headers
-  printer.tableCustom([
-    { text: "Item", align: "LEFT", width: 0.30 },
-    { text: "Portion", align: "CENTER", width: 0.20 },
-    { text: "Rate", align: "RIGHT", width: 0.15 },
-    { text: "Qty.", align: "RIGHT", width: 0.15 },
-    { text: "Amount", align: "RIGHT", width: 0.20 },
-  ]);
-
-  printer.drawLine();
-
-  let totalQty = 0;
-  let itemCount = 0;
-
-  for (const item of order.items) {
-    if (item.isCombo) {
-      printer.tableCustom([
-        { text: item.comboName, align: "LEFT", width: 0.5 },
-        { text: "-", align: "CENTER", width: 0.2 },
-        { text: item.comboPrice.toFixed(2), align: "RIGHT", width: 0.15 },
-        { text: `x${item.qty}`, align: "RIGHT", width: 0.15 },
-        { text: item.total.toFixed(2), align: "RIGHT", width: 0.2 },
-      ]);
-    } else {
-      printer.tableCustom([
-        { text: item.foodName, align: "LEFT", width: 0.3 },
-        { text: item.portion || "-", align: "CENTER", width: 0.2 },
-        { text: item.price.toFixed(2), align: "RIGHT", width: 0.15 },
-        { text: `x${item.qty}`, align: "RIGHT", width: 0.15 },
-        { text: item.total.toFixed(2), align: "RIGHT", width: 0.2 },
-      ]);
-    }
-
-    totalQty += item.qty;
-    itemCount++;
-  }
-
-  printer.drawLine();
-  printer.tableCustom([
-    { text: `Item : ${itemCount}`, align: "LEFT", width: 0.5 },
-    { text: `Qty. : ${totalQty}`, align: "RIGHT", width: 0.5 },
-  ]);
-  printer.newLine();
-
-  // Totals
-  printer.alignRight();
-  printer.println(`Sub Total : ${order.subTotal?.toFixed(2) || "0.00"}`);
-  printer.println(`VAT ${order.vat || 0}% : ${(order.subTotal * (order.vat / 100)).toFixed(2)}`);
-  printer.println(`Grand Total : AED${order.totalAmount.toFixed(2)}`);
-
-  printer.newLine();
-  printer.alignCenter();
-  printer.println("Thank you! Visit Again");
-
-  printer.cut();
-
-  const isConnected = await printer.isPrinterConnected();
-  if (isConnected) {
-    await printer.execute();
-    console.log(`✅ Customer bill printed for table: ${table?.name}`);
-
-    if (order.tableId) {
-  const updatedTable = await TABLES.findOneAndUpdate(
-    { _id: order.tableId },
-    {
-      currentStatus: 'VacatingSoon',
-      totalAmount: order.totalAmount,
-    },
-    { new: true }
-  ).lean();
-
-  // Notify POS via socket
-  const io = getIO();
-  io.to(`posTable-${order.restaurantId}`).emit('single_table_update', updatedTable);
-
-    }
-
-    
-
-
-  } else {
-    console.error(" Printer not connected.");
-  }
-}
 
 
 export const cancelOrder = async(req,res,next)=>{
