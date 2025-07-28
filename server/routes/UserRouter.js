@@ -289,12 +289,12 @@ router.get('/purchase/one/:purchaseId',VerifyToken,checkOfflinePermission('Purch
 
 
 
-
 //Expense
 router.post('/expense',VerifyToken,checkOfflinePermission('Admin'),createExpense);
 router.get('/expense',VerifyToken,checkOfflinePermission('Admin'),getExpenseList);
 router.put('/expense',VerifyToken,checkOfflinePermission('Admin'),updateExpense);
 router.get('/expense-report',VerifyToken,checkOfflinePermission('Admin'),getAllExpensesReport);
+
 
 
 //kitchen kot 
