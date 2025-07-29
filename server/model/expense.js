@@ -18,6 +18,10 @@ const expenseItemSchema = new mongoose.Schema({
     type: Number,
     default: 1,
   },
+  baseTotal: {
+      type: Number,
+      default: 0,
+    },
   total: {
     type: Number,
     default: 0,

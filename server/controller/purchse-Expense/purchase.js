@@ -202,9 +202,17 @@ export const getPurchaseList = async (req, res, next) => {
       }
     ]);
 
+      const totalGrandTotalResult = await PURCHASE.aggregate([
+          {
+            $group: {
+              _id: null,
+              totalGrandTotal: { $sum: "$totalAmount" }
+            }
+          }
+        ]);
+
     const totalVAT = totalVATResult[0]?.totalVAT || 0;
-
-
+  const totalGrandTotal = totalGrandTotalResult[0]?.totalGrandTotal || 0;
     const totalCount = await PURCHASE.countDocuments();
 
     return res.json({
@@ -212,6 +220,7 @@ export const getPurchaseList = async (req, res, next) => {
       limit,
       totalCount,
       totalVAT,
+      totalGrandTotal,
       data
     });
   } catch (err) {
@@ -521,7 +530,7 @@ export const getOnePurchase = async (req, res, next) => {
           paymentAccount: { $first: "$paymentAccount" },
           purchaseAccount: { $first: "$purchaseAccount" },
           totalAmount: { $first: "$totalAmount" },
-          vatAmount: { $first: "$vatAmount" },
+          vatTotal: { $first: "$vatTotal" },
           totalBeforeVAT: { $first: "$totalBeforeVAT" },
           isVatInclusive : { $first: "$isVatInclusive" },
           createdAt: { $first: "$createdAt" },
@@ -544,7 +553,7 @@ export const getOnePurchase = async (req, res, next) => {
           date: 1,
           invoiceNo: 1,
           totalAmount: 1,
-          vatAmount:1,
+          vatTotal:1,
           totalBeforeVAT:1,
           isVatInclusive:1,
           createdAt: 1,

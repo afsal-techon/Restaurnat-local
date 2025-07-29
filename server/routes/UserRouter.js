@@ -28,7 +28,7 @@ import { getPosSettings, getPritnerConfigs, updatePosSettings, updatePrinterConf
 import { createSupplier, deleteSupplier, getSupplierDueHistory, getSuppliers, paySupplierDue, SupplierDueHistoryPdf, updateSupplier } from '../controller/supplierCntrl/supplierCntrl.js';
 import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient } from '../controller/purchse-Expense/ingredients.js';
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
-import { createExpense, getAllExpensesReport, getExpenseList, updateExpense } from '../controller/purchse-Expense/Expense.js';
+import { createExpense, getAllExpensesReport, getExpenseList, getOneExpense, updateExpense } from '../controller/purchse-Expense/Expense.js';
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
 import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
 import { getProfitAndLossReport, profitAndLossExcel, profitandLossPdf } from '../controller/ReportsController/otherReports.js';
@@ -296,6 +296,7 @@ router.get('/purchase/one/:purchaseId',VerifyToken,checkOfflinePermission('Purch
 router.post('/expense',VerifyToken,checkOfflinePermission('Admin'),createExpense);
 router.get('/expense',VerifyToken,checkOfflinePermission('Admin'),getExpenseList);
 router.put('/expense',VerifyToken,checkOfflinePermission('Admin'),updateExpense);
+router.get('/expense/:expenseId',VerifyToken,checkOfflinePermission('Admin'),getOneExpense)
 router.get('/expense-report',VerifyToken,checkOfflinePermission('Admin'),getAllExpensesReport);
 
 

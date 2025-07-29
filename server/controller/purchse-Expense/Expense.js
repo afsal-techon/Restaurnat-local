@@ -3,6 +3,8 @@ import USER from '../../model/userModel.js';
 import TRANSACTION from '../../model/transaction.js';
 import { generateUniqueRefId } from '../POS controller/posOrderCntrl.js'
 import EXPENSE from '../../model/expense.js'
+import mongoose from "mongoose";
+
 
 
 
@@ -100,6 +102,10 @@ export const createExpense = async (req, res, next) => {
       isVatInclusive,
 
     } = req.body;
+
+
+    console.log(expenseItems[0].baseTotal);
+    
 
     if (!date) return res.status(400).json({ message: "Expense date is required!" });
     if (!paymentModeId) return res.status(400).json({ message: "Payment mode (Account ID) is required!" });
@@ -269,7 +275,8 @@ export const getExpenseList = async (req, res, next) => {
               amount: "$expenseItems.amount",
               qty: "$expenseItems.qty",
               total: "$expenseItems.total",
-              vatAmount: "$expenseItems.vatAmount"
+              vatAmount: "$expenseItems.vatAmount",
+              baseTotal: "$expenseItems.baseTotal",
             }
           }
         }
@@ -298,12 +305,35 @@ export const getExpenseList = async (req, res, next) => {
     ];
 
     const data = await EXPENSE.aggregate(pipeline);
+        const totalVATResult = await EXPENSE.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalVAT: { $sum: "$vatTotal" }
+        }
+      }
+    ]);
+
+  const totalGrandTotalResult = await EXPENSE.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalGrandTotal: { $sum: "$grandTotal" }
+        }
+      }
+    ]);
+
+
+    const totalVAT = totalVATResult[0]?.totalVAT || 0;
+     const totalGrandTotal = totalGrandTotalResult[0]?.totalGrandTotal || 0;
     const totalCount = await EXPENSE.countDocuments();
 
     return res.json({
       page,
       limit,
       totalCount,
+      totalVAT,
+      totalGrandTotal,
       data
     });
 
@@ -545,5 +575,123 @@ export const updateExpense = async (req, res, next) => {
 
 
 
+export const getOneExpense = async (req, res, next) => {
+  try {
+    const { expenseId } = req.params;
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found!" });
 
+    if ((!expenseId)) {
+      return res.status(400).json({ message: "Expense Id is required!" });
+    }
+
+    const pipeline = [
+      { $match: { _id: new mongoose.Types.ObjectId(expenseId) } },
+
+      // Supplier lookup
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplier"
+        }
+      },
+      { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+
+      // Payment mode lookup
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "paymentModeId",
+          foreignField: "_id",
+          as: "paymentAccount"
+        }
+      },
+      { $unwind: { path: "$paymentAccount", preserveNullAndEmptyArrays: true } },
+
+      // Unwind expenseItems
+      { $unwind: "$expenseItems" },
+
+      // Lookup account name for each expense item
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "expenseItems.accountId",
+          foreignField: "_id",
+          as: "expenseItemAccount"
+        }
+      },
+      { $unwind: { path: "$expenseItemAccount", preserveNullAndEmptyArrays: true } },
+
+      // Rebuild the expenseItems object with account name
+      {
+        $addFields: {
+          "expenseItems.accountId": "$expenseItemAccount._id",
+          "expenseItems.accountName": "$expenseItemAccount.accountName"
+        }
+      },
+
+      // Group back by main expense
+      {
+        $group: {
+          _id: "$_id",
+          date: { $first: "$date" },
+          invoiceNo: { $first: "$invoiceNo" },
+          createdAt: { $first: "$createdAt" },
+          supplier: { $first: "$supplier.supplierName" },
+          supplierId: { $first: "$supplier._id" },
+          paymentModeId: { $first: "$paymentAccount._id" },
+          paymentMode: { $first: "$paymentAccount.accountName" },
+          vatTotal: { $first: "$vatTotal" },
+          totalBeforeVAT: { $first: "$totalBeforeVAT" },
+          grandTotal: { $first: "$grandTotal" },
+          createdBy: { $first: "$createdBy" },
+          isVatInclusive: { $first: "$isVatInclusive" },
+          createdById: { $first: "$createdById" },
+
+          expenseItems: {
+            $push: {
+              accountId: "$expenseItems.accountId",
+              accountName: "$expenseItems.accountName",
+              note: "$expenseItems.note",
+              amount: "$expenseItems.amount",
+              qty: "$expenseItems.qty",
+              total: "$expenseItems.total",
+              vatAmount: "$expenseItems.vatAmount",
+              baseTotal: "$expenseItems.baseTotal",
+            }
+          }
+        }
+      },
+
+      {
+        $project: {
+          _id: 1,
+          date: 1,
+          invoiceNo: 1,
+          createdAt: 1,
+          supplier: 1,
+          supplierId: 1,
+          paymentModeId: 1,
+          paymentMode: 1,
+          vatTotal: 1,
+          totalBeforeVAT: 1,
+          grandTotal: 1,
+          isVatInclusive: 1,
+          createdBy: 1,
+          createdById: 1,
+          expenseItems: 1
+        }
+      }
+    ];
+
+    const data = await EXPENSE.aggregate(pipeline);
+    
+    return res.json(data[0]);
+
+  } catch (err) {
+    next(err);
+  }
+};
 
