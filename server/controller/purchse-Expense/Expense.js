@@ -152,7 +152,7 @@ export const createExpense = async (req, res, next) => {
         supplierId: supplierId || null,
         amount: item.total,
         vatAmount: item.vatAmount || 0,
-        totalBeforeVAT:baseTotal,
+        totalBeforeVAT:item.baseTotal,
         type: "Debit",
         referenceId: refId,
         referenceType: acc.accountType || "Expense",
