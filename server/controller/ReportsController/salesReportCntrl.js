@@ -95,7 +95,9 @@ export const getDailySalesReport = async (req, res, next) => {
           table: { $first: "$table.name" },
           customerType: { $first: "$customerType.type" },
           discount: { $first: "$order.discount" },
+          beforeVat: { $first: "$beforeVat" },
           amount: { $first: "$grandTotal" },
+          vatAmount:{ $first: "$vatAmount" },
           date: { $first: "$createdAt" },
           paymentMethods: {
             $push: {
@@ -158,12 +160,29 @@ export const getDailySalesReport = async (req, res, next) => {
       PAYMENT.aggregate([...basePipeline, { $count: "total" }])
     ]);
 
-    const totalCount = countResult[0]?.total || 0;
+          const totalCount = countResult[0]?.total || 0;
+
+          const totalsPipeline = [
+        ...basePipeline,
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: "$grandTotal" },
+            totalVAT: { $sum: "$vatAmount" }
+          }
+        }
+      ];
+
+      const [totalsResult] = await PAYMENT.aggregate(totalsPipeline);
+      const totalAmount = totalsResult?.totalAmount || 0;
+      const totalVAT = totalsResult?.totalVAT || 0;
 
     return res.status(200).json({
       page,
       limit,
       totalCount,
+      totalAmount,
+      totalVAT,
       data
     });
 
@@ -315,12 +334,12 @@ export const getCategoryWiseSalesReport = async (req, res, next) => {
       },
       { $unwind: "$all" },
 
-      // ✅ Apply minPrice / maxPrice filter here
+      //  Apply minPrice / maxPrice filter here
       ...(Object.keys(priceFilter).length
         ? [{ $match: { "all.totalSales": priceFilter } }]
         : []),
 
-      // ✅ Final group by category
+      //  Final group by category
       {
         $group: {
           _id: "$all._id",
