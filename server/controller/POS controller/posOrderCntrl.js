@@ -1582,7 +1582,7 @@ const paymentRecord = {
       type: "Credit",
       referenceId: refId,
       referenceType: incomeAcc.accountType ||  "Income",
-      description: note || `POS Sale for Order ${order.order_id}`,
+      description: `POS Sale for Order ${order.order_id}`,
       createdById: user._id,
       createdBy:user.name,
     });

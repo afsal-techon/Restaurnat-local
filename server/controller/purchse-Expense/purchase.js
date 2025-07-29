@@ -23,10 +23,11 @@ export const createPurchase = async (req, res, next) => {
       items,
       note,
       totalAmount,
-      totalBeforeVAT,
+      baseTotal,
       vatTotal,
       isVatInclusive,
     } = req.body;
+
 
         if (!date) {
         return res.status(400).json({ message: "Purchase date is required!" });
@@ -79,9 +80,10 @@ export const createPurchase = async (req, res, next) => {
         quantity: item.quantity,
         total: item.total,
         vatAmount: item.vatAmount,
+        baseTotal:item.baseTotal,
       })),
       totalAmount,
-      totalBeforeVAT,
+      totalBeforeVAT :baseTotal,
       note,
       vatTotal,
       createdById: user._id,
@@ -98,7 +100,7 @@ export const createPurchase = async (req, res, next) => {
       supplierId,
       vatAmount : vatTotal,
       amount: totalAmount,
-      totalBeforeVAT:totalBeforeVAT,
+      totalBeforeVAT:baseTotal,
       type: "Debit",
       referenceId: refId,
       referenceType: account.accountType ||  "Purchase",
@@ -174,7 +176,7 @@ export const getPurchaseList = async (req, res, next) => {
           date: 1,
           invoiceNo: 1,
           totalAmount: 1,
-           totalBeforeVAT: { $subtract: ["$totalAmount", "$vatTotal"] },
+          totalBeforeVAT: 1,
           vatTotal:1,
           note:1,
           createdAt: 1,
@@ -344,7 +346,9 @@ export const updatePurchase = async (req, res, next) => {
       paymentModeId,
       items,
       totalAmount,
+     baseTotal,
       vatTotal,
+     isVatInclusive,
       note
     } = req.body;
 
@@ -380,9 +384,12 @@ export const updatePurchase = async (req, res, next) => {
           quantity: item.quantity,
           total: item.total,
           vatAmount: item.vatAmount,
+          baseTotal:item.baseTotal,
         })),
         totalAmount,
+        totalBeforeVAT:baseTotal,
         vatTotal,
+        isVatInclusive,
         note,
         updatedById: user._id,
         createdBy: user.name,
@@ -402,6 +409,8 @@ export const updatePurchase = async (req, res, next) => {
       paymentType: paymentModeId,
       supplierId,
       amount: totalAmount,
+      totalBeforeVAT:baseTotal,
+      vatAmount:vatTotal,
       type: "Debit",
       referenceId: refId,
       referenceType: account.accountType || "Purchase",
@@ -512,6 +521,9 @@ export const getOnePurchase = async (req, res, next) => {
           paymentAccount: { $first: "$paymentAccount" },
           purchaseAccount: { $first: "$purchaseAccount" },
           totalAmount: { $first: "$totalAmount" },
+          vatAmount: { $first: "$vatAmount" },
+          totalBeforeVAT: { $first: "$totalBeforeVAT" },
+          isVatInclusive : { $first: "$isVatInclusive" },
           createdAt: { $first: "$createdAt" },
           items: {
             $push: {
@@ -519,7 +531,9 @@ export const getOnePurchase = async (req, res, next) => {
               ingredientName: "$items.ingredientName",
               price: "$items.price",
               quantity: "$items.quantity",
-              total: "$items.total"
+              total: "$items.total",
+              vatAmount:"$items.vatAmount",
+              baseTotal:"$items.baseTotal",
             }
           }
         }
@@ -530,6 +544,9 @@ export const getOnePurchase = async (req, res, next) => {
           date: 1,
           invoiceNo: 1,
           totalAmount: 1,
+          vatAmount:1,
+          totalBeforeVAT:1,
+          isVatInclusive:1,
           createdAt: 1,
           supplier: "$supplier.supplierName",
           paymentMode: "$paymentAccount.accountName",

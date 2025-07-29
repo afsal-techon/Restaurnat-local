@@ -43,6 +43,10 @@ const purchaseSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
+          baseTotal: {
+          type: Number,
+          default: 0,
+        },
             total: {
           type: Number,
           default: 0,
@@ -59,6 +63,7 @@ const purchaseSchema = new mongoose.Schema(
     },
      totalBeforeVAT: {
       type: Number,
+      default:0,
     },
      vatTotal:{
       type: Number,
