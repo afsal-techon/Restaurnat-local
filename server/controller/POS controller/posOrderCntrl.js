@@ -1543,7 +1543,8 @@ const paymentRecord = {
 
 };
       
-     await PAYMENT.create([paymentRecord]);
+    
+const [createdPayment] = await PAYMENT.create([paymentRecord]);
 
 
    // Add a Transaction for each account used
@@ -1555,8 +1556,6 @@ const paymentRecord = {
         restaurantId,
         accountId: acc.accountId,
         amount: acc.amount,
-        // vatAmount:order.vat,
-        // totalBeforeVAT:order.subTotal,
         type: "Credit",
         description: `POS Sale for Order ${order.order_id}`,
         referenceId: refId,
@@ -1575,7 +1574,7 @@ const paymentRecord = {
       restaurantId : incomeAcc.restaurantId || null,
       paymentId: paymentRecord._id,
       accountId: incomeAcc._id, // supplier account
-      paymentType: paymentRecord.methods.accountId,
+      paymentType: createdPayment.methods.accountId,
       vatAmount : order.vat,
       amount: paymentRecord.grandTotal,
       totalBeforeVAT:order.subTotal,
