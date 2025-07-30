@@ -42,6 +42,8 @@ export const createRider = async (req, res, next) => {
   }
 };
 
+
+
 export const getRiders = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
@@ -77,7 +79,6 @@ export const getRiders = async (req, res, next) => {
     next(err);
   }
 };
-
 
 
 export const getOneRider = async (req, res, next) => {
