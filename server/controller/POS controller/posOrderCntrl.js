@@ -1075,7 +1075,6 @@ printer.code128(popOrder.order_id, { height: 70 });
 
 
 
-
 export const rePrintForTakeHome = async(req,res,next)=>{
   try {
 
