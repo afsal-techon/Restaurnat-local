@@ -8,11 +8,6 @@ import CUSTOMER_TYPE from '../../model/customerTypes.js'
 import ExcelJS from 'exceljs';
 
 
-
-
-
-
-
 export const getDailySalesReport = async (req, res, next) => {
   try {
     const userId = req.user;

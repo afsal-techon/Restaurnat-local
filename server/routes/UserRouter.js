@@ -33,6 +33,7 @@ import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
 import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
 import { getProfitAndLossReport, getVATReport, profitAndLossExcel, profitandLossPdf, vatSummary } from '../controller/ReportsController/otherReports.js';
 import { getBillSettings, updateBillSettings } from '../controller/Settings/Bill-settings.js';
+import { addPartner, deletePartner, getDividendSharingReport, getPartners, updatePartner } from '../controller/ReportsController/dividend.js';
 const router = express.Router();
 
 
@@ -349,10 +350,14 @@ router.get('/summery/vat',VerifyToken,checkOfflinePermission('Reports'),vatSumma
 
 
 
+//partner
+router.post('/partner',VerifyToken,checkOfflinePermission('Admin'),addPartner)
+router.put('/partner',VerifyToken,checkOfflinePermission('Admin'),updatePartner)
+router.get('/partner',VerifyToken,checkOfflinePermission('Admin'),getPartners)
+router.delete('/partner',VerifyToken,checkOfflinePermission('Admin'),deletePartner);
 
-
-
-
+//dividend report
+router.get('/divident',VerifyToken,checkOfflinePermission('Admin'),getDividendSharingReport)
 
 
 export default router;

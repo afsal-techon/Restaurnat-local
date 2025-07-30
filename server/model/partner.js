@@ -5,9 +5,9 @@ const partnerSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  mobile: {
-    type: String,
-  },
+  // mobile: {
+  //   type: String,
+  // },
   percentage: {
     type: Number,
     required: true,
@@ -18,4 +18,5 @@ const partnerSchema = new mongoose.Schema({
     timestamps:true
 });
 
-export const PARTNER = mongoose.model("Partner", partnerSchema);
+const partnerModel = mongoose.model("Partner", partnerSchema);
+export default partnerModel;
