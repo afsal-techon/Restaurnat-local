@@ -1574,7 +1574,7 @@ const [createdPayment] = await PAYMENT.create([paymentRecord]);
       restaurantId : incomeAcc.restaurantId || null,
       paymentId: paymentRecord._id,
       accountId: incomeAcc._id, // supplier account
-      paymentType: createdPayment.methods.accountId,
+      paymentType: createdPayment.methods.map(m => m.accountId).join(','),
       vatAmount : order.vat,
       amount: paymentRecord.grandTotal,
       totalBeforeVAT:order.subTotal,
