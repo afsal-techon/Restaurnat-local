@@ -218,7 +218,7 @@ export const getDividendSharingReport = async (req, res, next) => {
       amount: Number(((netBase * (p.percentage || 0)) / 100).toFixed(2))
     }));
 
-    return res.status(200).json({ data:partnerShares });
+    return res.status(200).json({ data:partnerShares, netProfit });
 
   } catch (err) {
     next(err);

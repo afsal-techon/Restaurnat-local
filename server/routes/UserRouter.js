@@ -354,10 +354,10 @@ router.get('/summery/vat',VerifyToken,checkOfflinePermission('Reports'),vatSumma
 router.post('/partner',VerifyToken,checkOfflinePermission('Admin'),addPartner)
 router.put('/partner',VerifyToken,checkOfflinePermission('Admin'),updatePartner)
 router.get('/partner',VerifyToken,checkOfflinePermission('Admin'),getPartners)
-router.delete('/partner',VerifyToken,checkOfflinePermission('Admin'),deletePartner);
+router.delete('/partner/:partnerId',VerifyToken,checkOfflinePermission('Admin'),deletePartner);
 
 //dividend report
-router.get('/divident',VerifyToken,checkOfflinePermission('Admin'),getDividendSharingReport)
+router.get('/dividend',VerifyToken,checkOfflinePermission('Admin'),getDividendSharingReport)
 
 
 export default router;

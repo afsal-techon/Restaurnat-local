@@ -509,3 +509,138 @@ export const getDeliveredHomeDelivery = async (req, res, next) => {
   }
 };
 
+
+
+
+
+//rider delivery
+
+export const getRiderOngoingOrders = async (req, res, next) => {
+  try {
+    const userId = req.user;
+    const { riderId, fromDate, toDate, search, limit: lim, page: pg } = req.query;
+
+    const limit = parseInt(lim) || 20;
+    const page = parseInt(pg) || 1;
+    const skip = (page - 1) * limit;
+
+    const user = await USER.findById(userId).lean();
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+    // Base query
+    const query = {
+      riderId,
+      status: "OutForDelivery"
+    };
+
+    // Filter by delivery date range
+    if (fromDate || toDate) {
+      query.deliveryDate = {};
+      if (fromDate) query.deliveryDate.$gte = new Date(fromDate);
+      if (toDate) query.deliveryDate.$lte = new Date(toDate);
+    }
+
+    // Advanced search by order_id, orderNo, customer name or mobile
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+
+      const customers = await CUSTOMER.find({
+        $or: [{ name: searchRegex }, { mobileNo: searchRegex }],
+      }).select("_id");
+
+      const customerIds = customers.map((c) => c._id);
+
+      query.$or = [
+        { orderNo: searchRegex },
+        { order_id: searchRegex },
+        { customerId: { $in: customerIds } },
+      ];
+    }
+
+    const totalCount = await ORDER.countDocuments(query);
+
+    const orders = await ORDER.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select(
+        "_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod deliveryDate deliveryTime location pickupTime"
+      )
+      .populate({ path: "customerId", select: "name mobileNo address" })
+      .populate({ path: "riderId", select: "name mobileNo" });
+
+    return res.status(200).json({
+      data: orders,
+      page,
+      limit,
+      totalCount,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getRiderCompleted = async (req, res, next) => {
+  try {
+    const userId = req.user;
+    const { riderId, fromDate, toDate, search, limit: lim, page: pg } = req.query;
+
+    const limit = parseInt(lim) || 20;
+    const page = parseInt(pg) || 1;
+    const skip = (page - 1) * limit;
+
+    const user = await USER.findById(userId).lean();
+    if (!user) return res.status(403).json({ message: "User not found!" });
+
+    // Base query
+    const query = {
+      riderId,
+      status: "Completed"
+    };
+
+    // Filter by delivery date range
+    if (fromDate || toDate) {
+      query.deliveryDate = {};
+      if (fromDate) query.deliveryDate.$gte = new Date(fromDate);
+      if (toDate) query.deliveryDate.$lte = new Date(toDate);
+    }
+
+    // Advanced search by order_id, orderNo, customer name or mobile
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
+
+      const customers = await CUSTOMER.find({
+        $or: [{ name: searchRegex }, { mobileNo: searchRegex }],
+      }).select("_id");
+
+      const customerIds = customers.map((c) => c._id);
+
+      query.$or = [
+        { orderNo: searchRegex },
+        { order_id: searchRegex },
+        { customerId: { $in: customerIds } },
+      ];
+    }
+
+    const totalCount = await ORDER.countDocuments(query);
+
+    const orders = await ORDER.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select(
+        "_id createdAt orderNo orderType order_id restaurantId totalAmount items subMethod deliveryDate deliveryTime location pickupTime"
+      )
+      .populate({ path: "customerId", select: "name mobileNo address" })
+      .populate({ path: "riderId", select: "name mobileNo" });
+
+    return res.status(200).json({
+      data: orders,
+      page,
+      limit,
+      totalCount,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

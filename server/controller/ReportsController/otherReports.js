@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 import USER from '../../model/userModel.js';
 import { generatePDF } from '../../config/pdfGeneration.js';
 import RESTAURANT from '../../model/restaurant.js'
-import CUSTOMER_TYPE from '../../model/customerTypes.js'
 import TRANSACTION from '../../model/transaction.js'
 import CUSTOMER from '../../model/customer.js'
 import ExcelJS from 'exceljs';
