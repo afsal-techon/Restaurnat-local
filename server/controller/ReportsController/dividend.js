@@ -61,6 +61,7 @@ export const addPartner = async (req, res, next) => {
 };
 
 
+
 export const getPartners = async(req,res,next)=>{
     try {
 
@@ -81,7 +82,6 @@ export const getPartners = async(req,res,next)=>{
         next(err)
     }
 }
-
 
 
 export const updatePartner = async (req, res, next) => {
@@ -147,8 +147,8 @@ export const deletePartner = async (req, res, next) => {
 };
 
 
-//divident report 
 
+//divident report 
 export const getDividendSharingReport = async (req, res, next) => {
   try {
 
@@ -183,7 +183,7 @@ export const getDividendSharingReport = async (req, res, next) => {
       {
         $group: {
           _id: null,
-          totalCOGS: { $sum: "$totalAmount" }
+          totalCOGS: { $sum: "$beforeVat" }
         }
       }
     ]);
@@ -197,7 +197,7 @@ export const getDividendSharingReport = async (req, res, next) => {
     let totalOperatingExpenses = 0;
     for (const exp of expenseDocs) {
       for (const item of exp.expenseItems) {
-        totalOperatingExpenses += item.amount || 0;
+        totalOperatingExpenses += item.beforeVat || 0;
       }
     }
 

@@ -30,7 +30,7 @@ import { createIngredient, deleteIngredient, getAllIngredients, updateIngredient
 import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList, updatePurchase } from '../controller/purchse-Expense/purchase.js';
 import { createExpense, getAllExpensesReport, getExpenseList, getOneExpense, updateExpense } from '../controller/purchse-Expense/Expense.js';
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
-import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
+import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiderCompleted, getRiderOngoingOrders, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
 import { getProfitAndLossReport, getVATReport, profitAndLossExcel, profitandLossPdf, vatSummary } from '../controller/ReportsController/otherReports.js';
 import { getBillSettings, updateBillSettings } from '../controller/Settings/Bill-settings.js';
 import { addPartner, deletePartner, getDividendSharingReport, getPartners, updatePartner } from '../controller/ReportsController/dividend.js';
@@ -321,6 +321,9 @@ router.get('/rider/:riderId',VerifyToken,checkOfflinePermission('Admin'),getRide
 router.put('/rider',VerifyToken,checkOfflinePermission('Admin'),updateRider);
 router.delete('/rider/:riderId',VerifyToken,checkOfflinePermission('Admin'),deleteRider);
 
+router.get('/rider/ongoing',VerifyToken,checkOfflinePermission('Admin'),getRiderOngoingOrders);
+router.get('/rider/completed',VerifyToken,checkOfflinePermission('Admin'),getRiderCompleted);
+
 
 //Deliver listings 
 router.get('/placed/delivery',VerifyToken,checkOfflinePermission('Admin'),getPlacedHomeDelivery);
@@ -332,6 +335,7 @@ router.get('/completed/delivery',VerifyToken,checkOfflinePermission('Admin'),get
 router.post('/ready/delivery',VerifyToken,checkOfflinePermission('Admin'),markOrderReadyForPickup)
 router.post('/assign/delivery',VerifyToken,checkOfflinePermission('Admin'),assignRiderForOut)
 router.post('/complete/delivery',VerifyToken,checkOfflinePermission('Admin'),completeHomeDelivery)
+
 
 
 //profit and loss

@@ -36,15 +36,15 @@ export const getProfitAndLossReport = async (req, res, next) => {
         $group: {
           _id: null,
           totalBeforeVAT: { $sum: "$beforeVat" },
-          totalVAT: { $sum: "$vatAmount" },
-          totalGrand: { $sum: "$grandTotal" }
+          // totalVAT: { $sum: "$vatAmount" },
+          // totalGrand: { $sum: "$grandTotal" }
         }
       }
     ]);
 
     const revenue = payments[0]?.totalBeforeVAT || 0;
-    const totalOutputVAT = payments[0]?.totalVAT || 0;
-    const totalSalesWithVAT = revenue + totalOutputVAT;
+    // const totalOutputVAT = payments[0]?.totalVAT || 0;
+    // const totalSalesWithVAT = revenue + totalOutputVAT;
 
     // === Fetch Purchases (COGS) ===
     const purchases = await PURCHASE.aggregate([
@@ -56,7 +56,8 @@ export const getProfitAndLossReport = async (req, res, next) => {
       {
         $group: {
           _id: null,
-          totalCOGS: { $sum: "$totalAmount" }
+          // totalCOGS: { $sum: "$totalAmount" }
+           totalCOGS: { $sum: "$totalBeforeVAT" }
         }
       }
     ]);
@@ -80,8 +81,8 @@ export const getProfitAndLossReport = async (req, res, next) => {
         if (!operatingExpenses[name]) {
           operatingExpenses[name] = 0;
         }
-        operatingExpenses[name] += item.amount;
-        totalOperatingExpenses += item.amount;
+        operatingExpenses[name] += item.totalBeforeVAT;
+        totalOperatingExpenses += item.totalBeforeVAT;
       }
     }
 
@@ -92,15 +93,17 @@ export const getProfitAndLossReport = async (req, res, next) => {
     // === Final Response ===
     return res.status(200).json({
       Income: {
-        "Sale (Before VAT)": revenue,
-        "VAT on Sale": totalOutputVAT,
-        "Total Sales (With VAT)": totalSalesWithVAT
+        "Sale": revenue,
+        // "VAT on Sale": totalOutputVAT,
       },
       "Cost of Goods Sold": {
         Purchase: cogs
       },
       "Gross Profit": grossProfit,
-      "Operating Expense": operatingExpenses,
+      "Operating Expense": {
+          totalOperatingExpenses,
+         operatingExpenses
+      },
       "Net Profit": netProfit,
       "From Date": fromDate,
       "To Date": toDate
@@ -110,7 +113,6 @@ export const getProfitAndLossReport = async (req, res, next) => {
     next(error);
   }
 };
-
 
 
 
