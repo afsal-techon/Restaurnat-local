@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>VAT Report</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      font-size: 12px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .summary-box {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      background: #f8f8f8;
+    }
+
+    .summary-box .item {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #eee;
+    }
+
+    .filters {
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+
+    .filters span {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>VAT Report</h2>
+
+  <% if (filters?.fromDate) { %>
+    <div class="filters">
+      <span>From:</span> <%= filters.fromDate %> &nbsp;&nbsp;
+      <span>To:</span> <%= filters.toDate %>
+    </div>
+  <% } %>
+
+  <div class="summary-box">
+    <div class="item">Sales Total: <%= currency %> <%= summary.totalSales.toFixed(2) %></div>
+    <div class="item">VAT on Sales: <%= currency %> <%= summary.vatOnSales.toFixed(2) %></div>
+    <div class="item">Purchase Total: <%= currency %> <%= summary.totalPurchase.toFixed(2) %></div>
+    <div class="item">VAT on Purchase: <%= currency %> <%= summary.vatOnPurchase.toFixed(2) %></div>
+    <div class="item">Expense Total: <%= currency %> <%= summary.totalExpense.toFixed(2) %></div>
+    <div class="item">VAT on Expense: <%= currency %> <%= summary.vatOnExpense.toFixed(2) %></div>
+    <div class="item" style="background: #e0f7fa;">Net VAT: <%= currency %> <%= summary.netVAT.toFixed(2) %></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Reference</th>
+        <th>Total Before VAT (<%= currency %>)</th>
+        <th>VAT (<%= currency %>)</th>
+        <th>Total (<%= currency %>)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% transactions.forEach(item => { %>
+        <tr>
+          <td><%= item.date %></td>
+          <td><%= item.type %></td>
+          <td><%= item.reference %></td>
+          <td><%= item.totalBeforeVAT.toFixed(2) %></td>
+          <td><%= item.vat.toFixed(2) %></td>
+          <td><%= item.total.toFixed(2) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+</body>
+</html>

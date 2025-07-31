@@ -26,7 +26,7 @@ const partnerDividendPayoutSchema = new mongoose.Schema({
   createdBy: String,
 },{
     timestamps:true
-});
+}); 
 
  const devidentModel = mongoose.model("DividendPayout", partnerDividendPayoutSchema);
  export default devidentModel;

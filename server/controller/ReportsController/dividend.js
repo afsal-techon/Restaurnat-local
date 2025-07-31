@@ -8,6 +8,7 @@ import PAYMENT_RECORD from '../../model/paymentRecord.js'
 import PURCHASE from '../../model/purchase.js'
 import ACCOUNTS from '../../model/account.js'
 import PARTNER_DIVIDEND_PAYOUT from '../../model/dividentPay.js'
+import { generateUniqueRefId } from '../POS controller/posOrderCntrl.js'
 
 
 
@@ -346,22 +347,20 @@ export const takePartnerDividend = async (req, res, next) => {
 
     // In your system, "Debit" means money going out
     const txn = await TRANSACTION.create({
-      restaurantId: user.restaurantId || null,
+      restaurantId: dividendAccount.restaurantId || null,
       accountId: dividendAccount._id,
+      paymentType: paymentModeId || null,
       amount: amount,
       type: "Debit",
       referenceId: refId,
       referenceType: "Dividend",
       description: note || `Dividend payout to ${partner.name} for period ${start.toISOString().slice(0,10)} to ${end.toISOString().slice(0,10)}`,
-      partnerId: partner._id,
-      paymentType: paymentModeId || null, // optional, to track which cash/bank account used
       createdById: user._id,
       createdBy: user.name
     });
 
     // === 5) Save payout record ===
     const payout = await PARTNER_DIVIDEND_PAYOUT.create({
-      restaurantId: user.restaurantId || null,
       partnerId: partner._id,
       periodFrom: start,
       periodTo: end,
@@ -378,25 +377,114 @@ export const takePartnerDividend = async (req, res, next) => {
       createdBy: user.name
     });
 
-    const remaining = Number((available - amount).toFixed(2));
+    // const remaining = Number((available - amount).toFixed(2));
 
     return res.status(201).json({
       message: "Dividend payout recorded",
-      payout: {
-        _id: payout._id,
-        partnerId: partner._id,
-        name: partner.name,
-        percentage: partner.percentage,
-        periodFrom: start,
-        periodTo: end,
-        eligibleAmount,
-        alreadyTaken,
-        paidNow: amount,
-        remaining
-      }
     });
 
   } catch (err) {
     next(err);
   }
 };
+
+
+export const getAvailablePartnerDividends = async (req, res, next) => {
+  try {
+    const { fromDate, toDate } = req.query;
+
+       const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    if (!fromDate || !toDate) {
+      return res.status(400).json({ message: "fromDate and toDate are required" });
+    }
+
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    end.setHours(23, 59, 59, 999);
+
+    // === 1) SALES from PAYMENT_RECORD
+    const paymentsAgg = await PAYMENT_RECORD.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      { $group: { _id: null, totalBeforeVAT: { $sum: "$beforeVat" } } }
+    ]);
+    const revenue = paymentsAgg[0]?.totalBeforeVAT || 0;
+
+    // === 2) COGS from PURCHASE
+    const purchasesAgg = await PURCHASE.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      { $group: { _id: null, totalCOGS: { $sum: "$totalBeforeVAT" } } }
+    ]);
+    const cogs = purchasesAgg[0]?.totalCOGS || 0;
+
+    // === 3) Operating Expenses from EXPENSE
+    const expenseDocs = await EXPENSE.find({ createdAt: { $gte: start, $lte: end } }).lean();
+    let totalExpenses = 0;
+    for (const exp of expenseDocs) {
+      for (const item of exp.expenseItems) {
+        totalExpenses += item.totalBeforeVAT || 0;
+      }
+    }
+
+    const grossProfit = revenue - cogs;
+    const netProfit = grossProfit - totalExpenses;
+
+    if (netProfit <= 0) {
+      return res.status(200).json({
+        message: "No dividend available for the selected period",
+      });
+    }
+
+    // === 4) Get all partners
+    const partners = await PARTNER.find().lean();
+
+    // === 5) Get payouts already made during this period
+    const payouts = await PARTNER_DIVIDEND_PAYOUT.aggregate([
+      {
+        $match: {
+          periodFrom: { $eq: start },
+          periodTo: { $eq: end },
+          status: "Paid"
+        }
+      },
+      {
+        $group: {
+          _id: "$partnerId",
+          totalPaid: { $sum: "$amount" }
+        }
+      }
+    ]);
+    const paidMap = {};
+    payouts.forEach(p => {
+      paidMap[p._id.toString()] = p.totalPaid;
+    });
+
+    // === 6) Build result per partner
+    const data = partners.map(partner => {
+      const eligible = Number(((netProfit * (partner.percentage || 0)) / 100).toFixed(2));
+      const alreadyTaken = paidMap[partner._id.toString()] || 0;
+      const remaining = Number((eligible - alreadyTaken).toFixed(2));
+      return {
+        partnerId: partner._id,
+        name: partner.name,
+        percentage: partner.percentage,
+        eligible,
+        alreadyTaken,
+        remaining
+      };
+    });
+
+    res.status(200).json({
+      fromDate,
+      toDate,
+      netProfit,
+      data
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+

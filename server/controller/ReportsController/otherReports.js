@@ -278,7 +278,6 @@ export const vatSummary = async (req, res, next) => {
 
 
 
-
 export const profitandLossPdf = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
@@ -484,6 +483,98 @@ export const profitAndLossExcel = async (req, res, next) => {
     res.send(buffer);
   } catch (error) {
     next(error);
+  }
+};
+
+
+//vat pdf
+export const generateVATReportPDF = async (req, res, next) => {
+  try {
+    const { fromDate, toDate } = req.query;
+
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const matchStage = { vatAmount: { $gt: 0 } };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    const transactions = await TRANSACTION.aggregate([
+      { $match: matchStage },
+      {
+        $project: {
+          type: 1,
+          referenceType: 1,
+          referenceId: 1,
+          vatAmount: 1,
+          totalBeforeVAT: 1,
+          amount: 1,
+          createdAt: 1
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ]);
+
+    // VAT Summary Calculation
+    let summary = {
+      totalSales: 0,
+      vatOnSales: 0,
+      totalPurchase: 0,
+      vatOnPurchase: 0,
+      totalExpense: 0,
+      vatOnExpense: 0,
+      netVAT: 0
+    };
+
+    transactions.forEach(txn => {
+      if (txn.type === "Credit" && txn.referenceType === "Income") {
+        summary.totalSales += txn.totalBeforeVAT || 0;
+        summary.vatOnSales += txn.vatAmount || 0;
+      } else if (txn.type === "Debit" && txn.referenceType === "Purchase") {
+        summary.totalPurchase += txn.totalBeforeVAT || 0;
+        summary.vatOnPurchase += txn.vatAmount || 0;
+      } else if (txn.type === "Debit" && txn.referenceType === "Expense") {
+        summary.totalExpense += txn.totalBeforeVAT || 0;
+        summary.vatOnExpense += txn.vatAmount || 0;
+      }
+    });
+
+    summary.netVAT =
+      summary.vatOnSales - summary.vatOnPurchase - summary.vatOnExpense;
+
+    const restaurant = await RESTAURANT.findOne().lean();
+    const currency = restaurant?.currency || "AED";
+
+    // Generate table data for PDF
+    const formattedTransactions = transactions.map(txn => ({
+      date: new Date(txn.createdAt).toLocaleDateString("en-GB"),
+      type: txn.type,
+      reference: txn.referenceType,
+      totalBeforeVAT: txn.totalBeforeVAT?.toFixed(2) || "0.00",
+      vat: txn.vatAmount?.toFixed(2) || "0.00",
+      total: txn.amount?.toFixed(2) || "0.00"
+    }));
+
+    const pdfBuffer = await generatePDF("vatReportTemplate", {
+      transactions: formattedTransactions,
+      summary,
+      currency,
+      filters: { fromDate, toDate }
+    });
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="vat-report-${Date.now()}.pdf"`
+    });
+
+    return res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
   }
 };
 
