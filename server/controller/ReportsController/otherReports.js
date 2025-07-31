@@ -275,9 +275,6 @@ export const vatSummary = async (req, res, next) => {
 };
 
 
-
-
-
 export const profitandLossPdf = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
@@ -362,7 +359,6 @@ export const profitandLossPdf = async (req, res, next) => {
     next(error);
   }
 };
-
 
 
 export const profitAndLossExcel = async (req, res, next) => {
