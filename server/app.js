@@ -57,4 +57,4 @@ app.use((err, req, res, next) => {
   } catch (error) {
     console.error(" App failed to start:", error);
   }
-})();
+})(); 
