@@ -5,7 +5,7 @@ import CATEGORY from '../../model/category.js'
 import FOOD from '../../model/food.js'
 import CUSTOMER_TYPE from '../../model/customerTypes.js';
 import ORDER from '../../model/oreder.js';
-import COMBO from '../../model/combo.js'
+import COMBO from '../../model/combo.js';
 import CUSTOMER from '../../model/customer.js';
 import PAYMENT from '../../model/paymentRecord.js'
 import { getIO  } from "../../config/socket.js";
