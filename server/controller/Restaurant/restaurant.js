@@ -36,9 +36,15 @@ export const  createRestuarantBranch = async (req,res,next)=>{
             if (!req.file) {
       return res.status(400).json({ message: "Logo image is required!" });
     }
+        const originalPath = req.file.path;
 
-            const originalPath = req.file.path;
-            const pngPath = originalPath.replace(path.extname(originalPath), ".png");
+        const dir = path.dirname(originalPath);
+        const baseName = path.basename(originalPath, path.extname(originalPath)); // removes extension
+        const timestamp = Date.now();
+        const outputFileName = `${baseName}-${timestamp}.png`;
+        const pngPath = path.join(dir, outputFileName); // full path to save new image
+
+
 
             // Convert to PNG using sharp
                     await sharp(originalPath)
@@ -177,8 +183,14 @@ export const updateRestaurantBranch = async (req, res, next) => {
             openingTime, closingTime, vatPercentage, currency, currencySymbol,trn
         } = req.body;
 
-           const originalPath = req.file.path;
-            const pngPath = originalPath.replace(path.extname(originalPath), ".png");
+                 const originalPath = req.file.path;
+
+        const dir = path.dirname(originalPath);
+        const baseName = path.basename(originalPath, path.extname(originalPath)); // removes extension
+        const timestamp = Date.now();
+        const outputFileName = `${baseName}-${timestamp}.png`;
+        const pngPath = path.join(dir, outputFileName); // full path to save new image
+
 
             // Convert to PNG using sharp
                         await sharp(originalPath)
