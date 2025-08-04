@@ -150,6 +150,11 @@ const created = await INGREDIENT.create(ingredientData);
       if (!ingredient) {
         return res.status(404).json({ message: "Ingredient not found!" });
       }
+
+      const hasPurchase = await PURCHASE.exists({ "items.ingredientId": ingredientId });
+                if (hasPurchase) {
+                  return res.status(400).json({ message: "Cannot delete ingredient linked to Purchase." });
+                }
   
       await INGREDIENT.findByIdAndDelete(ingredientId)
   

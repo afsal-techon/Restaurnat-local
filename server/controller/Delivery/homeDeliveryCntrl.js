@@ -135,6 +135,11 @@ export const deleteRider = async (req, res, next) => {
 
     const { riderId } = req.params;
 
+     const hasOrder = await ORDER.exists({ riderId });
+          if (hasOrder) {
+            return res.status(400).json({ message: "Cannot delete rider linked to Orders." });
+          }
+
     const rider = await RIDER.findByIdAndDelete(riderId);
     if (!rider) return res.status(404).json({ message: "Rider not found!" });
 

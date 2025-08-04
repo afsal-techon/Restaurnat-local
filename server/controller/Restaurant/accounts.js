@@ -9,7 +9,6 @@ import PAYMENT from '../../model/paymentRecord.js'
 import ExcelJS from 'exceljs';
 import EXPENSE from '../../model/expense.js'
 import PURCHASE from '../../model/purchase.js'
-import expense from '../../model/expense.js';
 
 
 export const createAccounts = async (req, res,next) => {

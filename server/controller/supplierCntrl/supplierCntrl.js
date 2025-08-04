@@ -2,6 +2,8 @@ import USER from '../../model/userModel.js';
 import SUPPLIER from '../../model/supplier.js'
 import { generateUniqueRefId } from '../POS controller/posOrderCntrl.js';
 import TRANSACTION from '../../model/transaction.js';
+import EXPENSE from '../../model/expense.js'
+import PURCHASE from '../../model/purchase.js'
 import mongoose from 'mongoose';
 
 
@@ -200,6 +202,16 @@ export const deleteSupplier = async (req, res, next) => {
     if (!supplier) {
       return res.status(404).json({ message: "Supplier not found!" });
     }
+
+       const hasPurchase = await PURCHASE.exists({ supplierId });
+          if (hasPurchase) {
+            return res.status(400).json({ message: "Cannot delete supplier linked to Purchase." });
+          }
+    
+              const hasExpense = await EXPENSE.exists({ supplierId });
+          if (hasExpense) {
+            return res.status(400).json({ message: "Cannot delete supplier linked to Expense." });
+          }
 
     await SUPPLIER.findByIdAndDelete(supplierId)
 
