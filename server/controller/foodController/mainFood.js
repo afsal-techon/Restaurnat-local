@@ -44,20 +44,19 @@ export const createFood = async (req, res, next) => {
     // 1. Compress if needed
         if (req.file) {
         const originalPath = req.file.path;
-        const ext = path.extname(req.file.originalname).toLowerCase();
-        const resizedPath = originalPath.replace(ext, '-compressed.webp');
+      const ext = path.extname(req.file.originalname).toLowerCase();
+          const resizedPath = originalPath.replace(ext, '-compressed.webp');
 
-        // Convert to WebP with resize + quality control
-        await sharp(originalPath)
-          .resize({
-            width: 600,               // Adjust as needed
-            withoutEnlargement: true,
-          })
-          .webp({ quality: 70 })      // You can increase to 75–80 if needed
-          .toFile(resizedPath);
+          await sharp(originalPath)
+            .resize({ width: 600, withoutEnlargement: true })
+            .webp({ quality: 70 })
+            .toFile(resizedPath);
 
-        // Delete the original image
-        fs.unlinkSync(originalPath);
+          try {
+            await fs.promises.unlink(originalPath);  // safer async delete
+          } catch (err) {
+            console.warn("File busy, couldn't delete:", err.message);
+          }
 
         // Update file refernce for further processing
         req.file.path = resizedPath;
