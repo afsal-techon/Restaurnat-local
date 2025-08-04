@@ -200,7 +200,10 @@ export const getExpenseList = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const pipeline = [
+      // Ensure latest created expenses first
       { $sort: { createdAt: -1 } },
+
+      // Pagination
       { $skip: skip },
       { $limit: limit },
 
@@ -240,7 +243,7 @@ export const getExpenseList = async (req, res, next) => {
       },
       { $unwind: { path: "$expenseItemAccount", preserveNullAndEmptyArrays: true } },
 
-      // Rebuild the expenseItems object with account name
+      // Add accountName to expenseItems
       {
         $addFields: {
           "expenseItems.accountId": "$expenseItemAccount._id",
@@ -248,7 +251,7 @@ export const getExpenseList = async (req, res, next) => {
         }
       },
 
-      // Group back by main expense
+      // Group back by expense
       {
         $group: {
           _id: "$_id",
@@ -263,10 +266,9 @@ export const getExpenseList = async (req, res, next) => {
           totalBeforeVAT: { $first: "$totalBeforeVAT" },
           grandTotal: { $first: "$grandTotal" },
           createdBy: { $first: "$createdBy" },
-          isVatInclusive: { $first: "$isVatInclusive" },
           createdById: { $first: "$createdById" },
+          isVatInclusive: { $first: "$isVatInclusive" },
 
-          // Collect full array of expenseItems with selected fields
           expenseItems: {
             $push: {
               accountId: "$expenseItems.accountId",
@@ -276,13 +278,16 @@ export const getExpenseList = async (req, res, next) => {
               qty: "$expenseItems.qty",
               total: "$expenseItems.total",
               vatAmount: "$expenseItems.vatAmount",
-              baseTotal: "$expenseItems.baseTotal",
+              baseTotal: "$expenseItems.baseTotal"
             }
           }
         }
       },
 
-      // Optional final projection
+      // Re-sort after grouping, just to ensure order remains
+      { $sort: { createdAt: -1 } },
+
+      // Final projection
       {
         $project: {
           _id: 1,
@@ -294,38 +299,31 @@ export const getExpenseList = async (req, res, next) => {
           paymentModeId: 1,
           paymentMode: 1,
           vatTotal: 1,
-          totalBeforeVAT:1,
+          totalBeforeVAT: 1,
           grandTotal: 1,
-          isVatInclusive:1,
           createdBy: 1,
           createdById: 1,
+          isVatInclusive: 1,
           expenseItems: 1
         }
       }
     ];
 
     const data = await EXPENSE.aggregate(pipeline);
-        const totalVATResult = await EXPENSE.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalVAT: { $sum: "$vatTotal" }
-        }
-      }
+
+    // Total VAT
+    const totalVATResult = await EXPENSE.aggregate([
+      { $group: { _id: null, totalVAT: { $sum: "$vatTotal" } } }
     ]);
-
-  const totalGrandTotalResult = await EXPENSE.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalGrandTotal: { $sum: "$grandTotal" }
-        }
-      }
-    ]);
-
-
     const totalVAT = totalVATResult[0]?.totalVAT || 0;
-     const totalGrandTotal = totalGrandTotalResult[0]?.totalGrandTotal || 0;
+
+    // Total Grand Total
+    const totalGrandTotalResult = await EXPENSE.aggregate([
+      { $group: { _id: null, totalGrandTotal: { $sum: "$grandTotal" } } }
+    ]);
+    const totalGrandTotal = totalGrandTotalResult[0]?.totalGrandTotal || 0;
+
+    // Total Count
     const totalCount = await EXPENSE.countDocuments();
 
     return res.json({
@@ -341,6 +339,7 @@ export const getExpenseList = async (req, res, next) => {
     next(err);
   }
 };
+
 
 
 
