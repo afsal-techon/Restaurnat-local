@@ -78,13 +78,21 @@ export const getProfitAndLossReport = async (req, res, next) => {
         if (!account) continue;
         const name = account.accountName;
 
+         const amount = Number(item.baseTotal) || 0;
+
         if (!operatingExpenses[name]) {
           operatingExpenses[name] = 0;
         }
-        operatingExpenses[name] += item.totalBeforeVAT;
-        totalOperatingExpenses += item.totalBeforeVAT;
+        operatingExpenses[name] += amount;
+        totalOperatingExpenses += amount;
       }
     }
+
+
+
+
+
+
 
     // === Calculations ===
     const grossProfit = revenue - cogs;
