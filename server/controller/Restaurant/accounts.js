@@ -7,6 +7,9 @@ import { generatePDF } from '../../config/pdfGeneration.js';
 import {  generateUniqueRefId } from '../../controller/POS controller/posOrderCntrl.js'
 import PAYMENT from '../../model/paymentRecord.js'
 import ExcelJS from 'exceljs';
+import EXPENSE from '../../model/expense.js'
+import PURCHASE from '../../model/purchase.js'
+import expense from '../../model/expense.js';
 
 
 export const createAccounts = async (req, res,next) => {
@@ -274,11 +277,20 @@ export const createAccounts = async (req, res,next) => {
       if (!account) {
         return res.status(404).json({ message: "Account not found." });
       }
+
+      if(account.accountType ==='Income' && account.accountName === 'Sale'){
+        return res.status(400).json({ message:'Cannot delete income account!'})
+      }
   
-      // const hasTransactions = await TRANSACTION.exists({ accountId });
-      // if (hasTransactions) {
-      //   return res.status(400).json({ message: "Cannot delete account linked to transactions." });
-      // }
+      const hasPurchase = await PURCHASE.exists({ accountId });
+      if (hasPurchase) {
+        return res.status(400).json({ message: "Cannot delete account linked to Purchase." });
+      }
+
+          const hasExpense = await EXPENSE.exists({ "expenseItems.accountId": accountId });
+      if (hasExpense) {
+        return res.status(400).json({ message: "Cannot delete account linked to Expense." });
+      }
 
           //  Check 2: Used in payment records (inside methods[].accountId)
     const usedInPayments = await PAYMENT.exists({
