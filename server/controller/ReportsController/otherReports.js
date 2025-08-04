@@ -70,7 +70,7 @@ export const getProfitAndLossReport = async (req, res, next) => {
     }).lean();
 
     let operatingExpenses = {};
-    let totalOperatingExpenses = 0;
+    let TotalOperatingExpenses = 0;
 
     for (const exp of expenses) {
       for (const item of exp.expenseItems) {
@@ -84,7 +84,7 @@ export const getProfitAndLossReport = async (req, res, next) => {
           operatingExpenses[name] = 0;
         }
         operatingExpenses[name] += amount;
-        totalOperatingExpenses += amount;
+        TotalOperatingExpenses += amount;
       }
     }
 
@@ -96,7 +96,7 @@ export const getProfitAndLossReport = async (req, res, next) => {
 
     // === Calculations ===
     const grossProfit = revenue - cogs;
-    const netProfit = grossProfit - totalOperatingExpenses;
+    const netProfit = grossProfit - TotalOperatingExpenses;
 
     // === Final Response ===
     return res.status(200).json({
@@ -109,7 +109,7 @@ export const getProfitAndLossReport = async (req, res, next) => {
       },
       "Gross Profit": grossProfit,
       "Operating Expense": {
-          totalOperatingExpenses,
+          TotalOperatingExpenses,
          operatingExpenses
       },
       "Net Profit": netProfit,
