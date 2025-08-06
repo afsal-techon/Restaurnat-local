@@ -495,6 +495,18 @@ if (shouldSendKOT) {
     const kitchen = kitchenMap[kitchenId];
     if (!kitchen) continue;
 
+     // Get max preparation time
+    const maxPrepTime = Math.max(
+      ...items.map(i => {
+        if (i.isComboItem) {
+          return Math.max(...(i.comboItems?.map(ci => ci.preparationTime || 0) || [0]));
+        }
+        console.log(i.preparationTime,'perepera')
+        return i.preparationTime || 0;
+      })
+    );
+    
+
     const kotData = {
       restaurantId,
       kitchenId,
@@ -507,6 +519,7 @@ if (shouldSendKOT) {
       order_id: order.order_id,
       status: 'Pending',
       orderTime: new Date(),
+      preparationTime:maxPrepTime,
       isAdditionalKOT: isAdditionalOrder,
       message: `New ${ctypeName} Order received${table ? ` for Table ${table.name}` : ''}, Ticket #${ticketNo}`,
     };
@@ -519,17 +532,6 @@ if (shouldSendKOT) {
     const [createdKOT] = await KOT_NOTIFICATION.create([kotData]);
 
     req.io?.to(`kitchen:${kitchenId}`).emit('kot_status_update', createdKOT);
-
-    // Get max preparation time
-    const maxPrepTime = Math.max(
-      ...items.map(i => {
-        if (i.isComboItem) {
-          return Math.max(...(i.comboItems?.map(ci => ci.preparationTime || 0) || [0]));
-        }
-        console.log(i.preparationTime,'perepera')
-        return i.preparationTime || 0;
-      })
-    );
 
     const readyAt = new Date(Date.now() + maxPrepTime * 60 * 1000);
     const rejectAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
