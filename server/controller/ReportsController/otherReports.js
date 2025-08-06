@@ -493,7 +493,6 @@ export const profitAndLossExcel = async (req, res, next) => {
 export const generateVATReportPDF = async (req, res, next) => {
   try {
     const { fromDate, toDate } = req.query;
-
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found!" });
 
@@ -506,24 +505,22 @@ export const generateVATReportPDF = async (req, res, next) => {
       matchStage.createdAt = { $gte: start, $lte: end };
     }
 
-    const transactions = await TRANSACTION.aggregate([
+    // === VAT Summary Calculation ===
+    const summaryAgg = await TRANSACTION.aggregate([
       { $match: matchStage },
       {
-        $project: {
-          type: 1,
-          referenceType: 1,
-          referenceId: 1,
-          vatAmount: 1,
-          totalBeforeVAT: 1,
-          amount: 1,
-          createdAt: 1
+        $group: {
+          _id: {
+            referenceType: "$referenceType",
+            type: "$type"
+          },
+          totalBeforeVAT: { $sum: "$totalBeforeVAT" },
+          vatAmount: { $sum: "$vatAmount" }
         }
-      },
-      { $sort: { createdAt: -1 } }
+      }
     ]);
 
-    // VAT Summary Calculation
-    let summary = {
+    const vatSummary = {
       totalSales: 0,
       vatOnSales: 0,
       totalPurchase: 0,
@@ -533,45 +530,59 @@ export const generateVATReportPDF = async (req, res, next) => {
       netVAT: 0
     };
 
-    transactions.forEach(txn => {
-      if (txn.type === "Credit" && txn.referenceType === "Income") {
-        summary.totalSales += txn.totalBeforeVAT || 0;
-        summary.vatOnSales += txn.vatAmount || 0;
-      } else if (txn.type === "Debit" && txn.referenceType === "Purchase") {
-        summary.totalPurchase += txn.totalBeforeVAT || 0;
-        summary.vatOnPurchase += txn.vatAmount || 0;
-      } else if (txn.type === "Debit" && txn.referenceType === "Expense") {
-        summary.totalExpense += txn.totalBeforeVAT || 0;
-        summary.vatOnExpense += txn.vatAmount || 0;
+    summaryAgg.forEach(item => {
+      const { referenceType, type } = item._id;
+      if (referenceType === "Income" && type === "Credit") {
+        vatSummary.totalSales = item.totalBeforeVAT;
+        vatSummary.vatOnSales = item.vatAmount;
+      } else if (referenceType === "Purchase" && type === "Debit") {
+        vatSummary.totalPurchase = item.totalBeforeVAT;
+        vatSummary.vatOnPurchase = item.vatAmount;
+      } else if (referenceType === "Expense" && type === "Debit") {
+        vatSummary.totalExpense = item.totalBeforeVAT;
+        vatSummary.vatOnExpense = item.vatAmount;
       }
     });
 
-    summary.netVAT =
-      summary.vatOnSales - summary.vatOnPurchase - summary.vatOnExpense;
+    vatSummary.netVAT =
+      vatSummary.vatOnSales -
+      vatSummary.vatOnPurchase -
+      vatSummary.vatOnExpense;
+
+    // === VAT Transaction Table ===
+    const transactionsAgg = await TRANSACTION.aggregate([
+      { $match: matchStage },
+      {
+        $project: {
+          type: 1,
+          referenceType: 1,
+          referenceId: 1,
+          vatAmount: 1,
+          totalBeforeVAT: 1,
+          purchaseId: 1,
+          paymentId: 1,
+          expenseId: 1,
+          amount: 1,
+          createdAt: 1
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ]);
 
     const restaurant = await RESTAURANT.findOne().lean();
-    const currency = restaurant?.currency || "AED";
+    const currency = restaurant?.currency || 'AED';
 
-    // Generate table data for PDF
-    const formattedTransactions = transactions.map(txn => ({
-      date: new Date(txn.createdAt).toLocaleDateString("en-GB"),
-      type: txn.type,
-      reference: txn.referenceType,
-      totalBeforeVAT: txn.totalBeforeVAT?.toFixed(2) || "0.00",
-      vat: txn.vatAmount?.toFixed(2) || "0.00",
-      total: txn.amount?.toFixed(2) || "0.00"
-    }));
-
-    const pdfBuffer = await generatePDF("vatReportTemplate", {
-      transactions: formattedTransactions,
-      summary,
+    const pdfBuffer = await generatePDF('vatReportTemplate', {
       currency,
-      filters: { fromDate, toDate }
+      vatSummary,
+      transactions: transactionsAgg,
+      fromDate,
+      toDate
     });
 
     res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="vat-report-${Date.now()}.pdf"`
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="vat-report-${Date.now()}.pdf"`
     });
 
     return res.send(pdfBuffer);
@@ -579,4 +590,5 @@ export const generateVATReportPDF = async (req, res, next) => {
     next(err);
   }
 };
+
 

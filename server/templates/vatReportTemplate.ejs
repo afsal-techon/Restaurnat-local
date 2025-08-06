@@ -1,111 +1,133 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <title>VAT Report</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 20px;
-      font-size: 12px;
+      font-size: 13px;
+      color: #333;
+      margin: 20px;
     }
-
     h2 {
       text-align: center;
+      margin-bottom: 10px;
+    }
+    .filters {
+      font-size: 13px;
       margin-bottom: 20px;
     }
-
-    .summary-box {
-      border: 1px solid #ccc;
-      padding: 15px;
-      margin-bottom: 20px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 10px;
-      background: #f8f8f8;
+    .section {
+      margin-bottom: 25px;
     }
-
-    .summary-box .item {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: center;
-      font-weight: bold;
+    .box-row {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 15px;
     }
-
+    .box {
+      flex: 1;
+      border: 1px solid #999;
+      padding: 12px;
+    }
+    .box h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      text-decoration: underline;
+    }
+    .box p {
+      margin: 4px 0;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 10px;
     }
-
-    table, th, td {
-      border: 1px solid #ccc;
-    }
-
     th, td {
+      border: 1px solid #999;
       padding: 8px;
-      text-align: center;
+      text-align: left;
+      font-size: 13px;
     }
-
     th {
-      background-color: #eee;
+      background-color: #f2f2f2;
     }
-
-    .filters {
-      margin-bottom: 10px;
-      font-size: 12px;
-    }
-
-    .filters span {
-      font-weight: bold;
+    .nowrap {
+      white-space: nowrap;
     }
   </style>
 </head>
 <body>
-
   <h2>VAT Report</h2>
 
-  <% if (filters?.fromDate) { %>
-    <div class="filters">
-      <span>From:</span> <%= filters.fromDate %> &nbsp;&nbsp;
-      <span>To:</span> <%= filters.toDate %>
-    </div>
-  <% } %>
-
-  <div class="summary-box">
-    <div class="item">Sales Total: <%= currency %> <%= summary.totalSales.toFixed(2) %></div>
-    <div class="item">VAT on Sales: <%= currency %> <%= summary.vatOnSales.toFixed(2) %></div>
-    <div class="item">Purchase Total: <%= currency %> <%= summary.totalPurchase.toFixed(2) %></div>
-    <div class="item">VAT on Purchase: <%= currency %> <%= summary.vatOnPurchase.toFixed(2) %></div>
-    <div class="item">Expense Total: <%= currency %> <%= summary.totalExpense.toFixed(2) %></div>
-    <div class="item">VAT on Expense: <%= currency %> <%= summary.vatOnExpense.toFixed(2) %></div>
-    <div class="item" style="background: #e0f7fa;">Net VAT: <%= currency %> <%= summary.netVAT.toFixed(2) %></div>
+  <div class="filters">
+    <% if (fromDate) { %><strong>From:</strong> <%= fromDate %><br/><% } %>
+    <% if (toDate) { %><strong>To:</strong> <%= toDate %><br/><% } %>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Type</th>
-        <th>Reference</th>
-        <th>Total Before VAT (<%= currency %>)</th>
-        <th>VAT (<%= currency %>)</th>
-        <th>Total (<%= currency %>)</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% transactions.forEach(item => { %>
-        <tr>
-          <td><%= item.date %></td>
-          <td><%= item.type %></td>
-          <td><%= item.reference %></td>
-          <td><%= item.totalBeforeVAT.toFixed(2) %></td>
-          <td><%= item.vat.toFixed(2) %></td>
-          <td><%= item.total.toFixed(2) %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+  <!-- VAT Summary Boxes -->
+  <div class="section">
+    <div class="box-row">
+      <div class="box">
+        <h4>Sales</h4>
+        <p>Total Sales: <%= vatSummary.totalSales.toFixed(2) %> <%= currency %></p>
+        <p>VAT on Sales: <%= vatSummary.vatOnSales.toFixed(2) %> <%= currency %></p>
+      </div>
+      <div class="box">
+        <h4>Purchase</h4>
+        <p>Total Purchase: <%= vatSummary.totalPurchase.toFixed(2) %> <%= currency %></p>
+        <p>VAT on Purchase: <%= vatSummary.vatOnPurchase.toFixed(2) %> <%= currency %></p>
+      </div>
+    </div>
 
+    <div class="box-row">
+      <div class="box">
+        <h4>Expense</h4>
+        <p>Total Expense: <%= vatSummary.totalExpense.toFixed(2) %> <%= currency %></p>
+        <p>VAT on Expense: <%= vatSummary.vatOnExpense.toFixed(2) %> <%= currency %></p>
+      </div>
+      <div class="box">
+        <h4>Payable VAT</h4>
+        <p>Net VAT Payable: <%= vatSummary.netVAT.toFixed(2) %> <%= currency %></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- VAT Transactions Table -->
+  <div class="section">
+    <h4>VAT Transactions</h4>
+    <table>
+      <thead>
+        <tr>
+          <th class="nowrap">Date</th>
+          <th>Ref Type</th>
+          <th>Ref ID</th>
+          <th>Type</th>
+          <th>Total Before VAT (<%= currency %>)</th>
+          <th>VAT Amount (<%= currency %>)</th>
+          <th>Total Amount (<%= currency %>)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (transactions.length === 0) { %>
+          <tr>
+            <td colspan="7" style="text-align: center;">No data available.</td>
+          </tr>
+        <% } else { %>
+          <% transactions.forEach(item => { %>
+            <tr>
+              <td class="nowrap"><%= new Date(item.createdAt).toLocaleDateString() %></td>
+              <td><%= item.referenceType || '-' %></td>
+              <td><%= item.referenceId || '-' %></td>
+              <td><%= item.type || '-' %></td>
+              <td class="nowrap"><%= item.totalBeforeVAT?.toFixed(2) || '0.00' %></td>
+              <td class="nowrap"><%= item.vatAmount?.toFixed(2) || '0.00' %></td>
+              <td class="nowrap"><%= item.amount?.toFixed(2) || '0.00' %></td>
+            </tr>
+          <% }) %>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
 </body>
 </html>
