@@ -367,6 +367,127 @@ try {
 };
 
 
+// export const profitAndLossExcel = async (req, res, next) => {
+//   try {
+//     const user = await USER.findById(req.user).lean();
+//     if (!user) return res.status(400).json({ message: "User not found!" });
+
+//     const { fromDate, toDate } = req.query;
+//     const start = fromDate ? new Date(fromDate) : new Date("2000-01-01");
+//     const end = toDate ? new Date(toDate) : new Date();
+//     end.setHours(23, 59, 59, 999);
+
+//     const transactions = await TRANSACTION.aggregate([
+//       {
+//         $match: {
+//           createdAt: { $gte: start, $lte: end }
+//         }
+//       },
+//       {
+//         $lookup: {
+//           from: "accounts",
+//           localField: "accountId",
+//           foreignField: "_id",
+//           as: "account"
+//         }
+//       },
+//       { $unwind: "$account" },
+//       {
+//         $project: {
+//           amount: 1,
+//           type: 1,
+//           referenceType: 1,
+//           accountType: "$account.accountType"
+//         }
+//       }
+//     ]);
+
+//     let revenue = 0;
+//     let cogs = 0;
+//     let expenses = 0;
+
+//     for (const txn of transactions) {
+//       if (txn.type === "Credit" && txn.referenceType === "Sale") {
+//         revenue += txn.amount;
+//       } else if (txn.type === "Debit" && txn.accountType === "Purchase") {
+//         cogs += txn.amount;
+//       } else if (txn.type === "Debit" && txn.accountType === "Expense") {
+//         expenses += txn.amount;
+//       }
+//     }
+
+//     const totalCustomerCredit = await CUSTOMER.aggregate([
+//       {
+//         $group: {
+//           _id: null,
+//           totalCredit: { $sum: "$credit" }
+//         }
+//       }
+//     ]);
+
+//     const dueAmount = totalCustomerCredit[0]?.totalCredit || 0;
+//     const grossProfit = revenue - cogs;
+//     const netProfit = grossProfit - expenses;
+
+//     // Excel generation
+//     const workbook = new ExcelJS.Workbook();
+//     const worksheet = workbook.addWorksheet("Profit and Loss");
+
+//     // Title
+//     worksheet.mergeCells("A1", "B1");
+//     worksheet.getCell("A1").value = "Profit & Loss Report";
+//     worksheet.getCell("A1").font = { bold: true, size: 16 };
+//     worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+//     // Filters
+//     worksheet.addRow([]);
+//     worksheet.addRow(["From Date", fromDate || "All"]);
+//     worksheet.addRow(["To Date", toDate || "All"]);
+//     worksheet.addRow([]);
+
+//     // Headers
+//     worksheet.addRow(["Label", "Amount"]).eachCell(cell => {
+//       cell.font = { bold: true };
+//       cell.fill = {
+//         type: "pattern",
+//         pattern: "solid",
+//         fgColor: { argb: "FFD3D3D3" }
+//       };
+//       cell.border = {
+//         top: { style: "thin" },
+//         left: { style: "thin" },
+//         bottom: { style: "thin" },
+//         right: { style: "thin" }
+//       };
+//     });
+
+//     // Data
+//     const rows = [
+//       ["Revenue", revenue],
+//       ["COGS", cogs],
+//       ["Gross Profit", grossProfit],
+//       ["Expenses", expenses],
+//       ["Net Profit", netProfit],
+//       ["Total Customer Due", dueAmount]
+//     ];
+
+//     rows.forEach(r => worksheet.addRow(r));
+
+//     worksheet.columns.forEach(col => {
+//       col.width = 25;
+//     });
+
+//     // Finalize and send
+//     const buffer = await workbook.xlsx.writeBuffer();
+
+//     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+//     res.setHeader("Content-Disposition", "attachment; filename=ProfitAndLossReport.xlsx");
+//     res.send(buffer);
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 export const profitAndLossExcel = async (req, res, next) => {
   try {
     const user = await USER.findById(req.user).lean();
@@ -377,112 +498,113 @@ export const profitAndLossExcel = async (req, res, next) => {
     const end = toDate ? new Date(toDate) : new Date();
     end.setHours(23, 59, 59, 999);
 
-    const transactions = await TRANSACTION.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: start, $lte: end }
-        }
-      },
-      {
-        $lookup: {
-          from: "accounts",
-          localField: "accountId",
-          foreignField: "_id",
-          as: "account"
-        }
-      },
-      { $unwind: "$account" },
-      {
-        $project: {
-          amount: 1,
-          type: 1,
-          referenceType: 1,
-          accountType: "$account.accountType"
-        }
-      }
+    // === Sales (Revenue) ===
+    const payments = await PAYMENT_RECORD.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      { $group: { _id: null, totalBeforeVAT: { $sum: "$beforeVat" } } }
     ]);
+    const revenue = payments[0]?.totalBeforeVAT || 0;
 
-    let revenue = 0;
-    let cogs = 0;
-    let expenses = 0;
+    // === Purchases (COGS) ===
+    const purchases = await PURCHASE.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      { $group: { _id: null, totalCOGS: { $sum: "$totalBeforeVAT" } } }
+    ]);
+    const cogs = purchases[0]?.totalCOGS || 0;
 
-    for (const txn of transactions) {
-      if (txn.type === "Credit" && txn.referenceType === "Sale") {
-        revenue += txn.amount;
-      } else if (txn.type === "Debit" && txn.accountType === "Purchase") {
-        cogs += txn.amount;
-      } else if (txn.type === "Debit" && txn.accountType === "Expense") {
-        expenses += txn.amount;
+    // === Expenses ===
+    const expenses = await EXPENSE.find({ createdAt: { $gte: start, $lte: end } }).lean();
+    let operatingExpenses = {};
+    let TotalOperatingExpenses = 0;
+
+    for (const exp of expenses) {
+      for (const item of exp.expenseItems) {
+        const account = await ACCOUNT.findById(item.accountId).lean();
+        if (!account) continue;
+        const name = account.accountName;
+        const amount = Number(item.baseTotal) || 0;
+
+        if (!operatingExpenses[name]) {
+          operatingExpenses[name] = 0;
+        }
+        operatingExpenses[name] += amount;
+        TotalOperatingExpenses += amount;
       }
     }
 
-    const totalCustomerCredit = await CUSTOMER.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalCredit: { $sum: "$credit" }
-        }
-      }
-    ]);
-
-    const dueAmount = totalCustomerCredit[0]?.totalCredit || 0;
     const grossProfit = revenue - cogs;
-    const netProfit = grossProfit - expenses;
+    const netProfit = grossProfit - TotalOperatingExpenses;
 
-    // Excel generation
+    // === Excel Generation ===
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Profit and Loss");
+    const worksheet = workbook.addWorksheet("Profit & Loss");
 
     // Title
-    worksheet.mergeCells("A1", "B1");
-    worksheet.getCell("A1").value = "Profit & Loss Report";
-    worksheet.getCell("A1").font = { bold: true, size: 16 };
+    worksheet.mergeCells("A1:B1");
+    worksheet.getCell("A1").value = "Profit and Loss Report";
+    worksheet.getCell("A1").font = { size: 16, bold: true };
     worksheet.getCell("A1").alignment = { horizontal: "center" };
 
-    // Filters
-    worksheet.addRow([]);
-    worksheet.addRow(["From Date", fromDate || "All"]);
-    worksheet.addRow(["To Date", toDate || "All"]);
     worksheet.addRow([]);
 
-    // Headers
-    worksheet.addRow(["Label", "Amount"]).eachCell(cell => {
-      cell.font = { bold: true };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFD3D3D3" }
-      };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" }
-      };
-    });
+    // Filters Row
+    const filters = [
+      fromDate ? `From: ${fromDate}` : null,
+      toDate ? `To: ${toDate}` : null
+    ].filter(Boolean);
+    if (filters.length) {
+      const filterRow = worksheet.addRow(filters);
+      filterRow.eachCell(cell => (cell.font = { bold: true }));
+      worksheet.addRow([]);
+    }
 
-    // Data
-    const rows = [
-      ["Revenue", revenue],
-      ["COGS", cogs],
-      ["Gross Profit", grossProfit],
-      ["Expenses", expenses],
-      ["Net Profit", netProfit],
-      ["Total Customer Due", dueAmount]
+    // === Income Section ===
+    worksheet.addRow(["Income"]).font = { bold: true };
+    worksheet.addRow(["Sale", revenue]);
+
+    worksheet.addRow([]);
+
+    // === COGS Section ===
+    worksheet.addRow(["Cost of Goods Sold"]).font = { bold: true };
+    worksheet.addRow(["Purchase", cogs]);
+
+    worksheet.addRow([]);
+
+    // === Gross Profit ===
+    worksheet.addRow(["Gross Profit", grossProfit]).font = { bold: true };
+
+    worksheet.addRow([]);
+
+    // === Operating Expenses ===
+    worksheet.addRow(["Operating Expenses"]).font = { bold: true };
+    for (const [name, value] of Object.entries(operatingExpenses)) {
+      worksheet.addRow([name, value]);
+    }
+    worksheet.addRow(["Total Operating Expenses", TotalOperatingExpenses]).font = { bold: true };
+
+    worksheet.addRow([]);
+
+    // === Net Profit ===
+    worksheet.addRow(["Net Profit", netProfit]).font = { bold: true };
+
+    // Format column width
+    worksheet.columns = [
+      { width: 35 },
+      { width: 20 }
     ];
 
-    rows.forEach(r => worksheet.addRow(r));
+    // Send Excel
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=profit_and_loss_report.xlsx"
+    );
 
-    worksheet.columns.forEach(col => {
-      col.width = 25;
-    });
-
-    // Finalize and send
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", "attachment; filename=ProfitAndLossReport.xlsx");
-    res.send(buffer);
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (error) {
     next(error);
   }
@@ -590,5 +712,189 @@ export const generateVATReportPDF = async (req, res, next) => {
     next(err);
   }
 };
+
+
+export const generateVATReportExcel = async (req, res, next) => {
+  try {
+    const { fromDate, toDate } = req.query;
+    const user = await USER.findById(req.user).lean();
+    if (!user) return res.status(400).json({ message: "User not found!" });
+
+    const matchStage = { vatAmount: { $gt: 0 } };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      matchStage.createdAt = { $gte: start, $lte: end };
+    }
+
+    // === VAT Summary ===
+    const summaryAgg = await TRANSACTION.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            referenceType: "$referenceType",
+            type: "$type"
+          },
+          totalBeforeVAT: { $sum: "$totalBeforeVAT" },
+          vatAmount: { $sum: "$vatAmount" }
+        }
+      }
+    ]);
+
+    const vatSummary = {
+      totalSales: 0,
+      vatOnSales: 0,
+      totalPurchase: 0,
+      vatOnPurchase: 0,
+      totalExpense: 0,
+      vatOnExpense: 0,
+      netVAT: 0
+    };
+
+    summaryAgg.forEach(item => {
+      const { referenceType, type } = item._id;
+      if (referenceType === "Income" && type === "Credit") {
+        vatSummary.totalSales = item.totalBeforeVAT;
+        vatSummary.vatOnSales = item.vatAmount;
+      } else if (referenceType === "Purchase" && type === "Debit") {
+        vatSummary.totalPurchase = item.totalBeforeVAT;
+        vatSummary.vatOnPurchase = item.vatAmount;
+      } else if (referenceType === "Expense" && type === "Debit") {
+        vatSummary.totalExpense = item.totalBeforeVAT;
+        vatSummary.vatOnExpense = item.vatAmount;
+      }
+    });
+
+    vatSummary.netVAT =
+      vatSummary.vatOnSales -
+      vatSummary.vatOnPurchase -
+      vatSummary.vatOnExpense;
+
+    // === VAT Transaction Table ===
+    const transactionsAgg = await TRANSACTION.aggregate([
+      { $match: matchStage },
+      {
+        $project: {
+          type: 1,
+          referenceType: 1,
+          referenceId: 1,
+          vatAmount: 1,
+          totalBeforeVAT: 1,
+          amount: 1,
+          createdAt: 1
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ]);
+
+    const restaurant = await RESTAURANT.findOne().lean();
+    const currency = restaurant?.currency || 'AED';
+
+    // === Generate Excel ===
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("VAT Report");
+
+    // Title
+    worksheet.mergeCells("A1:G1");
+    worksheet.getCell("A1").value = "VAT Report";
+    worksheet.getCell("A1").font = { size: 16, bold: true };
+    worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+    worksheet.addRow([]);
+
+    // Filters
+    const filters = [
+      fromDate ? `From: ${fromDate}` : null,
+      toDate ? `To: ${toDate}` : null
+    ].filter(Boolean);
+
+    if (filters.length) {
+      const filterRow = worksheet.addRow(filters);
+      filterRow.eachCell(cell => (cell.font = { bold: true }));
+      worksheet.addRow([]);
+    }
+
+    // === VAT Summary ===
+    worksheet.addRow(["Sales Summary"]).font = { bold: true };
+    worksheet.addRow(["Total Sales", vatSummary.totalSales, currency]);
+    worksheet.addRow(["VAT on Sales", vatSummary.vatOnSales, currency]);
+
+    worksheet.addRow([]);
+    worksheet.addRow(["Purchase Summary"]).font = { bold: true };
+    worksheet.addRow(["Total Purchase", vatSummary.totalPurchase, currency]);
+    worksheet.addRow(["VAT on Purchase", vatSummary.vatOnPurchase, currency]);
+
+    worksheet.addRow([]);
+    worksheet.addRow(["Expense Summary"]).font = { bold: true };
+    worksheet.addRow(["Total Expense", vatSummary.totalExpense, currency]);
+    worksheet.addRow(["VAT on Expense", vatSummary.vatOnExpense, currency]);
+
+    worksheet.addRow([]);
+    worksheet.addRow(["Payable VAT"]).font = { bold: true };
+    worksheet.addRow(["Net VAT Payable", vatSummary.netVAT, currency]);
+
+    worksheet.addRow([]);
+    worksheet.addRow([]);
+
+    // === VAT Transactions Table ===
+    worksheet.addRow(["VAT Transactions"]).font = { bold: true };
+    const tableHeader = [
+      "Date",
+      "Type",
+      "Reference",
+      `Total Before VAT (${currency})`,
+      `VAT(${currency})`,
+      `Total(${currency})`
+    ];
+    const headerRow = worksheet.addRow(tableHeader);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: "center" };
+    });
+
+    transactionsAgg.forEach(txn => {
+      worksheet.addRow([
+        txn.createdAt ? new Date(txn.createdAt).toLocaleDateString() : "-",
+        txn.referenceType || "-",
+        txn.referenceId || "-",
+        txn.type || "-",
+        txn.totalBeforeVAT?.toFixed(2) || "0.00",
+        txn.vatAmount?.toFixed(2) || "0.00",
+        txn.amount?.toFixed(2) || "0.00"
+      ]);
+    });
+
+    // Column widths
+    worksheet.columns = [
+      { width: 15 },
+      { width: 18 },
+      { width: 20 },
+      { width: 18 },
+      { width: 20 },
+      { width: 18 },
+      { width: 18 }
+    ];
+
+    // Download response
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=vat_report_${Date.now()}.xlsx`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 

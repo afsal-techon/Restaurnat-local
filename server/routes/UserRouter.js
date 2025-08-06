@@ -31,7 +31,7 @@ import { createPurchase, getAllPurchasesReport, getOnePurchase, getPurchaseList,
 import { createExpense, getAllExpensesReport, getExpenseList, getOneExpense, updateExpense } from '../controller/purchse-Expense/Expense.js';
 import {  getKOTTickets } from '../controller/kithchenPanel/kitchenCntrl.js';
 import { assignRiderForOut, completeHomeDelivery, createRider, deleteRider, getDeliveredHomeDelivery, getOutForHomeDelivery, getPlacedHomeDelivery, getRiderCompleted, getRiderOngoingOrders, getRiders, getWaitingForHomeDelivery, markOrderReadyForPickup, updateRider } from '../controller/Delivery/homeDeliveryCntrl.js';
-import { generateVATReportPDF, getProfitAndLossReport, getVATReport, profitAndLossExcel, profitandLossPdf, vatSummary } from '../controller/ReportsController/otherReports.js';
+import { generateVATReportExcel, generateVATReportPDF, getProfitAndLossReport, getVATReport, profitAndLossExcel, profitandLossPdf, vatSummary } from '../controller/ReportsController/otherReports.js';
 import { getBillSettings, updateBillSettings } from '../controller/Settings/Bill-settings.js';
 import { addPartner, deletePartner, getAvailablePartnerDividends, getDividendSharingReport, getPartners, takePartnerDividend, updatePartner } from '../controller/ReportsController/dividend.js';
 const router = express.Router();
@@ -352,6 +352,7 @@ router.get('/dineIn/re-print/:orderId',VerifyToken,checkOfflinePermission('Admin
 router.get('/reports/vat',VerifyToken,checkOfflinePermission('Reports'),getVATReport);
 router.get('/summery/vat',VerifyToken,checkOfflinePermission('Reports'),vatSummary);
 router.get('/vat/pdf',VerifyToken,checkOfflinePermission('Reports'),generateVATReportPDF);
+router.get('/vat/excel',VerifyToken,checkOfflinePermission('Reports'),generateVATReportExcel);
 
 
 
