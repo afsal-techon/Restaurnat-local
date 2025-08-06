@@ -284,87 +284,85 @@ export const vatSummary = async (req, res, next) => {
 
 
 export const profitandLossPdf = async (req, res, next) => {
-  try {
+try {
     const user = await USER.findById(req.user).lean();
     if (!user) return res.status(400).json({ message: "User not found!" });
 
-       const { fromDate, toDate } = req.query;
+    const { fromDate, toDate } = req.query;
+    const start = fromDate ? new Date(fromDate) : new Date("2000-01-01");
+    const end = toDate ? new Date(toDate) : new Date();
+    end.setHours(23, 59, 59, 999);
 
-
-      const start = fromDate ? new Date(fromDate) : new Date("2000-01-01");
-      const end = toDate ? new Date(toDate) : new Date();
-      end.setHours(23, 59, 59, 999);
-
-    const transactions = await TRANSACTION.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: start, $lte: end }
-        }
-      },
-      {
-        $lookup: {
-          from: "accounts",
-          localField: "accountId",
-          foreignField: "_id",
-          as: "account"
-        }
-      },
-      { $unwind: "$account" },
-      {
-        $project: {
-          amount: 1,
-          type: 1,
-          referenceType: 1,
-          accountType: "$account.accountType"
-        }
-      }
-    ]);
-
-    let revenue = 0, cogs = 0, expenses = 0;
-
-    for (const txn of transactions) {
-      if (txn.type === "Credit" && txn.referenceType === "Sale") revenue += txn.amount;
-      else if (txn.type === "Debit" && txn.accountType === "Purchase") cogs += txn.amount;
-      else if (txn.type === "Debit" && txn.accountType === "Expense") expenses += txn.amount;
-    }
-
-    const totalCustomerCredit = await CUSTOMER.aggregate([
+    const payments = await PAYMENT_RECORD.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
       {
         $group: {
           _id: null,
-          totalCredit: { $sum: "$credit" }
+          totalBeforeVAT: { $sum: "$beforeVat" }
         }
       }
     ]);
-    const dueAmount = totalCustomerCredit[0]?.totalCredit || 0;
+    const revenue = payments[0]?.totalBeforeVAT || 0;
+
+    const purchases = await PURCHASE.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: null,
+          totalCOGS: { $sum: "$totalBeforeVAT" }
+        }
+      }
+    ]);
+    const cogs = purchases[0]?.totalCOGS || 0;
+
+    const expenses = await EXPENSE.find({
+      createdAt: { $gte: start, $lte: end }
+    }).lean();
+
+    let operatingExpenses = {};
+    let TotalOperatingExpenses = 0;
+
+    for (const exp of expenses) {
+      for (const item of exp.expenseItems) {
+        const account = await ACCOUNT.findById(item.accountId).lean();
+        if (!account) continue;
+        const name = account.accountName;
+        const amount = Number(item.baseTotal) || 0;
+
+        if (!operatingExpenses[name]) {
+          operatingExpenses[name] = 0;
+        }
+        operatingExpenses[name] += amount;
+        TotalOperatingExpenses += amount;
+      }
+    }
 
     const grossProfit = revenue - cogs;
-    const netProfit = grossProfit - expenses;
+    const netProfit = grossProfit - TotalOperatingExpenses;
 
-     const restaurant = await RESTAURANT.findOne().lean();
+    const restaurant = await RESTAURANT.findOne().lean();
     const currency = restaurant?.currency || 'AED';
 
-    const pdfBuffer = await generatePDF("profitAndLossReport", {
-      filters: { fromDate, toDate },
-      data: {
-        revenue,
-        cogs,
-        grossProfit,
-        expenses,
-        netProfit,
-        dueAmount
-      },
+    const pdfBuffer = await generatePDF('profitAndLossReport', {
+      revenue,
+      cogs,
+      grossProfit,
+      operatingExpenses,
+      TotalOperatingExpenses,
+      netProfit,
+      fromDate,
+      toDate,
       currency
     });
 
     res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="Profit-And-Loss-${Date.now()}.pdf"`
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="profit-loss-report-${Date.now()}.pdf"`
     });
 
-    res.send(pdfBuffer);
-  } catch (error) {
-    next(error);
+    return res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
   }
 };
 
