@@ -515,48 +515,62 @@ export const addCustomerType = async (req, res, next) => {
   };
 
 
-  export const deleteCustomerTypes = async (req, res, next) => {
-    try {
-      const { customerTypeId, subMethod } = req.body;
+export const deleteCustomerTypes = async (req, res, next) => {
+  try {
+    const { customerTypeId, subMethod } = req.body;
 
-      console.log(customerTypeId,subMethod,'___payment mehtod')
+    console.log(customerTypeId, subMethod, '___payment method');
 
-      // Validate input
-      if (!customerTypeId) {
-          return res.status(400).json({ success: false, message: "Valid customerTypeId is required" });
+    // Validate input
+    if (!customerTypeId) {
+      return res.status(400).json({ success: false, message: "Valid customerTypeId is required" });
+    }
+
+    // Find the customer type
+    const customerType = await CUSTOMER_TYPE.findById(customerTypeId);
+    if (!customerType) {
+      return res.status(404).json({ success: false, message: "Customer type not found" });
+    }
+
+    // 1. Check in Food.prices with price > 0
+    const foodPriceUsed = await FOOD.exists({
+      prices: {
+        $elemMatch: {
+          customerTypeId,
+          price: { $gt: 0 }
+        }
       }
-
-      // Find the customer type
-      const customerType = await CUSTOMER_TYPE.findById(customerTypeId);
-      if (!customerType) {
-          return res.status(404).json({ success: false, message: "Customer type not found" });
-      }
-
-          // 1. Check in Food.prices
-    const foodPriceUsed = await FOOD.exists({ 
-      "prices.customerTypeId": customerTypeId 
     });
 
-     if (foodPriceUsed) {
+    if (foodPriceUsed) {
       return res.status(400).json({
         success: false,
-        message: "Cannot delete: Customer type is used in Food prices. Please remove related food entries first."
+        message: "Cannot delete: Customer type is used in Food prices with price > 0. Please remove or set them to 0 first."
       });
     }
 
-        // 2. Check in Food.portions.prices
-    const portionPriceUsed = await FOOD.exists({ 
-      "portions.prices.customerTypeId": customerTypeId 
+    // 2. Check in Food.portions.prices with price > 0
+    const portionPriceUsed = await FOOD.exists({
+      portions: {
+        $elemMatch: {
+          prices: {
+            $elemMatch: {
+              customerTypeId,
+              price: { $gt: 0 }
+            }
+          }
+        }
+      }
     });
 
     if (portionPriceUsed) {
       return res.status(400).json({
         success: false,
-        message: "Cannot delete: Customer type is used in Food portion prices. Please remove related entries first."
+        message: "Cannot delete: Customer type is used in Food portion prices with price > 0. Please remove or set them to 0 first."
       });
     }
 
-        // 3. Check in Order.customerTypeId
+    // 3. Check in Order.customerTypeId
     const orderUsed = await ORDER.exists({ customerTypeId });
     if (orderUsed) {
       return res.status(400).json({
@@ -565,48 +579,49 @@ export const addCustomerType = async (req, res, next) => {
       });
     }
 
-// If type is "Online" and subMethod is provided
+    // 4. If type is "Online" and subMethod is provided
     if (customerType.type === "Online" && subMethod) {
       const index = customerType.subMethods.indexOf(subMethod);
       if (index === -1) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "SubMethod not found in this Online type" 
+        return res.status(400).json({
+          success: false,
+          message: "SubMethod not found in this Online type"
         });
       }
 
       // Remove subMethod
       customerType.subMethods.splice(index, 1);
 
-             // If no subMethods left, delete whole document
+      // If no subMethods left, delete whole document
       if (customerType.subMethods.length === 0) {
         await CUSTOMER_TYPE.findByIdAndDelete(customerTypeId);
-        return res.status(200).json({ 
-          success: true, 
-          message: "Online type deleted as no subMethods remain" 
+        return res.status(200).json({
+          success: true,
+          message: "Online type deleted as no subMethods remain"
         });
       }
 
-         // Save if subMethods still exist
-          await customerType.save();
-          return res.status(200).json({ 
-              success: true, 
-              message: "SubMethod deleted successfully",
-              data: customerType
-          });
-      }
-
-      // For non-Online types or when not specifying subMethod
-      await CUSTOMER_TYPE.findByIdAndDelete(customerTypeId);
-      return res.status(200).json({ 
-          success: true, 
-          message: "Customer type deleted successfully" 
+      // Save if subMethods still exist
+      await customerType.save();
+      return res.status(200).json({
+        success: true,
+        message: "SubMethod deleted successfully",
+        data: customerType
       });
-    } catch (err) {
-      console.error("Error deleting customer type:", err);
-      return res.status(500).json({ message: "Server error", error: err.message });
     }
-  };
+
+    // For non-Online types or when not specifying subMethod
+    await CUSTOMER_TYPE.findByIdAndDelete(customerTypeId);
+    return res.status(200).json({
+      success: true,
+      message: "Customer type deleted successfully"
+    });
+  } catch (err) {
+    console.error("Error deleting customer type:", err);
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
 
     export const getAllCustomerTypes = async (req, res, next) => {
     try {
