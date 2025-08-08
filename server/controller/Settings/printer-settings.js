@@ -203,3 +203,22 @@ export const getPosSettings = async(req,res,next)=>{
 }
 
 
+export const deletePrinterConfig = async (req, res, next) => {
+  try {
+    const { printerId } = req.params;
+
+    if (!printerId) {
+      return res.status(400).json({ message: "Printer ID is required" });
+    }
+
+    const deleted = await PRINTER_CONFIG.findByIdAndDelete(printerId);
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Printer not found" });
+    }
+
+    return res.status(200).json({ message: "Printer deleted successfully." });
+  } catch (err) {
+    next(err)
+  }
+};
