@@ -505,6 +505,7 @@ if (shouldSendKOT) {
         return i.preparationTime || 0;
       })
     );
+    console.log(maxPrepTime,'preperation time')
     
 
     const kotData = {
@@ -518,7 +519,7 @@ if (shouldSendKOT) {
       orderId: order._id,
       order_id: order.order_id,
       status: 'Pending',
-      orderTime: new Date(),
+      orderTime: new Date().toISOString(),
       preparationTime:maxPrepTime,
       isAdditionalKOT: isAdditionalOrder,
       message: `New ${ctypeName} Order received${table ? ` for Table ${table.name}` : ''}, Ticket #${ticketNo}`,
@@ -1463,7 +1464,7 @@ export const generateUniqueRefId = async () => {
 
   export const posOrderBilling = async (req,res,next)=>{
     try {
-  
+  console.log(req.body,'body')
       const {
         restaurantId,
         orderId,
@@ -1474,7 +1475,7 @@ export const generateUniqueRefId = async () => {
       } = req.body;
   
   
-  
+   console.log('working payekmnt')
       const userId = req.user;
   
        // Validate user
@@ -1587,9 +1588,11 @@ const [createdPayment] = await PAYMENT.create([paymentRecord]);
       createdBy:user.name,
     });
   
-             // Update order status
+             // Update order 
+
       order.status = "Completed";
       order.customerId = customerId || null;
+      order.deliveredTime = new Date() || null
       order.paymentStatus = dueAmount > 0 ? "Partial" : "Paid";
       await order.save();
   

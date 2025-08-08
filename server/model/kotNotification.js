@@ -44,7 +44,7 @@ const kotNotificationSchema = new mongoose.Schema({
   orderType :{type:String},
   orderTime: { type: Date },
   tableId: { type: mongoose.Schema.Types.ObjectId, ref: 'table' },
-  preparationTime:  { type: Date },
+  preparationTime:  { type: Number },
   preparedAt:{type:Date},
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
   order_id: { type: String },

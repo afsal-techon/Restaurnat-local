@@ -50,6 +50,7 @@ export const getKOTTickets = async (req, res, next) => {
           ticketNo: 1,
           order_id: 1,
           preparationTime:1,
+          createdAt:1,
           message: 1,
           isAdditionalKOT: 1,
           preparedAt:1,

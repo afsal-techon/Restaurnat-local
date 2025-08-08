@@ -446,6 +446,7 @@ export const getDeliveredHomeDelivery = async (req, res, next) => {
 
     const userId = req.user;
     const {restaurantId, fromDate, toDate, search, limit: lim, page: pg } = req.query;
+    console.log('deliver called')
 
     const limit = parseInt(lim) || 20;
     const page = parseInt(pg) || 1;
@@ -502,6 +503,8 @@ export const getDeliveredHomeDelivery = async (req, res, next) => {
       .populate({ path: "customerTypeId", select: "type" })
       .populate({ path: "customerId", select: "name mobileNo address" })
       .populate({ path: "riderId", select: "name mobileNo address" })
+
+      console.log(orders,'order data ')
 
     return res.status(200).json({
       data: orders,
