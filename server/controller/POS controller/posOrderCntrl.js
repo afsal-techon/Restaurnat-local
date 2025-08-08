@@ -1464,7 +1464,6 @@ export const generateUniqueRefId = async () => {
 
   export const posOrderBilling = async (req,res,next)=>{
     try {
-  console.log(req.body,'body')
       const {
         restaurantId,
         orderId,
@@ -1576,7 +1575,7 @@ const [createdPayment] = await PAYMENT.create([paymentRecord]);
       restaurantId : incomeAcc.restaurantId || null,
       paymentId: paymentRecord._id,
       accountId: incomeAcc._id, // supplier account
-      paymentType: createdPayment.methods.map(m => m.accountId).join(','),
+      paymentType: createdPayment.methods[0].accountId,
       vatAmount : order.vat,
       amount: paymentRecord.grandTotal,
       totalBeforeVAT:order.subTotal,
